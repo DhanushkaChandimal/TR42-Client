@@ -1,0 +1,30 @@
+from flask import Flask
+from .extensions import ma
+from .models import db
+from .blueprints.users import users_bp
+from flask_swagger_ui import get_swaggerui_blueprint
+
+SWAGGER_URL = '/api/docs'  # URL for exposing Swagger UI (without trailing '/')
+API_URL = '/static/swagger.yaml'  # Our API URL (can of course be a local resource)
+
+swaggerui_blueprint = get_swaggerui_blueprint(
+    SWAGGER_URL,
+    API_URL,
+    config={
+        'app_name': "Client Web Dashboard"
+    }
+)
+
+def create_app(config_name):
+    app = Flask(__name__)
+    app.config.from_object(f'config.{config_name}')
+    
+    # Initialize extensions
+    ma.init_app(app)
+    db.init_app(app)
+    
+    # Register blueprints
+    app.register_blueprint(users_bp, url_prefix='/users')
+    app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+    
+    return app
