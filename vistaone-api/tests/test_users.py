@@ -41,3 +41,13 @@ class TestUser(unittest.TestCase):
         response = self.client.post('/users/login', json=credentials)
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json['message'], 'Invalid email or password')
+
+    def test_login_invalid_email_format(self):
+        credentials = {
+            "email": "bad-email-format",
+            "password": "test"
+        }
+
+        response = self.client.post('/users/login', json=credentials)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('email', response.json)

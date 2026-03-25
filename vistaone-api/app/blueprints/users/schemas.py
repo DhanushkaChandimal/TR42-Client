@@ -3,6 +3,7 @@ from app.models import User
 from marshmallow import fields
 
 class UserSchema(ma.SQLAlchemyAutoSchema):
+    email = fields.Email(required=True)
     password_hash = fields.String(load_only=True)
     password = fields.String(required=True, load_only=True)
 
