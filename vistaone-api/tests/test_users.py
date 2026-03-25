@@ -51,3 +51,12 @@ class TestUser(unittest.TestCase):
         response = self.client.post('/users/login', json=credentials)
         self.assertEqual(response.status_code, 400)
         self.assertIn('email', response.json)
+
+    def test_missing_required_field(self):
+        credentials = {
+            "email": "test@email.com"
+        }
+
+        response = self.client.post('/users/login', json=credentials)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('password', response.json)

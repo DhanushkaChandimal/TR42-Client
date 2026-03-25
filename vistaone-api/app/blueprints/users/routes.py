@@ -3,10 +3,12 @@ from flask import request, jsonify
 from marshmallow import ValidationError
 from sqlalchemy import select
 from app.models import db, User
+from app.extensions import limiter
 from app.utils.util import encode_token
 from .schemas import login_schema
 
 @users_bp.route("/login", methods=['POST'])
+@limiter.limit("10 per minute")
 def login():
     try:
         credentials = login_schema.load(request.json)
