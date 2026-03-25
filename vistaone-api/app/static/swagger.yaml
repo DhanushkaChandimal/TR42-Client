@@ -24,7 +24,7 @@ paths:
       tags:
         - Users
       summary: "Login endpoint, (generates token)"
-      description: "Validates user credentials, generates and return a user specific token."
+      description: "Validates user credentials and returns a user-specific token."
       parameters:
         - in: "body"
           name: "body"
@@ -42,6 +42,23 @@ paths:
               message: "Successfully Logged In"
               status: "success"
               token: "eyJhbGciOiJIUzI1NiIsInR5cCI6I..."
+        400:
+          description: "Invalid request payload"
+          schema:
+            $ref: "#/definitions/LoginValidationError"
+          examples:
+            application/json:
+              email:
+                - "Not a valid email address."
+              password:
+                - "Missing data for required field."
+        401:
+          description: "Invalid credentials"
+          schema:
+            $ref: "#/definitions/LoginError"
+          examples:
+            application/json:
+              message: "Invalid email or password"
 
 definitions:
 
@@ -65,4 +82,22 @@ definitions:
       message:
         type: "string"
       status:
+        type: "string"
+
+  LoginValidationError:
+    type: "object"
+    properties:
+      email:
+        type: "array"
+        items:
+          type: "string"
+      password:
+        type: "array"
+        items:
+          type: "string"
+
+  LoginError:
+    type: "object"
+    properties:
+      message:
         type: "string"
