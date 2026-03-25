@@ -1,6 +1,6 @@
 from app.extensions import ma
 from app.models import User
-from marshmallow import fields
+from marshmallow import fields, pre_load
 
 class UserSchema(ma.SQLAlchemyAutoSchema):
     email = fields.Email(required=True)
@@ -9,6 +9,12 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
 
     class Meta:
         model = User
+
+    @pre_load
+    def strip_email(self, data, **kwargs):
+        if 'email' in data:
+            data['email'] = data['email'].strip()
+        return data
     
 user_schema =UserSchema()
 users_schema = UserSchema(many=True)
