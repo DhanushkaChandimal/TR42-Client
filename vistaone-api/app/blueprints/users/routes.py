@@ -6,14 +6,16 @@ from app.models import db, User
 from app.extensions import limiter
 from app.utils.util import encode_token
 from .schemas import login_schema
+from app.utils.loggingUtil import log_function_call
 import logging
+
 
 logger = logging.getLogger(__name__)
 
 @users_bp.route("/login", methods=['POST'])
+@log_function_call
 @limiter.limit("10 per minute")
 def login():
-    logger.info("Login attempt received")
     try:
         credentials = login_schema.load(request.json)
         email = credentials['email']
