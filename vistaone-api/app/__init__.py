@@ -3,6 +3,13 @@ from .extensions import ma, limiter
 from .models import db
 from .blueprints.users import users_bp
 from flask_swagger_ui import get_swaggerui_blueprint
+from app.utils.loggingUtil import logging_setup
+
+from dotenv import load_dotenv
+
+
+# Load .env file
+load_dotenv()
 
 SWAGGER_URL = '/api/docs'  # URL for exposing Swagger UI (without trailing '/')
 API_URL = '/static/swagger.yaml'  # Our API URL (can of course be a local resource)
@@ -23,6 +30,8 @@ def create_app(config_name):
     ma.init_app(app)
     db.init_app(app)
     limiter.init_app(app)
+
+    logging_setup()
     
     # Register blueprints
     app.register_blueprint(users_bp, url_prefix='/users')
@@ -31,5 +40,8 @@ def create_app(config_name):
     @app.errorhandler(429)
     def handle_rate_limit(_):
         return jsonify({'message': 'Too many requests. Please try again later.'}), 429
+    
+
+   
     
     return app
