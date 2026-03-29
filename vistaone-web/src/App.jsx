@@ -1,4 +1,3 @@
-import './App.css'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import { Route, Routes, Navigate } from 'react-router-dom'

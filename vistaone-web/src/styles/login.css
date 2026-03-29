@@ -6,6 +6,43 @@
 		linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
 }
 
+.login-hero {
+	color: #6a6a6a;
+}
+
+.login-badge {
+	border: 1px solid #dbe2ea;
+	background: #ffffff;
+}
+
+.login-badge-icon {
+	width: 2.5rem;
+	height: 2.5rem;
+	background: #5e5e5e;
+	color: #ffffff;
+}
+
+.login-badge-overline,
+.login-hero-overline,
+.login-panel-overline {
+	letter-spacing: 0.24em;
+	color: #64748b;
+	font-size: 0.69rem;
+}
+
+.login-hero-title {
+	max-width: 44rem;
+	font-family: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+	font-size: 3.75rem;
+	line-height: 1.1;
+}
+
+.login-hero-text {
+	max-width: 36rem;
+	font-size: 1.05rem;
+	line-height: 1.75;
+}
+
 .login-panel {
 	border: 1px solid #dbe2ea;
 	background: #ffffff;
@@ -13,12 +50,6 @@
 	border-radius: 1.75rem;
 	padding: 2rem;
     color: #0f172a;
-}
-
-.login-panel-overline {
-	letter-spacing: 0.24em;
-	color: #64748b;
-	font-size: 0.69rem;
 }
 
 .login-panel-text {
@@ -44,7 +75,6 @@
 
 .login-submit-btn {
 	min-height: 3.25rem;
-	border: 0;
 	border-radius: 1rem;
 	background-color: #e2e8f0 !important;
 	border: 1px solid #cbd5e1 !important;
