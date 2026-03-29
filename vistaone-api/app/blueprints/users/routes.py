@@ -25,7 +25,7 @@ def login():
     user = db.session.execute(query).scalars().first()
 
     if user and user.check_password(password):
-        logger.info(f"User {email} logged in successfully")
+        logger.info("User logged in successfully")
         token = encode_token(user.id)
 
         response = {
