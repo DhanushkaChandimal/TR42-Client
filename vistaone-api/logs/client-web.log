@@ -1,0 +1,43 @@
+2026-03-29 15:26:19,440 - INFO - root - Logging initialized successfully
+2026-03-29 15:26:19,795 - INFO - werkzeug - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-03-29 15:26:19,795 - INFO - werkzeug - [33mPress CTRL+C to quit[0m
+2026-03-29 15:26:19,797 - INFO - werkzeug -  * Restarting with stat
+2026-03-29 15:26:20,793 - INFO - root - Logging initialized successfully
+2026-03-29 15:26:20,901 - WARNING - werkzeug -  * Debugger is active!
+2026-03-29 15:26:20,905 - INFO - werkzeug -  * Debugger PIN: 997-771-113
+2026-03-29 15:26:47,914 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:26:47] "GET /api/docs/ HTTP/1.1" 200 -
+2026-03-29 15:26:48,591 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:26:48] "GET /api/docs/index.css HTTP/1.1" 200 -
+2026-03-29 15:26:48,677 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:26:48] "GET /api/docs/swagger-ui-bundle.js HTTP/1.1" 200 -
+2026-03-29 15:26:48,682 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:26:48] "GET /api/docs/swagger-ui.css HTTP/1.1" 200 -
+2026-03-29 15:26:48,682 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:26:48] "GET /api/docs/swagger-ui-standalone-preset.js HTTP/1.1" 200 -
+2026-03-29 15:26:49,218 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:26:49] "GET /static/swagger.yaml HTTP/1.1" 200 -
+2026-03-29 15:27:04,577 - INFO - app - Entering function: login
+2026-03-29 15:27:04,611 - ERROR - app.blueprints.users.routes - Failed login attempt
+2026-03-29 15:27:04,612 - INFO - app - Exiting function: login
+2026-03-29 15:27:04,616 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:27:04] "[31m[1mPOST /users/login HTTP/1.1[0m" 401 -
+2026-03-29 15:30:40,498 - INFO - werkzeug -  * Detected change in 'C:\\Deepa\\MyWork\\CodingTemple\\TechResidency\\TR42-Client\\vistaone-api\\app\\utils\\loggingUtil.py', reloading
+2026-03-29 15:30:40,747 - INFO - werkzeug -  * Restarting with stat
+2026-03-29 15:31:41,421 - INFO - root - Logging initialized successfully
+2026-03-29 15:31:41,592 - INFO - werkzeug - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-03-29 15:31:41,593 - INFO - werkzeug - [33mPress CTRL+C to quit[0m
+2026-03-29 15:31:41,594 - INFO - werkzeug -  * Restarting with stat
+2026-03-29 15:31:42,574 - INFO - root - Logging initialized successfully
+2026-03-29 15:31:42,694 - WARNING - werkzeug -  * Debugger is active!
+2026-03-29 15:31:42,699 - INFO - werkzeug -  * Debugger PIN: 997-771-113
+2026-03-29 15:31:53,584 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:31:53] "GET /api/docs/ HTTP/1.1" 200 -
+2026-03-29 15:31:54,081 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:31:54] "[36mGET /api/docs/swagger-ui-bundle.js HTTP/1.1[0m" 304 -
+2026-03-29 15:31:54,089 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:31:54] "[36mGET /api/docs/index.css HTTP/1.1[0m" 304 -
+2026-03-29 15:31:54,096 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:31:54] "[36mGET /api/docs/swagger-ui-standalone-preset.js HTTP/1.1[0m" 304 -
+2026-03-29 15:31:54,097 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:31:54] "[36mGET /api/docs/swagger-ui.css HTTP/1.1[0m" 304 -
+2026-03-29 15:31:54,351 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:31:54] "[36mGET /static/swagger.yaml HTTP/1.1[0m" 304 -
+2026-03-29 15:31:54,363 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:31:54] "GET /api/docs/favicon-32x32.png HTTP/1.1" 200 -
+2026-03-29 15:32:09,944 - INFO - app - Entering function: login
+2026-03-29 15:32:09,965 - ERROR - app.blueprints.users.routes - Failed login attempt
+2026-03-29 15:32:09,967 - INFO - app - Exiting function: login
+2026-03-29 15:32:09,970 - INFO - werkzeug - 127.0.0.1 - - [29/Mar/2026 15:32:09] "[31m[1mPOST /users/login HTTP/1.1[0m" 401 -
+2026-03-29 18:14:04,920 - INFO - werkzeug -  * Detected change in 'C:\\Deepa\\MyWork\\CodingTemple\\TechResidency\\TR42-Client\\vistaone-api\\app.py', reloading
+2026-03-29 18:14:05,688 - INFO - werkzeug -  * Restarting with stat
+2026-03-29 22:00:10,016 - INFO - werkzeug -  * Restarting with stat
+2026-03-29 22:09:30,658 - INFO - werkzeug -  * Restarting with stat

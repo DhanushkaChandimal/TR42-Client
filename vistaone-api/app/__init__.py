@@ -1,7 +1,7 @@
 from flask import Flask, jsonify
 from .extensions import ma, limiter
 from .models import db
-from .blueprints.users import users_bp
+from app.blueprints.controller import users_bp
 from flask_swagger_ui import get_swaggerui_blueprint
 
 SWAGGER_URL = '/api/docs'  # URL for exposing Swagger UI (without trailing '/')
