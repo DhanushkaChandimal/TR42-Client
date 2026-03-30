@@ -1,0 +1,94 @@
+/* same split layout as login page */
+.register-page {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* left navy panel */
+.register-brand {
+  width: 45%;
+  background-color: #0a1f3b;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px;
+  color: #ffffff;
+}
+
+.register-brand-title {
+  font-size: 36px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.register-brand-subtitle {
+  font-size: 16px;
+  color: #8facc4;
+  margin: 0 0 32px 0;
+}
+
+.register-brand-tagline {
+  font-size: 18px;
+  color: #c0d4e8;
+  line-height: 1.6;
+  max-width: 360px;
+}
+
+/* right side */
+.register-form-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eef1f5 0%, #e6e9f0 50%, #eef2f3 100%);
+  padding: 40px;
+}
+
+/* glass card */
+.register-form-container {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+}
+
+/* success message after submitting */
+.register-success {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.register-success-text {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin: 16px 0 28px 0;
+}
+
+.register-back-link {
+  display: inline-block;
+  padding: 10px 24px;
+  background-color: #0a1f3b;
+  color: #ffffff;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(10, 31, 59, 0.25);
+  transition: all 0.2s ease;
+}
+
+.register-back-link:hover {
+  background-color: #112d4e;
+  transform: translateY(-1px);
+}

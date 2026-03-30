@@ -1,0 +1,93 @@
+/* login page is split into two halves side by side */
+.login-page {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* left side navy branding panel */
+.login-brand {
+  width: 45%;
+  background-color: #0a1f3b;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px;
+  color: #ffffff;
+}
+
+.login-brand-title {
+  font-size: 36px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.login-brand-subtitle {
+  font-size: 16px;
+  color: #8facc4;
+  margin: 0 0 32px 0;
+}
+
+.login-brand-tagline {
+  font-size: 18px;
+  color: #c0d4e8;
+  line-height: 1.6;
+  max-width: 360px;
+}
+
+/* right side form area */
+.login-form-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eef1f5 0%, #e6e9f0 50%, #eef2f3 100%);
+  padding: 40px;
+}
+
+/* glass card effect on the form */
+.login-form-container {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.login-heading {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 4px 0;
+}
+
+.login-subheading {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 28px 0;
+}
+
+/* form layout */
+.login-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-options {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.login-forgot {
+  font-size: 13px;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.login-forgot:hover {
+  text-decoration: underline;
+}
