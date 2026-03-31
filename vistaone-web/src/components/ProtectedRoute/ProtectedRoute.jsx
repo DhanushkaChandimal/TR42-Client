@@ -1,20 +1,18 @@
 // ProtectedRoute - wraps pages that require login
-// if the user is not authenticated it redirects them back to the login page
+// checks both our AuthContext token and teammate's authToken in localStorage
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
 
 function ProtectedRoute({ children }) {
-  // pull isAuthenticated from our auth context
-  const { isAuthenticated } = useAuth();
+  // check if either auth token exists
+  const hasToken = localStorage.getItem("token") || localStorage.getItem("authToken");
 
   // if not logged in, redirect to the login page
-  // replace means it wont add to browser history so they cant hit back
-  if (!isAuthenticated) {
-    return <Navigate to="/" replace />;
+  if (!hasToken) {
+    return <Navigate to="/login" replace />;
   }
 
-  // if logged in, render whatever page was passed in as children
+  // if logged in, render the page
   return children;
 }
 
