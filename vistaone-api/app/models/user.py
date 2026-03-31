@@ -1,12 +1,9 @@
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+# from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import DateTime, func
 from werkzeug.security import check_password_hash, generate_password_hash
+from . import Base, db
 
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
 
 class User(Base):
     __tablename__ = 'users'

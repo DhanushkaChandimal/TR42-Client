@@ -7,7 +7,7 @@ class LoginService:
         user = LoginRepository.get_user_by_email(email)
 
         if user and user.check_password(password):
-
+            
             token = encode_token(user.id)
 
             return {

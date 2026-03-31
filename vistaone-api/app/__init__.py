@@ -1,6 +1,6 @@
 from flask import Flask, jsonify
 from .extensions import ma, limiter
-from .models import db
+from app.models import db
 from app.blueprints.controller import users_bp
 from flask_swagger_ui import get_swaggerui_blueprint
 
