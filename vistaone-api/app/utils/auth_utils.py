@@ -1,0 +1,1 @@
+#def role_required(role):

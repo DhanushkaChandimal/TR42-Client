@@ -1,25 +1,43 @@
-from app import create_app
+# tests/test_controllers/test_loginRoutes
 from app.models import db, User
+from app import create_app
 import unittest
 
-class TestUser(unittest.TestCase):
+# tests API routes/controllers for login functionality, including successful login, invalid credentials, and input validation errors. Also tests rate limiting on login endpoint.
+# Test the API endpoint (e.g., /users/login) using Flask test client
+class TestLoginRoutes(unittest.TestCase):
+
     def setUp(self):
+
         self.app = create_app("TestingConfig")
+
+        self.app_context = self.app.app_context()
+    # push the app context before accessing DB resources
+        self.app_context.push() 
+
+        db.create_all()
+
         self.user = User(
             first_name="Test",
             last_name="User",
             email="test@email.com",
             role_id=1,
-            company_id=1,
-            password_hash=""
+            company_id=1
         )
-        self.user.set_password('test')
-        with self.app.app_context():
-            db.drop_all()
-            db.create_all()
-            db.session.add(self.user)
-            db.session.commit()
-        self.client = self.app.test_client()
+
+        self.user.set_password("test")
+
+        db.session.add(self.user)
+        db.session.commit()
+        self.client = self.app.test_client() # use test client to make API requests in tests
+
+# ensure DB session is removed and tables are dropped after each test to maintain test isolation and clean state
+    def tearDown(self):
+
+        db.session.remove()
+        db.drop_all()
+        self.app_context.pop()
+
 
     def test_login_user(self):
         credentials = {
