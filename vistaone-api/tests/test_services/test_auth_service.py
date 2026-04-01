@@ -1,6 +1,6 @@
-# tests/test_services/test_loginService.py
+# tests/test_services/test_auth_service.py
 
-from app.blueprints.services.loginService import LoginService
+from app.blueprints.services.auth_service import LoginService
 from app import create_app
 from app.models import db, User
 import unittest

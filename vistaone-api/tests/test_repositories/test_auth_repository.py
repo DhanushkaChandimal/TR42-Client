@@ -1,5 +1,5 @@
-# tests/test_repositories/test_user_repository.py
-from app.blueprints.repository.loginRepository import LoginRepository
+# tests/test_repositories/test_auth_repository.py
+from app.blueprints.repository.auth_repository import LoginRepository
 from app import create_app
 from app.models import db, User
 import unittest
