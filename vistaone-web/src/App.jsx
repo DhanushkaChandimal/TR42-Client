@@ -1,12 +1,17 @@
-import './App.css'
+import Login from './components/Login'
+import Dashboard from './components/Dashboard'
+import { Route, Routes, Navigate } from 'react-router-dom'
 
 function App() {
 
-  return (
-    <>
-        <h1>Client Web Dashboard</h1>
-    </>
-  )
+    return (
+        <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login/*" element={<Login />} />
+            <Route path="/dashboard/*" element={<Dashboard />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+    )
 }
 
 export default App

@@ -1,0 +1,300 @@
+.login-page {
+	min-height: 100vh;
+	background:
+		radial-gradient(circle at top left, rgba(148, 163, 184, 0.18), transparent 32%),
+		radial-gradient(circle at bottom right, rgba(203, 213, 225, 0.35), transparent 30%),
+		linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+}
+
+.login-hero {
+	color: #6a6a6a;
+}
+
+.login-badge {
+	border: 1px solid #dbe2ea;
+	background: #ffffff;
+	animation: login-fade-drop 0.5s both;
+}
+
+.login-badge-icon {
+	width: 2.5rem;
+	height: 2.5rem;
+	background: #5e5e5e;
+	color: #ffffff;
+}
+
+.login-badge-overline,
+.login-hero-overline,
+.login-panel-overline {
+	letter-spacing: 0.24em;
+	color: #64748b;
+	font-size: 0.69rem;
+}
+
+.login-hero-overline {
+	animation: login-fade-left 0.5s 0.15s both;
+}
+
+.login-hero-title {
+	max-width: 44rem;
+	font-family: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+	font-size: 3.75rem;
+	line-height: 1.1;
+	animation: login-fade-left 0.65s 0.28s both;
+}
+
+.login-hero-text {
+	max-width: 36rem;
+	font-size: 1.05rem;
+	line-height: 1.75;
+	animation: login-fade-left 0.5s 0.42s both;
+}
+
+.login-panel {
+	border: 1px solid #dbe2ea;
+	background: #ffffff;
+	max-width: 28rem;
+	border-radius: 1.75rem;
+	padding: 2rem;
+	color: #0f172a;
+	animation: login-fade-right 0.65s 0.2s both;
+}
+
+.login-panel-text {
+	color: #64748b;
+}
+
+.login-label {
+	color: #334155;
+	font-weight: 500;
+	font-size: 0.9rem;
+}
+
+.login-input-group {
+	border: 1px solid #cbd5e1;
+	border-radius: 1rem;
+	overflow: hidden;
+}
+
+.login-input-group:focus-within {
+	border-color: #9da4c2;
+	box-shadow: 0 0 0 0.25rem rgba(148, 163, 184, 0.2);
+}
+
+.login-submit-btn {
+	min-height: 3.25rem;
+	border-radius: 1rem;
+	background-color: #e2e8f0 !important;
+	border: 1px solid #cbd5e1 !important;
+	font-weight: 700;
+	box-shadow: 0 8px 20px rgba(148, 163, 184, 0.35);
+	transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.login-submit-btn:hover,
+.login-submit-btn:focus {
+	background-color: #cbd5e1 !important;
+	color: #020617 !important;
+	border-color: #94a3b8 !important;
+	transform: translateY(-2px) scale(1.01);
+	box-shadow: 0 12px 28px rgba(148, 163, 184, 0.45) !important;
+}
+
+.login-submit-btn:active {
+	background-color: #94a3b8 !important;
+	color: #020617 !important;
+	border-color: #64748b !important;
+}
+
+.login-alert {
+	animation: login-fade-up 0.3s both;
+}
+
+/* Preview carousel */
+.login-preview-carousel {
+	overflow: hidden;
+	-webkit-mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+	mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+	animation: login-fade-up 0.5s 0.55s both;
+}
+
+.login-preview-track {
+	display: flex;
+	gap: 0.75rem;
+	width: max-content;
+	animation: login-carousel-scroll 30s linear infinite;
+}
+
+.login-preview-track:hover {
+	animation-play-state: paused;
+}
+
+@keyframes login-carousel-scroll {
+	from { transform: translateX(0); }
+	to   { transform: translateX(-50%); }
+}
+
+.login-preview-card {
+	min-width: 10.5rem;
+	flex-shrink: 0;
+	border: 1px solid rgba(203, 213, 225, 0.9);
+	background: rgba(255, 255, 255, 0.72);
+	backdrop-filter: blur(8px);
+	border-radius: 0.875rem;
+	padding: 0.875rem 1rem;
+}
+
+.login-preview-card-label {
+	font-size: 0.68rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #94a3b8;
+	margin-bottom: 0.25rem;
+}
+
+.login-preview-card-value {
+	font-size: 1.4rem;
+	font-weight: 700;
+	color: #1e293b;
+	line-height: 1;
+	margin-bottom: 0.25rem;
+}
+
+.login-preview-card-trend {
+	font-size: 0.72rem;
+	color: #64748b;
+	margin-bottom: 0;
+}
+
+/* ── Keyframes ────────────────────────────────────── */
+@keyframes login-fade-left {
+	from { opacity: 0; transform: translateX(-1.5rem); }
+	to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes login-fade-right {
+	from { opacity: 0; transform: translateX(1.5rem); }
+	to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes login-fade-drop {
+	from { opacity: 0; transform: translateY(-0.75rem); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes login-fade-up {
+	from { opacity: 0; transform: translateY(0.75rem); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive breakpoints ───────────────────────── */
+@media (max-width: 768px) {
+	.login-hero {
+		padding-bottom: 1.25rem;
+	}
+
+	.login-hero-title {
+		font-size: 2.8rem;
+		line-height: 1.12;
+		max-width: 100%;
+	}
+
+	.login-hero-text {
+		font-size: 1rem;
+		line-height: 1.65;
+		max-width: 100%;
+	}
+
+	.login-panel {
+		max-width: 100%;
+		border-radius: 1.25rem;
+		padding: 1.5rem;
+	}
+
+	.login-preview-track {
+		gap: 0.6rem;
+	}
+
+	.login-preview-card {
+		min-width: 9.25rem;
+		padding: 0.75rem 0.875rem;
+	}
+
+	.login-preview-card-value {
+		font-size: 1.2rem;
+	}
+
+	.login-submit-btn {
+		min-height: 3rem;
+	}
+}
+
+@media (max-width: 576px) {
+	.login-page {
+		min-height: auto;
+	}
+
+	.login-badge {
+		padding: 0.4rem 0.75rem !important;
+	}
+
+	.login-badge-icon {
+		width: 2.15rem;
+		height: 2.15rem;
+	}
+
+	.login-badge-overline,
+	.login-hero-overline,
+	.login-panel-overline {
+		letter-spacing: 0.18em;
+		font-size: 0.62rem;
+	}
+
+	.login-hero-title {
+		font-size: 2.25rem;
+		line-height: 1.15;
+	}
+
+	.login-hero-text,
+	.login-panel-text {
+		font-size: 0.95rem;
+		line-height: 1.6;
+	}
+
+	.login-panel {
+		padding: 1.25rem;
+		border-radius: 1rem;
+	}
+
+	.login-input-group,
+	.login-submit-btn {
+		border-radius: 0.8rem;
+	}
+
+	.login-preview-carousel {
+		-webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+		mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+	}
+
+	.login-preview-track {
+		gap: 0.5rem;
+		animation-duration: 24s;
+	}
+
+	.login-preview-card {
+		min-width: 8.25rem;
+		padding: 0.65rem 0.75rem;
+	}
+
+	.login-preview-card-label {
+		font-size: 0.58rem;
+	}
+
+	.login-preview-card-value {
+		font-size: 1.05rem;
+	}
+
+	.login-preview-card-trend {
+		font-size: 0.64rem;
+	}
+}
