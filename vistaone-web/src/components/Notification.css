@@ -1,0 +1,25 @@
+.notification-btn {
+	background: none;
+	border: none;
+	position: relative;
+	padding: 0.4rem;
+	border-radius: 50%;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	transition: background 0.15s;
+}
+.notification-btn:hover {
+	background: #f1f3f5;
+}
+.notification-dot {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	width: 8px;
+	height: 8px;
+	background: #e03131;
+	border-radius: 50%;
+	border: 2px solid #fff;
+	display: block;
+}

@@ -1,5 +1,6 @@
 import NavBar from './NavBar'
 import TopBar from './TopBar'
+import '../styles/appShell.css'
 
 function AppShell({ title, subtitle, eyebrow = 'Welcome back', controls, children }) {
 	return (
