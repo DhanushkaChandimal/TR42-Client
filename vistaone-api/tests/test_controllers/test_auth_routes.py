@@ -1,4 +1,4 @@
-# tests/test_controllers/test_loginRoutes
+# tests/test_controllers/test_auth_routes.py
 from app.models import db, User
 from app import create_app
 import unittest

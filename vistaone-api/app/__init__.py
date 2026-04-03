@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, app, jsonify
 from .extensions import ma, limiter
 from app.models import db
 from app.blueprints.controller import users_bp
@@ -31,8 +31,8 @@ def create_app(config_name):
     db.init_app(app)
     limiter.init_app(app)
 
-    logging_setup()
-    
+    logging_setup() 
+
     # Register blueprints
     app.register_blueprint(users_bp, url_prefix='/users')
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
@@ -42,6 +42,27 @@ def create_app(config_name):
         return jsonify({'message': 'Too many requests. Please try again later.'}), 429
     
 
-   
+    @app.errorhandler(401)
+    def unauthorized_error(e):
+        return jsonify({
+        "status": "error",
+        "message": "Unauthorized access"
+    }), 401
+
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return jsonify({
+        "status": "error",
+        "message": "Resource not found"
+    }), 404
+
+
+    @app.errorhandler(500)
+    def server_error(e):
+        return jsonify({
+        "status": "error",
+        "message": "Internal server error"
+    }), 500
     
     return app
