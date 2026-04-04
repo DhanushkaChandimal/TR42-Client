@@ -37,7 +37,7 @@ def create_app(config_name):
 
     # Register blueprints
     app.register_blueprint(users_bp, url_prefix='/users')
-     app.register_blueprint(workorder_bp, url_prefix='/workorders')
+    app.register_blueprint(workorder_bp, url_prefix='/workorders')
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     @app.errorhandler(429)

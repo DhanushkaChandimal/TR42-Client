@@ -29,7 +29,7 @@ class WorkOrder(Base):
 
     recursion: Mapped[Boolean] = mapped_column(Boolean, default=False)
     frequency: Mapped[FrequencyEnum] = mapped_column(SQLEnum(FrequencyEnum), nullable=True)
-    start_service: Mapped[Date] = mapped_column(Date, nullable=True)
+    #start_service: Mapped[Date] = mapped_column(Date, nullable=True)
     end_service: Mapped[Date] = mapped_column(Date, nullable=True)
 
     client_id: Mapped[str] = mapped_column(String(50), nullable=True)
