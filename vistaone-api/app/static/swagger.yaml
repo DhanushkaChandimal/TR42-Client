@@ -60,32 +60,53 @@ paths:
             application/json:
               message: "Invalid email or password"
 
-  /users/logout:
-    post:
+  /users/verify-token:
+    get:
       tags:
       - Users
-      summary: "Logout endpoint (revokes JWT token)"
-      description: "Revokes the token sent in the Authorization header."
+      summary: "Verify JWT token validity"
+      description: "Checks if the provided JWT token is valid. Requires Authorization header."
       security:
       - bearerAuth: []
       responses:
         200:
-          description: "Logout Successful"
+          description: "Token is valid"
           schema:
-            $ref: "#/definitions/LogoutResponse"
+            $ref: "#/definitions/VerifyTokenResponse"
           examples:
             application/json:
-              status: "success"
-              message: "Successfully logged out"
+              message: "Token is valid!"
+              user_id: "123"
+        400:
+          description: "Token is missing, expired, or invalid"
+          schema:
+            $ref: "#/definitions/VerifyTokenError"
+          examples:
+            application/json:
+              message: "Token is missing!"
         401:
-          description: "Unauthorized / Token revoked"
+          description: "Unauthorized"
           schema:
-            $ref: "#/definitions/LogoutError"
+            $ref: "#/definitions/VerifyTokenError"
           examples:
             application/json:
-              message: "Token has been revoked!"
+              message: "Invalid token!"
 
 definitions:
+
+  VerifyTokenResponse:
+    type: "object"
+    properties:
+      message:
+        type: "string"
+      user_id:
+        type: "string"
+
+  VerifyTokenError:
+    type: "object"
+    properties:
+      message:
+        type: "string"
 
   LoginCredentials:
     type: "object"
