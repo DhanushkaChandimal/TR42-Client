@@ -8,7 +8,7 @@ import uuid
 
 
 
-##  I will create the work order model so my refernce to create client, vendor and service type models. I will also create the relationships between these models. this is my reference to understand the relationships between the models. 
+##  I will create the work order model, that references for test purposes to create client, vendor and service type models. I will also create the relationships between these models. this is my reference to understand the relationships between the models. 
 class Client(db.Model):
     __tablename__ = "clients"
 
@@ -72,7 +72,6 @@ class WorkOrder(db.Model):
     created_by = mapped_column(db.String(100))
     created_date = mapped_column(db.DateTime, default=datetime.utcnow)
     last_modified_by = mapped_column(db.String(100))
-
     last_modified_date = mapped_column(db.DateTime)
 
     # # Relationships

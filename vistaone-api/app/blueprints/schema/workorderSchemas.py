@@ -33,7 +33,7 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
 
     frequency = fields.String()
 
-    start_service = fields.DateTime(required=True)
+    start_service = fields.DateTime()
     end_service = fields.DateTime()
 
     created_by = fields.String()
