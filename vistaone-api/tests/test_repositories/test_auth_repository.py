@@ -42,3 +42,10 @@ class TestLoginRepository(unittest.TestCase):
     def test_get_user_by_email_not_found(self):
         user = LoginRepository.get_user_by_email("notfound@email.com")
         self.assertIsNone(user)
+
+
+    ## test logout ##
+
+    def test_get_user_by_email_empty(self):
+        user = LoginRepository.get_user_by_email("")
+        self.assertIsNone(user)

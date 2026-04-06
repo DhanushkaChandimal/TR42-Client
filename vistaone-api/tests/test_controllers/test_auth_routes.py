@@ -1,4 +1,8 @@
-# tests/test_controllers/test_loginRoutes
+# tests/test_controllers/test_auth_routes.py
+import token
+from urllib import response
+from wsgiref import headers
+
 from app.models import db, User
 from app import create_app
 import unittest
@@ -92,3 +96,42 @@ class TestLoginRoutes(unittest.TestCase):
         self.assertIsNotNone(response)
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response.json['message'], 'Too many requests. Please try again later.')
+
+
+
+    ### Logout Tests ###
+
+
+    def test_logout_success(self):
+        # Login first to get token
+        credentials = {"email": "test@email.com", "password": "test"}
+        login_resp = self.client.post('/users/login', json=credentials)
+        token = login_resp.json['token']
+
+        # Logout using token
+        headers = {"Authorization": f"Bearer {token}"}
+        response = self.client.post('/users/logout', headers=headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['status'], 'success')
+
+    def test_logout_unauthorized(self):
+        response = self.client.post('/users/logout')  # No token
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Token is missing', response.json['message'])
+
+
+    def test_logout_token_revoked(self):
+           # Login first
+        credentials = {"email": "test@email.com", "password": "test"}
+        login_resp = self.client.post('/users/login', json=credentials)
+        token = login_resp.json['token']
+
+        # Logout to revoke token
+        headers = {"Authorization": f"Bearer {token}"}
+        self.client.post('/users/logout', headers=headers)
+
+        # Try accessing logout again with revoked token
+        response = self.client.post('/users/logout', headers=headers)
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Token has been revoked', response.json['message'])  

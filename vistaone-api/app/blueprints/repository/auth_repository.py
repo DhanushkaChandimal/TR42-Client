@@ -4,6 +4,8 @@ from app.models import db, User
 class LoginRepository:
     @staticmethod
     def get_user_by_email(email):
+        if not email:
+            return None
 
         query = select(User).where(User.email == email)
         user = db.session.execute(query).scalars().first()

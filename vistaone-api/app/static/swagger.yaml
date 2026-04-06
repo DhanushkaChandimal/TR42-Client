@@ -5,12 +5,12 @@ info:
   version: "1.0.0"
 host: "127.0.0.1:5000"
 schemes:
-  - "http"
-  # - "https"
+- "http"
+# - "https"
 consumes:
-  - "application/json"
+- "application/json"
 produces:
-  - "application/json"
+- "application/json"
 
 securityDefinitions:
   bearerAuth:
@@ -22,16 +22,16 @@ paths:
   /users/login:
     post:
       tags:
-        - Users
+      - Users
       summary: "Login endpoint, (generates token)"
       description: "Validates user credentials and returns a user-specific token."
       parameters:
-        - in: "body"
-          name: "body"
-          description: "Login credentials"
-          required: true
-          schema:
-            $ref: "#/definitions/LoginCredentials"
+      - in: "body"
+        name: "body"
+        description: "Login credentials"
+        required: true
+        schema:
+          $ref: "#/definitions/LoginCredentials"
       responses:
         200:
           description: "Login Successful"
@@ -49,9 +49,9 @@ paths:
           examples:
             application/json:
               email:
-                - "Not a valid email address."
+              - "Not a valid email address."
               password:
-                - "Missing data for required field."
+              - "Missing data for required field."
         401:
           description: "Invalid credentials"
           schema:
@@ -63,11 +63,11 @@ paths:
   /users/verify-token:
     get:
       tags:
-        - Users
+      - Users
       summary: "Verify JWT token validity"
       description: "Checks if the provided JWT token is valid. Requires Authorization header."
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       responses:
         200:
           description: "Token is valid"
@@ -91,6 +91,31 @@ paths:
           examples:
             application/json:
               message: "Invalid token!"
+
+  /users/logout:
+    post:
+      tags:
+      - Users
+      summary: "Logout endpoint (revokes JWT token)"
+      description: "Revokes the token sent in the Authorization header."
+      security:
+      - bearerAuth: []
+      responses:
+        200:
+          description: "Logout Successful"
+          schema:
+            $ref: "#/definitions/LogoutResponse"
+          examples:
+            application/json:
+              status: "success"
+              message: "Successfully logged out"
+        401:
+          description: "Unauthorized / Token revoked"
+          schema:
+            $ref: "#/definitions/LogoutError"
+          examples:
+            application/json:
+              message: "Token has been revoked!"
 
 definitions:
 
@@ -117,8 +142,8 @@ definitions:
         type: "string"
 
     required:
-      - email
-      - password
+    - email
+    - password
 
   LoginResponse:
     type: "object"
@@ -147,3 +172,17 @@ definitions:
     properties:
       message:
         type: "string"
+
+  LogoutResponse:
+    type: object
+    properties:
+      status:
+        type: string
+      message:
+        type: string
+
+  LogoutError:
+    type: object
+    properties:
+      message:
+        type: string

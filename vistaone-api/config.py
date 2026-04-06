@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class DevelopmentConfig:
-    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://<postgre_username>:<postgre_password>@localhost/client_web_dashboard_db'
+    SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI')
     DEBUG = True
     CACHE_TYPE = 'SimpleCache'
     CACHE_DEFAULT_TIMEOUT = 300
