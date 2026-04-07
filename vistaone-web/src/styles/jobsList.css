@@ -1,0 +1,122 @@
+/* the card that wraps a jobs list - glass effect */
+.jobs-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 14px;
+  padding: 20px;
+  flex: 1;
+  min-width: 300px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+/* title row with View all link */
+.jobs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.jobs-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0;
+}
+
+.jobs-view-all {
+  font-size: 13px;
+  color: #2563eb;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.jobs-view-all:hover {
+  text-decoration: underline;
+}
+
+/* remove default list styles */
+.jobs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* each job row */
+.jobs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.jobs-row:last-child {
+  border-bottom: none;
+}
+
+/* filled blue dot for active jobs */
+.dot-filled {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #1a5276;
+  flex-shrink: 0;
+}
+
+/* hollow circle for upcoming jobs */
+.dot-hollow {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #9ca3af;
+  background-color: transparent;
+  flex-shrink: 0;
+}
+
+/* job name and detail text */
+.jobs-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.jobs-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jobs-detail {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 2px 0 0 0;
+}
+
+/* badge styles */
+.jobs-badge {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* green-ish badge for active */
+.badge-active {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+/* neutral badge for upcoming dates */
+.badge-upcoming {
+  background-color: #f9fafb;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}

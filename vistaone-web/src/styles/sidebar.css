@@ -1,0 +1,135 @@
+/* sidebar sits on the left, full height, fixed width */
+.sidebar {
+  width: 240px;
+  min-height: 100vh;
+  background-color: #0a1f3b;
+  border-right: none;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+}
+
+/* brand name at the top */
+.sidebar-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.sidebar-subtitle {
+  font-size: 13px;
+  color: #8facc4;
+  margin: 4px 0 0 0;
+}
+
+/* section labels like MAIN and ACCOUNT */
+.sidebar-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5a7fa0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 28px 0 8px 0;
+}
+
+/* remove default list styling */
+.sidebar-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* each nav item is a row with icon + label */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #c0d4e8;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.sidebar-item:hover {
+  background-color: #112d4e;
+}
+
+/* highlighted state for the currently selected page */
+.sidebar-item.active {
+  background-color: #1a3d5c;
+  color: #ffffff;
+  font-weight: 600;
+  border-left: 3px solid #4a9eff;
+}
+
+.sidebar-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+/* push user and logout to the bottom */
+.sidebar-bottom {
+  margin-top: auto;
+  border-top: 1px solid #1a3d5c;
+  padding-top: 12px;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* sign out button */
+.sidebar-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: #8facc4;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sidebar-logout:hover {
+  background-color: #1a3d5c;
+  color: #ffffff;
+}
+
+/* circle with the users initials */
+.sidebar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #1a3d5c;
+  color: #4a9eff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sidebar-user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.sidebar-user-role {
+  font-size: 12px;
+  color: #8facc4;
+  margin: 2px 0 0 0;
+}

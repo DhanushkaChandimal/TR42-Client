@@ -1,10 +1,10 @@
-import Login from './components/Login'
-import Dashboard from './components/Dashboard'
+import "./styles/forms.css";
 import { Route, Routes, Navigate } from 'react-router-dom'
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
 import ProtectedRoute from './routes/ProtectedRoute'
 
 function App() {
-
     return (
         <Routes>
             <Route path="/login" element={<Login />} />
@@ -22,4 +22,4 @@ function App() {
     )
 }
 
-export default App
+export default App;

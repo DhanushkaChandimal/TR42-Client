@@ -4,6 +4,23 @@ body,
 	min-height: 100%;
 }
 
-* {
-	box-sizing: border-box;
+/* global reset - removes default browser spacing and sets a clean baseline */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* base body styles - system font stack for a clean professional look */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #eef1f5;
+  color: #1a1a2e;
+  background-image: linear-gradient(135deg, #eef1f5 0%, #e6e9f0 50%, #eef2f3 100%);
+  min-height: 100vh;
 }
