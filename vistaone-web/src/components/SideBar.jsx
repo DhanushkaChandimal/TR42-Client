@@ -1,6 +1,6 @@
 // sidebar component - the left nav panel with links and user info
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/sidebar.css";
 
 // importing icons from react-icons (fi = Feather Icons set)
@@ -9,6 +9,7 @@ import { FiGrid, FiList, FiClipboard, FiFileText, FiUsers, FiFolder, FiLogOut } 
 // navData gets passed in from the parent component
 function Sidebar({ navData }) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // clears both auth tokens and sends user back to login
   const handleLogout = () => {
@@ -17,9 +18,11 @@ function Sidebar({ navData }) {
     navigate("/login");
   };
 
+  // Helper to check if route is active
+  const isActive = (to) => to && location.pathname.startsWith(to);
+
   return (
     <aside className="sidebar">
-
       {/* brand section at the top */}
       <div className="sidebar-brand">
         <h2 className="sidebar-title">FieldPortal</h2>
@@ -29,28 +32,25 @@ function Sidebar({ navData }) {
       {/* navigation links */}
       <nav className="sidebar-nav">
         <p className="sidebar-section-label">MAIN</p>
-
-        {/* map through each main nav item */}
         <ul className="sidebar-list">
           {navData.main.map((item) => (
             <li
               key={item.label}
-              className={`sidebar-item ${item.active ? "active" : ""}`}
+              className={`sidebar-item ${isActive(item.to) ? "active" : ""}`}
+              onClick={() => item.to && navigate(item.to)}
+                style={{ cursor: item.to ? "pointer" : "default" }}
             >
               <span className="sidebar-icon">{getIcon(item.icon)}</span>
               <span>{item.label}</span>
             </li>
           ))}
         </ul>
-
         <p className="sidebar-section-label">ACCOUNT</p>
-
-        {/* account section */}
         <ul className="sidebar-list">
           {navData.account.map((item) => (
             <li
               key={item.label}
-              className={`sidebar-item ${item.active ? "active" : ""}`}
+              className="sidebar-item"
             >
               <span className="sidebar-icon">{getIcon(item.icon)}</span>
               <span>{item.label}</span>
