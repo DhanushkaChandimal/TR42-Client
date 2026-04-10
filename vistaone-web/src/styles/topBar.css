@@ -1,0 +1,56 @@
+.topbar {
+  width: 100%;
+  background: #fff;
+  border-bottom: 1px solid #e9ecef;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  padding: 0.75rem 1.5rem;
+  top: 0;
+  z-index: 20;
+}
+
+.topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+}
+
+.topbar-btn {
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.topbar-badge {
+  font-size: 10px;
+}
+
+.topbar-dropdown {
+  right: 0;
+  left: auto;
+  min-width: 280px;
+}
+
+.topbar-dropdown-profile {
+  min-width: 180px;
+}
+
+.dropdown-item.topbar-notification-item {
+  font-size: 13px;
+  background-color: #b3b3b3;
+  color: #fff;
+}
+
+.dropdown-item.topbar-notification-item.read {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+.dropdown-item.topbar-notification-item:hover {
+  background-color: #dddddd;
+}
+
+.topbar-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+}

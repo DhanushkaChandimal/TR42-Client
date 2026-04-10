@@ -1,0 +1,182 @@
+.app-shell-page {
+	min-height: 100vh;
+	padding: 0;
+	background:
+		radial-gradient(circle at 8% 10%, rgba(149, 157, 165, 0.12), transparent 25%),
+		radial-gradient(circle at 90% 8%, rgba(108, 117, 125, 0.12), transparent 24%),
+		linear-gradient(135deg, #ffffff, #f8f9fa 52%, #f1f3f5);
+}
+
+.app-shell-layout {
+	max-width: 100%;
+	margin: 0;
+	display: grid;
+	grid-template-columns: 252px 1fr;
+	gap: 1rem;
+	min-height: 100vh;
+	padding: 0;
+}
+
+.app-shell-sidebar {
+	background: #ffffff;
+	border: 1px solid #e9ecef;
+	border-radius: 1rem;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.app-shell-brand {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	padding: 1rem;
+	border-bottom: 1px solid #e9ecef;
+}
+
+.app-shell-brand-icon {
+	width: 2.2rem;
+	height: 2.2rem;
+	display: grid;
+	place-items: center;
+	border-radius: 0.7rem;
+	background: #212529;
+	color: #ffffff;
+}
+
+.app-shell-brand-overline {
+	margin: 0;
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	color: #6c757d;
+	font-weight: 600;
+}
+
+.app-shell-brand-title {
+	margin: 0.16rem 0 0;
+	font-size: 0.95rem;
+	font-weight: 700;
+	color: #1a1a1a;
+}
+
+.app-shell-nav {
+	display: grid;
+	gap: 0.4rem;
+	padding: 0.9rem;
+}
+
+.app-shell-link {
+	display: flex;
+	align-items: center;
+	gap: 0.62rem;
+	border-radius: 0.7rem;
+	background: transparent;
+	color: #6c757d;
+	padding: 0.62rem 0.72rem;
+	font-size: 0.9rem;
+	font-weight: 600;
+	text-decoration: none;
+	transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.app-shell-link:hover {
+	background: #f1f3f5;
+	color: #212529;
+}
+
+.app-shell-link.active {
+	background: #212529;
+	color: #ffffff;
+}
+
+.app-shell-main {
+	display: grid;
+	grid-template-rows: auto 1fr;
+	gap: 0.8rem;
+	min-width: 0;
+}
+
+.app-shell-topbar {
+	background: #ffffff;
+	border: 1px solid #e9ecef;
+	border-radius: 1rem;
+	padding: 1rem;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 1rem;
+}
+
+.app-shell-topbar-eyebrow {
+	margin: 0;
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #6c757d;
+}
+
+.app-shell-title {
+	margin: 0;
+	font-size: clamp(1.5rem, 3vw, 2.1rem);
+	font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, sans-serif;
+	letter-spacing: 0.02em;
+	color: #1a1a1a;
+}
+
+.app-shell-subtitle {
+	margin: 0.3rem 0 0 0;
+	font-size: 0.9rem;
+	color: #6c757d;
+	font-weight: 400;
+}
+
+.app-shell-topbar-controls {
+	display: grid;
+	grid-template-columns: minmax(260px, 1fr) 180px auto;
+	gap: 0.65rem;
+	width: min(100%, 760px);
+}
+
+.app-shell-content {
+	background: rgba(255, 255, 255, 0.95);
+	backdrop-filter: blur(6px);
+	border: 1px solid #e9ecef;
+	border-radius: 1rem;
+	padding: 1.25rem;
+}
+
+@media (max-width: 860px) {
+	.app-shell-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.app-shell-nav {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.app-shell-topbar {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.app-shell-topbar-controls {
+		grid-template-columns: 1fr;
+		width: 100%;
+	}
+}
+
+@media (max-width: 576px) {
+	.app-shell-layout {
+		padding: 0.8rem;
+	}
+
+	.app-shell-content {
+		padding: 0.9rem;
+	}
+
+	.app-shell-nav {
+		grid-template-columns: 1fr;
+	}
+}

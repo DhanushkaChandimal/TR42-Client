@@ -7,7 +7,7 @@ from app.utils.util import token_required
 import logging
 
 
-users_bp = Blueprint("users_bp", __name__)
+users_bp = Blueprint("users_bp", __name__, url_prefix="/auth")
 
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 @users_bp.route("/verify-token", methods=["GET"])
 @token_required
 def verify_token(user_id):
-    logger.info(f"Token verification requested for user ID: {user_id}")
+    logger.info(f"Token verification requested for user ID")
     return jsonify({"message": "Token is valid!", "user_id": user_id}), 200
 
 @users_bp.route("/login", methods=['POST'])
@@ -32,7 +32,7 @@ def login():
     email = credentials["email"]
     password = credentials["password"]
 
-    logger.info(f"Login attempt with email")
+    logger.info(f"Login attempt for email")
 
     response, status_code = LoginService.login_user(email, password)
 
