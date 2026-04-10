@@ -1,4 +1,15 @@
 import { useState } from "react";
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+
+function LocationPicker({ setCoordinates }) {
+    useMapEvents({
+        click(e) {
+            setCoordinates(`${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`);
+        }
+    });
+    return null;
+}
 import { useWorkOrder } from "../hooks/useWorkOrder";
 
 const recurringOptions = [
@@ -42,6 +53,8 @@ const emptyForm = {
 function CreateWorkOrderModal({ setShowModal }) {
     
     const [formData, setFormData] = useState(emptyForm);
+        // For map marker
+        const [markerPos, setMarkerPos] = useState(null);
     const {
             workOrders,
             // loading,
@@ -57,6 +70,18 @@ function CreateWorkOrderModal({ setShowModal }) {
             ...prev,
             [name]: type === 'checkbox' ? checked : value,
         }));
+        // If user edits gpsCoordinates manually, update marker
+        if (name === 'gpsCoordinates') {
+            const [lat, lng] = value.split(',').map(Number);
+            if (!isNaN(lat) && !isNaN(lng)) setMarkerPos([lat, lng]);
+        }
+    };
+
+    // When user clicks map, update gpsCoordinates and marker
+    const handleMapClick = coords => {
+        setFormData(prev => ({ ...prev, gpsCoordinates: coords }));
+        const [lat, lng] = coords.split(',').map(Number);
+        setMarkerPos([lat, lng]);
     };
 
     const handleCreateWorkOrder = e => {
@@ -184,14 +209,35 @@ function CreateWorkOrderModal({ setShowModal }) {
                         />
                     )}
                     {formData.locationMethod === 'gps' && (
-                        <input
-                            type="text"
-                            name="gpsCoordinates"
-                            placeholder="31.7451, -102.5028"
-                            value={formData.gpsCoordinates}
-                            onChange={handleFormChange}
-                            required
-                        />
+                        <div style={{ marginBottom: 16 }}>
+                            <input
+                                type="text"
+                                name="gpsCoordinates"
+                                placeholder="31.7451, -102.5028"
+                                value={formData.gpsCoordinates}
+                                onChange={handleFormChange}
+                                required
+                                style={{ marginBottom: 8 }}
+                            />
+                            <div style={{ height: 220, width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+                                <MapContainer
+                                    center={markerPos || [31.7451, -102.5028]}
+                                    zoom={10}
+                                    style={{ height: '100%', width: '100%' }}
+                                    whenCreated={map => {
+                                        if (markerPos) map.setView(markerPos, 13);
+                                    }}
+                                >
+                                    <TileLayer
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        attribution="&copy; OpenStreetMap contributors"
+                                    />
+                                    <LocationPicker setCoordinates={handleMapClick} />
+                                    {markerPos && <Marker position={markerPos} />}
+                                </MapContainer>
+                            </div>
+                            <small>Click on the map to set coordinates.</small>
+                        </div>
                     )}
                     {formData.locationMethod === 'address' && (
                         <input

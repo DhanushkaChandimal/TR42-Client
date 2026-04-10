@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/AppShell';
 import { useWorkOrder } from '../hooks/useWorkOrder';
-import { CreateWorkOrderModal } from '../components/CreateWorkOrderModal';
+import CreateWorkOrderModal from '../components/CreateWorkOrderModal';
 import '../styles/workorder.css';
 
 const statusOptions = ['all', 'pending', 'in_progress', 'completed'];
