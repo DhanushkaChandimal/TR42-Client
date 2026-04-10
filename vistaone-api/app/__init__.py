@@ -1,12 +1,9 @@
 from flask import Flask, app, jsonify
-from .extensions import ma, limiter
-from app.models import db
+from app.extensions import ma, limiter, db
 from app.blueprints.controller import users_bp
 from app.blueprints.controller import workorder_bp
-from app.utils.loggingUtil import logging_setup
+from app.utils.logging_util import logging_setup
 from flask_swagger_ui import get_swaggerui_blueprint
-from app.utils.loggingUtil import logging_setup
-
 from dotenv import load_dotenv
 
 
@@ -24,6 +21,7 @@ swaggerui_blueprint = get_swaggerui_blueprint(
     }
 )
 
+#def create_app(config_name="ProductionConfig"):
 def create_app(config_name):
     app = Flask(__name__)
     app.config.from_object(f'config.{config_name}')

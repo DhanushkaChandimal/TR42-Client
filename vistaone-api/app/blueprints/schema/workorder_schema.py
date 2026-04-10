@@ -1,13 +1,13 @@
 from app.extensions import ma
 from marshmallow import fields, validates_schema, ValidationError
-from app.models.workorder import WorkOrder
+from app.models import WorkOrder
 from app.models.enums import PriorityEnum, FrequencyEnum, LocationTypeEnum
 
 class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = WorkOrder
-       # include_fk = True
-        load_instance = True
+        include_fk = True
+        load_instance = False
 
     client_id = fields.String(required=True)
     vendor_id = fields.String(required=True)
@@ -19,25 +19,23 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
     well_number = fields.String()
     coordinates = fields.String()
 
-    address_line1 = fields.String()
+    address_id = fields.String()
+    street = fields.String()
     city = fields.String()
     state = fields.String()
     zip = fields.String()
 
-    metrics = fields.String()
-    volume = fields.Float()
+    units = fields.String()
+    estimated_quantity = fields.Float()
 
     priority = fields.String(required=True)
 
-    recursion = fields.Boolean()
+    is_recurring = fields.Boolean()
 
-    frequency = fields.String()
+    recurrence_type = fields.String()
 
-    start_service = fields.DateTime()
-    end_service = fields.DateTime()
-
-    created_by = fields.String()
-
+    estimated_start_date = fields.DateTime()
+    estimated_end_date = fields.DateTime()
 
 
     @validates_schema
@@ -57,8 +55,8 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
 
         elif location_type == LocationTypeEnum.ADDRESS.value:
 
-            if not data.get("address_line1"):
-                raise ValidationError("address required for ADDRESS location")
+            if not data.get("address") and not data.get("street"):
+                raise ValidationError("Either address or street required for ADDRESS location")
 
 
     @validates_schema
@@ -68,12 +66,12 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
         if data.get("priority") not in [e.value for e in PriorityEnum]:
             raise ValidationError("Invalid priority")
 
-        if data.get("frequency") and data.get("frequency") not in [e.value for e in FrequencyEnum]:
-            raise ValidationError("Invalid frequency")
+        if data.get("recurrence_type") and data.get("recurrence_type") not in [e.value for e in FrequencyEnum]:
+            raise ValidationError("Invalid recurrence_type")
         
         # RECURSION VALIDATION
-        if data.get("recursion") == True and not data.get("frequency"):
-            raise ValidationError("frequency required when recursion is TRUE")
+        if data.get("is_recurring") == True and not data.get("recurrence_type"):
+            raise ValidationError("recurrence_type required when is_recurring is TRUE")
 
 
 workorder_schema = WorkOrderSchema()

@@ -6,13 +6,14 @@ class PriorityEnum(Enum):
     LOW = "LOW"
 
 class StatusEnum(Enum):
-    CREATED = "CREATED"
-    SCHEDULED = "SCHEDULED"
-    IN_PROGRESS = "IN_PROGRESS"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-    CLOSED = "CLOSED"
+    UNASSIGNED = "UNASSIGNED"
+    ASSIGNED = "ASSIGNED"
     APPROVED = "APPROVED"
+    CANCELLED = "CANCELLED"
+    IN_PROGRESS = "IN_PROGRESS"  
+    COMPLETED = "COMPLETED"
+    CLOSED = "CLOSED"
+  
 
 class FrequencyEnum(Enum):
     DAILY = "DAILY"
