@@ -18,7 +18,7 @@ class LoginService:
         user = LoginRepository.get_user_by_email(email)
 
         if user and user.check_password(password): # ensure password hash check
-        # if user:
+        
             logger.info(f"User logged in: {user.id}")
             token = encode_token(user.id)
 

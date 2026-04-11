@@ -9,6 +9,7 @@ class WorkOrderRepository:
     def create(workorder: WorkOrder):
         db.session.add(workorder)
         db.session.commit()
+        db.session.refresh(workorder)
         return workorder
 
     @staticmethod
@@ -21,11 +22,6 @@ class WorkOrderRepository:
 
     @staticmethod
     def update():
-        db.session.commit()
-
-    @staticmethod
-    def cancel():
-        #db.session.delete())
         db.session.commit()
 
        

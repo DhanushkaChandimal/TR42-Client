@@ -7,7 +7,7 @@ from app.utils.util import token_required
 import logging
 
 
-users_bp = Blueprint("users_bp", __name__)
+users_bp = Blueprint("users_bp", __name__, url_prefix="/auth")
 
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,8 @@ def login():
 @users_bp.route("/logout", methods=["POST"])
 @token_required
 def logout(user_id):
-    logger.info(f"Logout request received for user ID: {user_id}")
-    response, status_code = LoginService.logout_user()
+    logger.info(f"Logout request received for user ID:")
+    response, status_code = LoginService.logout_user(user_id)
     logger.info(f"Logout response: {response}, Status Code: {status_code}")
     response = {
         "status": "success",

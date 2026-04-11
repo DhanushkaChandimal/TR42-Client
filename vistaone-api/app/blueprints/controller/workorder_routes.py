@@ -1,6 +1,7 @@
 from flask import request, jsonify,Blueprint
 from app.blueprints.schema.workorder_schema import workorder_schema, workorders_schema
 from app.blueprints.services.workorder_service import WorkOrderService
+from app.blueprints.schema.delete_workorder import delete_workorder_schema
 from marshmallow import ValidationError
 from app.utils.util import token_required
 
@@ -16,10 +17,12 @@ def create_workorder(current_user_id):
     json_data = request.get_json()
     if not json_data:
         return jsonify({"error": "No input data provided"}), 400
+    if not current_user_id:
+                raise Exception("current_user_id not provided!")
 
     try:
-        validated_data = workorder_schema.load(json_data)
-        workorder = WorkOrderService.create_workorder(validated_data, current_user_id)
+        validated_workorder_data = workorder_schema.load(json_data)
+        workorder = WorkOrderService.create_workorder(validated_workorder_data, current_user_id)
         return workorder_schema.jsonify(workorder), 201
     
     except ValidationError as err:
@@ -65,13 +68,19 @@ def update_workorder(current_user_id, work_order_id):
         return jsonify({"error": str(e)}), 400
 
 # DELETE
-@workorder_bp.route("/<string:work_order_id>", methods=["DELETE"])
+@workorder_bp.route("/", methods=["DELETE"])
 @token_required
-def delete_workorder(current_user_id, work_order_id):
-    if not work_order_id:
-        return jsonify({"error": "WorkOrder ID is required"}), 400
+def delete_workorder(current_user_id):
+    if not current_user_id:
+        raise Exception("current_user_id not provided!")
+    
+    json_data = request.get_json()
+    
+    if not json_data.get("work_order_id") or not json_data.get("cancellation_reason"):
+        return jsonify({"error": "WorkOrder ID and cancellation reason are required"}), 400
     try:
-        WorkOrderService.delete_workorder(work_order_id, current_user_id)
+        validate_delete_workorder = delete_workorder_schema.load(json_data)
+        WorkOrderService.cancel_workorder(validate_delete_workorder, current_user_id)
         return jsonify({"message": "Deleted successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400

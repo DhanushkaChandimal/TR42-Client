@@ -1,7 +1,10 @@
 from app.extensions import ma
 from marshmallow import fields, validates_schema, ValidationError
 from app.models import WorkOrder
-from app.models.enums import PriorityEnum, FrequencyEnum, LocationTypeEnum
+from app.blueprints.enum.enums import PriorityEnum, FrequencyEnum, LocationTypeEnum, StatusEnum
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
@@ -14,11 +17,12 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
     service_type_id = fields.String(required=True)
     description = fields.String(required=True)
 
-    location_type = fields.String(required=True)
+    location_type = fields.Enum(LocationTypeEnum, by_value=True, required=True)
 
-    well_number = fields.String()
-    coordinates = fields.String()
-
+    well_id = fields.String()
+    latitude = fields.Float()
+    longitude = fields.Float()
+ 
     address_id = fields.String()
     street = fields.String()
     city = fields.String()
@@ -28,47 +32,20 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
     units = fields.String()
     estimated_quantity = fields.Float()
 
-    priority = fields.String(required=True)
+    priority = fields.Enum(PriorityEnum, by_value=True, required=True)
 
     is_recurring = fields.Boolean()
-
-    recurrence_type = fields.String()
+    recurrence_type = fields.Enum(FrequencyEnum, by_value=True)
 
     estimated_start_date = fields.DateTime()
     estimated_end_date = fields.DateTime()
 
+    status = fields.Enum(StatusEnum, by_value=True)
 
-    @validates_schema
-    def validate_location(self, data, **kwargs):
-        # LOCATION VALIDATION
-        location_type = data.get("location_type")
-
-        if location_type == LocationTypeEnum.WELL.value:
-
-            if not data.get("well_number"):
-                raise ValidationError("well_number required for WELL location")
-
-        elif location_type == LocationTypeEnum.GPS.value:
-
-            if not data.get("coordinates"):
-                raise ValidationError("coordinates required for GPS location")
-
-        elif location_type == LocationTypeEnum.ADDRESS.value:
-
-            if not data.get("address") and not data.get("street"):
-                raise ValidationError("Either address or street required for ADDRESS location")
 
 
     @validates_schema
     def validate_fields(self, data, **kwargs):
-
-        # ENUM validation
-        if data.get("priority") not in [e.value for e in PriorityEnum]:
-            raise ValidationError("Invalid priority")
-
-        if data.get("recurrence_type") and data.get("recurrence_type") not in [e.value for e in FrequencyEnum]:
-            raise ValidationError("Invalid recurrence_type")
-        
         # RECURSION VALIDATION
         if data.get("is_recurring") == True and not data.get("recurrence_type"):
             raise ValidationError("recurrence_type required when is_recurring is TRUE")

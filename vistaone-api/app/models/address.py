@@ -1,10 +1,8 @@
-from datetime import datetime
+from typing import List
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.extensions import db
 from sqlalchemy.sql import func
-
-
 
 
 class Address(db.Model):
@@ -20,6 +18,11 @@ class Address(db.Model):
     created_by = mapped_column(db.String(100))
     created_date = mapped_column(db.DateTime, server_default=func.now())
 
-  
     last_modified_by = mapped_column(db.String(100))
     last_modified_date = mapped_column(db.DateTime)
+
+    # clients: Mapped[Client] = relationship('Client', back_populates='address')
+    # vendors: Mapped[Vendor]= relationship('Vendor', back_populates='address')
+    workorders: Mapped[List["WorkOrder"]] = relationship("WorkOrder",back_populates="address")
+
+    #workorders: Mapped[WorkOrder] = relationship('WorkOrder', back_populates='address')

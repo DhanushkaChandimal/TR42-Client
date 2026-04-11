@@ -13,7 +13,6 @@ class StatusEnum(Enum):
     IN_PROGRESS = "IN_PROGRESS"  
     COMPLETED = "COMPLETED"
     CLOSED = "CLOSED"
-  
 
 class FrequencyEnum(Enum):
     DAILY = "DAILY"
@@ -26,3 +25,8 @@ class LocationTypeEnum(Enum):
     WELL = "WELL"
     GPS = "GPS"
     ADDRESS = "ADDRESS"
+
+
+class WellStatusEnum(Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
