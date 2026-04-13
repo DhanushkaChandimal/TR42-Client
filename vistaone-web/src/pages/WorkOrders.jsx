@@ -48,7 +48,12 @@ export default function WorkOrders() {
     const formatStatusLabel = status => status.replace('_', ' ');
 
     return (
-        <AppShell title="Work Orders" subtitle="Manage field work orders">
+        <AppShell
+            title="Work Orders"
+            subtitle="Manage field work orders"
+            loading={loading}
+            loadingText="Loading work orders..."
+        >
             <section className="workorders-controls">
                 <input
                     type="search"
