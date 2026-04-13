@@ -73,10 +73,16 @@ export default function WorkOrders() {
                         </option>
                     ))}
                 </select>
-                <button className="workorders-create-btn" onClick={handleOpenModal}>
-                    Create Work Order
-                </button>
             </section>
+
+            <button className="fab-create-workorder" onClick={handleOpenModal} title="Create Work Order">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="12" fill="#007bff" />
+                    <rect x="11" y="6" width="2" height="12" rx="1" fill="#fff" />
+                    <rect x="6" y="11" width="12" height="2" rx="1" fill="#fff" />
+                </svg>
+                <span className="fab-label">Create Work Order</span>
+            </button>
 
             <section className="workorders-table-wrap">
                 {loading ? (

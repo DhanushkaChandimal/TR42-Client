@@ -162,25 +162,6 @@
 	font-weight: 400;
 }
 
-.workorders-create-btn {
-	border: 0;
-	border-radius: 0.75rem;
-	padding: 0.68rem 1rem;
-	white-space: nowrap;
-	font-weight: 600;
-	color: #ffffff;
-	background: linear-gradient(135deg, #495057, #343a40);
-	box-shadow: 0 10px 24px rgba(73, 80, 87, 0.28);
-	transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
-	cursor: pointer;
-}
-
-.workorders-create-btn:hover {
-	transform: translateY(-1px);
-	box-shadow: 0 12px 28px rgba(73, 80, 87, 0.36);
-	background: linear-gradient(135deg, #3e444a, #2a2e31);
-}
-
 .workorders-controls {
 	display: grid;
 	grid-template-columns: 1fr 220px;
@@ -441,6 +422,47 @@
 	filter: brightness(0.94);
 }
 
+/* Floating Action Button for Create Work Order */
+.fab-create-workorder {
+	position: fixed;
+	right: 2.5rem;
+	bottom: 2.5rem;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	background: #fff;
+	border: none;
+	box-shadow: 0 4px 24px 0 rgba(0,0,0,0.10), 0 1.5px 4px 0 rgba(0,0,0,0.08);
+	border-radius: 2rem;
+	padding: 0.5rem 1.25rem 0.5rem 0.5rem;
+	cursor: pointer;
+	transition: box-shadow 0.18s, background 0.18s;
+	font-size: 1rem;
+	font-weight: 500;
+	color: #222;
+	outline: none;
+}
+.fab-create-workorder svg {
+	display: block;
+	margin-right: 0.5rem;
+	background: #007bff;
+	border-radius: 50%;
+	box-shadow: 0 2px 8px 0 rgba(0,123,255,0.10);
+}
+.fab-create-workorder:hover, .fab-create-workorder:focus {
+	background: #f4f8ff;
+	box-shadow: 0 6px 32px 0 rgba(0,123,255,0.13), 0 2px 8px 0 rgba(0,0,0,0.10);
+}
+.fab-label {
+	display: inline-block;
+	margin-left: 0.5rem;
+	color: #007bff;
+	font-weight: 600;
+	font-size: 1.05rem;
+	letter-spacing: 0.01em;
+}
+
 @keyframes wo-fade-up {
 	from {
 		opacity: 0;
@@ -524,10 +546,6 @@
 	.workorders-header {
 		flex-direction: column;
 		align-items: stretch;
-	}
-
-	.workorders-create-btn {
-		width: 100%;
 	}
 
 	.workorders-form-row {
