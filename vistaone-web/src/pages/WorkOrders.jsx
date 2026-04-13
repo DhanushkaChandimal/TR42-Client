@@ -85,6 +85,7 @@ export default function WorkOrders() {
                                 <th>Order ID</th>
                                 <th>Vendor</th>
                                 <th>Job Type</th>
+                                <th>Location Type</th>
                                 <th>Location</th>
                                 <th>Date</th>
                                 <th>Status</th>
@@ -95,9 +96,10 @@ export default function WorkOrders() {
                             {filteredOrders.map(order => (
                                 <tr key={order.work_order_id}>
                                     <td>{order.work_order_id}</td>
-                                    <td>{order.vendor_id}</td>
-                                    <td>{order.service_type_id}</td>
+                                    <td>{order.vendor.name}</td>
+                                    <td>{order.service_type.service}</td>
                                     <td>{order.location_type}</td>
+                                    <td>{`${order.latitude}, ${order.longitude}`}</td>
                                     <td>{formatDate(order.created_date)}</td>
                                     <td>
                                         <span className={`status-badge status-${order.status?.toLowerCase()}`}>
