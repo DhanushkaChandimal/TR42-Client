@@ -34,13 +34,19 @@ const jobTypeOptions = [
   "Site Inspection",
 ];
 
+const wellOptions = [
+  { value: "well-1", label: "Well 1 - API 42-001-00001", gps: "31.7451, -102.5028" },
+  { value: "well-2", label: "Well 2 - API 42-001-00002", gps: "31.7500, -102.5100" },
+  { value: "well-3", label: "Well 3 - API 42-001-00003", gps: "31.7600, -102.5200" },
+];
+
 const emptyForm = {
   jobType: jobTypeOptions[0],
   volume: "",
   description: "",
   vendor: vendorOptions[0],
-  locationMethod: "api",
-  apiNumber: "",
+  well: wellOptions[0].value,
+  locationMethod: "well",
   gpsCoordinates: "",
   physicalAddress: "",
   date: "",
@@ -64,11 +70,40 @@ function CreateWorkOrderModal({ setShowModal }) {
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
+    // If changing locationMethod to 'well', fill GPS from well and set map
+    if (name === "locationMethod" && value === "well") {
+      const selectedWell = wellOptions.find(w => w.value === formData.well);
+      if (selectedWell && selectedWell.gps) {
+        setFormData((prev) => ({
+          ...prev,
+          locationMethod: value,
+          gpsCoordinates: selectedWell.gps,
+          physicalAddress: ""
+        }));
+        const [lat, lng] = selectedWell.gps.split(",").map(Number);
+        if (!isNaN(lat) && !isNaN(lng)) setMarkerPos([lat, lng]);
+        return;
+      }
+    }
+    // If changing well and locationMethod is 'well', update GPS from new well
+    if (name === "well" && formData.locationMethod === "well") {
+      const selectedWell = wellOptions.find(w => w.value === value);
+      if (selectedWell && selectedWell.gps) {
+        setFormData((prev) => ({
+          ...prev,
+          well: value,
+          gpsCoordinates: selectedWell.gps,
+          physicalAddress: ""
+        }));
+        const [lat, lng] = selectedWell.gps.split(",").map(Number);
+        if (!isNaN(lat) && !isNaN(lng)) setMarkerPos([lat, lng]);
+        return;
+      }
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    // If user edits gpsCoordinates manually, update marker
     if (name === "gpsCoordinates") {
       const [lat, lng] = value.split(",").map(Number);
       if (!isNaN(lat) && !isNaN(lng)) setMarkerPos([lat, lng]);
@@ -85,17 +120,21 @@ function CreateWorkOrderModal({ setShowModal }) {
   const handleCreateWorkOrder = (e) => {
     e.preventDefault();
     let locationDisplay = "";
-    if (formData.locationMethod === "api")
-      locationDisplay = formData.apiNumber.trim();
-    else if (formData.locationMethod === "gps")
+    if (formData.locationMethod === "well") {
+      const selectedWell = wellOptions.find(w => w.value === formData.well);
+      locationDisplay = selectedWell ? selectedWell.label : "";
+    } else if (formData.locationMethod === "gps") {
       locationDisplay = formData.gpsCoordinates.trim();
-    else locationDisplay = formData.physicalAddress.trim();
+    } else {
+      locationDisplay = formData.physicalAddress.trim();
+    }
 
     const newWorkOrder = {
       jobType: formData.jobType,
       title: `${formData.jobType}${formData.volume ? " - " + formData.volume : ""}`,
       description: formData.description.trim(),
       vendor: formData.vendor,
+      well: formData.well,
       location: locationDisplay,
       priority: formData.priority,
       status: "pending",
@@ -194,79 +233,91 @@ function CreateWorkOrderModal({ setShowModal }) {
               onChange={handleFormChange}
             />
           </label>
-          {/* Location method */}
+
+          {/* Job Location method and conditional well dropdown */}
           <div className="workorder-location-method">
-            <span className="workorder-location-label">Location Method</span>
+            <span className="workorder-location-label">Job Location</span>
             <div className="workorder-location-options">
               <button
                 type="button"
-                className={
-                  formData.locationMethod === "api"
-                    ? "workorder-location-btn active"
-                    : "workorder-location-btn"
-                }
-                onClick={() =>
-                  handleFormChange({
-                    target: {
-                      name: "locationMethod",
-                      value: "api",
-                      type: "radio",
-                    },
-                  })
-                }
+                className={formData.locationMethod === "well" ? "workorder-location-btn active" : "workorder-location-btn"}
+                onClick={() => handleFormChange({ target: { name: "locationMethod", value: "well", type: "radio" } })}
               >
-                API Well Number
+                Same as Well Location
               </button>
               <button
                 type="button"
-                className={
-                  formData.locationMethod === "gps"
-                    ? "workorder-location-btn active"
-                    : "workorder-location-btn"
-                }
-                onClick={() =>
-                  handleFormChange({
-                    target: {
-                      name: "locationMethod",
-                      value: "gps",
-                      type: "radio",
-                    },
-                  })
-                }
+                className={formData.locationMethod === "gps" ? "workorder-location-btn active" : "workorder-location-btn"}
+                onClick={() => handleFormChange({ target: { name: "locationMethod", value: "gps", type: "radio" } })}
               >
                 GPS Coordinates
               </button>
               <button
                 type="button"
-                className={
-                  formData.locationMethod === "address"
-                    ? "workorder-location-btn active"
-                    : "workorder-location-btn"
-                }
-                onClick={() =>
-                  handleFormChange({
-                    target: {
-                      name: "locationMethod",
-                      value: "address",
-                      type: "radio",
-                    },
-                  })
-                }
+                className={formData.locationMethod === "address" ? "workorder-location-btn active" : "workorder-location-btn"}
+                onClick={() => handleFormChange({ target: { name: "locationMethod", value: "address", type: "radio" } })}
               >
                 Physical Address
               </button>
             </div>
+            {/* Well dropdown only if Same as Well Location is selected */}
+            {formData.locationMethod === "well" && (
+              <label style={{ marginTop: "1rem", display: "block" }}>
+                Well
+                <select
+                  name="well"
+                  value={formData.well}
+                  onChange={handleFormChange}
+                  style={{ marginLeft: 8 }}
+                >
+                  {wellOptions.map((w) => (
+                    <option key={w.value} value={w.value}>{w.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
-          {/* Conditional location inputs */}
-          {formData.locationMethod === "api" && (
-            <input
-              type="text"
-              name="apiNumber"
-              placeholder="API-42-002-03456"
-              value={formData.apiNumber}
-              onChange={handleFormChange}
-              required
-            />
+
+          {/* Show map and well dropdown only for Same as Well Location, show map for GPS, hide well dropdown for GPS/Address */}
+          {formData.locationMethod === "well" && (
+            <div style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  height: 220,
+                  width: "100%",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  marginBottom: 8,
+                }}
+              >
+                <MapContainer
+                  center={(() => {
+                    const selectedWell = wellOptions.find(w => w.value === formData.well);
+                    if (selectedWell && selectedWell.gps) {
+                      const [lat, lng] = selectedWell.gps.split(",").map(Number);
+                      return [lat, lng];
+                    }
+                    return [31.7451, -102.5028];
+                  })()}
+                  zoom={13}
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                  />
+                  {(() => {
+                    const selectedWell = wellOptions.find(w => w.value === formData.well);
+                    if (selectedWell && selectedWell.gps) {
+                      const [lat, lng] = selectedWell.gps.split(",").map(Number);
+                      return <Marker position={[lat, lng]} />;
+                    }
+                    return null;
+                  })()}
+                </MapContainer>
+              </div>
+              <small>Location is set from selected well.</small>
+            </div>
           )}
           {formData.locationMethod === "gps" && (
             <div style={{ marginBottom: 16 }}>
@@ -290,7 +341,7 @@ function CreateWorkOrderModal({ setShowModal }) {
               >
                 <MapContainer
                   center={markerPos || [31.7451, -102.5028]}
-                  zoom={10}
+                  zoom={13}
                   style={{ height: "100%", width: "100%" }}
                   whenCreated={(map) => {
                     if (markerPos) map.setView(markerPos, 13);
@@ -308,14 +359,46 @@ function CreateWorkOrderModal({ setShowModal }) {
             </div>
           )}
           {formData.locationMethod === "address" && (
-            <input
-              type="text"
-              name="physicalAddress"
-              placeholder="Tank Battery A, South Lease"
-              value={formData.physicalAddress}
-              onChange={handleFormChange}
-              required
-            />
+            <div className="workorder-address-fields" style={{ marginBottom: 16 }}>
+              <input
+                type="text"
+                name="street"
+                placeholder="Street Address"
+                value={formData.street || ""}
+                onChange={handleFormChange}
+                required
+                style={{ marginBottom: 8 }}
+              />
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  type="text"
+                  name="city"
+                  placeholder="City"
+                  value={formData.city || ""}
+                  onChange={handleFormChange}
+                  required
+                  style={{ flex: 2 }}
+                />
+                <input
+                  type="text"
+                  name="state"
+                  placeholder="State"
+                  value={formData.state || ""}
+                  onChange={handleFormChange}
+                  required
+                  style={{ flex: 1 }}
+                />
+                <input
+                  type="text"
+                  name="zip"
+                  placeholder="ZIP"
+                  value={formData.zip || ""}
+                  onChange={handleFormChange}
+                  required
+                  style={{ flex: 1 }}
+                />
+              </div>
+            </div>
           )}
           {/* Date, priority, recurring */}
           <div className="workorders-form-row">
