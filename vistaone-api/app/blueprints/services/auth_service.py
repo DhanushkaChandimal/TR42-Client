@@ -18,7 +18,7 @@ class LoginService:
         user = LoginRepository.get_user_by_email(email)
 
         if user and user.check_password(password): # ensure password hash check
-            
+    
             token = encode_token(user.id)
 
             return {
@@ -33,6 +33,7 @@ class LoginService:
     @staticmethod
     @token_required
     def logout_user(user_id):
+
         # Extract token from request
         token = None
         if 'Authorization' in request.headers:

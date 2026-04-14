@@ -1,6 +1,6 @@
 from app.extensions import ma
-from app.models import User
 from marshmallow import fields, pre_load
+from app.models import User
 
 class UserSchema(ma.SQLAlchemyAutoSchema):
     email = fields.Email(required=True)

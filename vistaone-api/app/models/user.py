@@ -2,19 +2,20 @@
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import DateTime, func
 from werkzeug.security import check_password_hash, generate_password_hash
-from . import Base, db
+from app.extensions import db
+import uuid
 
 
-class User(Base):
+class User(db.Model):
     __tablename__ = 'users'
     
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     first_name: Mapped[str] = mapped_column(db.String(255), nullable=False)
     last_name: Mapped[str] = mapped_column(db.String(255), nullable=False)
     email: Mapped[str] = mapped_column(db.String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(db.String(255), nullable=False)
-    role_id: Mapped[int] = mapped_column(nullable=False)
-    company_id: Mapped[int] = mapped_column(nullable=False)
+    role_id: Mapped[str] = mapped_column(db.String(36),nullable=False)
+    company_id: Mapped[str] = mapped_column(db.String(36), nullable=False)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     def set_password(self, raw_password: str) -> None:

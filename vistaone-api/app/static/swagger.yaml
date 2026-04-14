@@ -117,6 +117,178 @@ paths:
             application/json:
               message: "Token has been revoked!"
 
+  /workorders:
+    post:
+      tags:
+      - WorkOrders
+      summary: "Create WorkOrder"
+      description: "Creates a work order. If location_type = ADDRESS, address is created internally."
+      security:
+      - bearerAuth: []
+      parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/WorkOrderCreateRequest"
+      responses:
+        201:
+          description: "WorkOrder created successfully"
+          schema:
+            $ref: "#/definitions/WorkOrderResponse"
+          examples:
+            application/json:
+              id: 1
+              work_order_id: "5e168730-85e4-402e-bd9f-b22db074ea3f"
+              client_id: "c1234564"
+              vendor_id: "v12345"
+              location_type: "ADDRESS"
+              priority: "HIGH"
+              status: "UNASSIGNED"
+              address:
+                address_id: "a737b086-1d1c-4451-a11a-eb6693a74bb8"
+                street: "9558 Creighton Rd NW"
+                city: "Houston"
+                state: "TX"
+                zip: "77001"
+                country: null
+              created_date: "2026-04-13T22:39:52.691436"
+
+        400:
+          description: "Validation error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+          examples:
+            application/json:
+              error: "Invalid address location - street, city, state, zip are required"
+
+    get:
+      tags:
+      - WorkOrders
+      summary: "Get all WorkOrders"
+      security:
+      - bearerAuth: []
+      responses:
+        200:
+          description: "List of WorkOrders"
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/WorkOrderResponse"
+
+  /workorders/{work_order_id}:
+    get:
+      tags:
+      - WorkOrders
+      summary: "Get WorkOrder by ID"
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: work_order_id
+        in: path
+        required: true
+        type: string
+      responses:
+        200:
+          description: "WorkOrder found"
+          schema:
+            $ref: "#/definitions/WorkOrderResponse"
+        404:
+          description: "Not found"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+
+    put:
+      tags:
+      - WorkOrders
+      summary: "Update WorkOrder (partial update allowed)"
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: work_order_id
+        in: path
+        required: true
+        type: string
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/WorkOrderUpdateRequest"
+      responses:
+        200:
+          description: "Updated successfully"
+          schema:
+            $ref: "#/definitions/WorkOrderResponse"
+        400:
+          description: "Validation error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+
+    delete:
+      tags:
+      - WorkOrders
+      summary: "Cancel WorkOrder"
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: work_order_id
+        in: path
+        required: true
+        type: string
+      - in: body
+        name: body
+        required: true
+        schema:
+          $ref: "#/definitions/CancelRequest"
+      responses:
+        200:
+          description: "Cancelled successfully"
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+        400:
+          description: "Error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+
+  /workorders/search:
+    get:
+      tags:
+      - WorkOrders
+      summary: "Search WorkOrders"
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: q
+        in: query
+        type: string
+      - name: status
+        in: query
+        type: string
+      - name: page
+        in: query
+        type: integer
+      - name: per_page
+        in: query
+        type: integer
+      - name: sort_by
+        in: query
+        type: string
+      - name: order
+        in: query
+        type: string
+      responses:
+        200:
+          description: "Paginated results"
+          schema:
+            $ref: "#/definitions/PaginatedWorkOrders"
+        400:
+          description: "Error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+
 definitions:
 
   VerifyTokenResponse:
@@ -186,3 +358,195 @@ definitions:
     properties:
       message:
         type: string
+
+  WorkOrderCreateRequest:
+    type: object
+    required:
+    - client_id
+    - vendor_id
+    - service_type_id
+    - description
+    - location_type
+    - priority
+    properties:
+      client_id:
+        type: string
+      vendor_id:
+        type: string
+      service_type_id:
+        type: string
+      description:
+        type: string
+      location_type:
+        type: string
+        enum: [ ADDRESS, GPS, WELL ]
+
+      well_id:
+        type: string
+
+      street:
+        type: string
+      city:
+        type: string
+      state:
+        type: string
+      zip:
+        type: string
+
+      latitude:
+        type: number
+        format: float
+      longitude:
+        type: number
+        format: float
+
+      priority:
+        type: string
+        enum: [ LOW, MEDIUM, HIGH ]
+
+      is_recurring:
+        type: boolean
+
+      recurrence_type:
+        type: string
+        enum: [ ONE_TIME, DAILY, WEEKLY, MONTHLY ]
+
+  WorkOrderResponse:
+    type: object
+    properties:
+      id:
+        type: integer
+      work_order_id:
+        type: string
+      client_id:
+        type: string
+      vendor_id:
+        type: string
+      service_type_id:
+        type: string
+      description:
+        type: string
+      location_type:
+        type: string
+      well_id:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      units:
+        type: string
+      estimated_quantity:
+        type: number
+      priority:
+        type: string
+      status:
+        type: string
+      is_recurring:
+        type: boolean
+      recurrence_type:
+        type: string
+      address_id:
+        type: string
+
+      address:
+        $ref: "#/definitions/AddressResponse"
+
+      created_by:
+        type: string
+      created_date:
+        type: string
+        format: date-time
+
+      last_modified_by:
+        type: string
+      last_modified_date:
+        type: string
+        format: date-time
+
+      cancellation_reason:
+        type: string
+
+  AddressResponse:
+    type: object
+  properties:
+    address_id:
+      type: string
+    street:
+      type: string
+    city:
+      type: string
+    state:
+      type: string
+    zip:
+      type: string
+    country:
+      type: string
+
+  ErrorResponse:
+    type: object
+    properties:
+      error:
+        type: string
+
+  WorkOrderUpdateRequest:
+    type: object
+    properties:
+      client_id:
+        type: string
+      vendor_id:
+        type: string
+      service_type_id:
+        type: string
+      description:
+        type: string
+      priority:
+        type: string
+      status:
+        type: string
+      street:
+        type: string
+      city:
+        type: string
+      state:
+        type: string
+      zip:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      well_id:
+        type: string
+      location_type:
+        type: string
+        enum: [ ADDRESS, GPS, WELL ]
+      is_recurring:
+        type: boolean
+      recurrence_type:
+        type: string
+        enum: [ ONE_TIME, DAILY, WEEKLY, MONTHLY ]
+
+  CancelRequest:
+    type: object
+    required:
+    - cancellation_reason
+    properties:
+      cancellation_reason:
+        type: string
+
+  PaginatedWorkOrders:
+    type: object
+    properties:
+      total:
+        type: integer
+      count:
+        type: integer
+      page:
+        type: integer
+      pages:
+        type: integer
+      data:
+        type: array
+        items:
+          $ref: "#/definitions/WorkOrderResponse"

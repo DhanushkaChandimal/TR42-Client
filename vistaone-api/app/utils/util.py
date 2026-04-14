@@ -48,7 +48,7 @@ def token_required(f):
                 return jsonify({'message': 'Token has been revoked!'}), 401
             
 
-            user_id = data['sub']  # Fetch the user ID
+            user_id = data['sub']  # Fetch the user ID, this is the user ID from token
             logger.info(f"User ID: {user_id}")
         except jose.exceptions.ExpiredSignatureError:
              return jsonify({'message': 'Token has expired!'}), 401
