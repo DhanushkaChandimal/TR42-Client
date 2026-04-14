@@ -19,33 +19,45 @@ const recurringOptions = [
 ];
 
 const vendorOptions = [
-  "ABC Trucking Co.",
-  "Midland Field Services",
-  "Texas Sand & Gravel",
-  "Odessa Water Transport",
-  "Permian Basin Logistics",
+  { id: "aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaa1", label: "Delta Services" },
+  {
+    id: "bbbbbbb2-bbbb-bbbb-bbbb-bbbbbbbbbbb2",
+    label: "Epsilon Drilling",
+  },
+  { id: "ccccccc3-cccc-cccc-cccc-ccccccccccc3", label: "Zeta Field Solutions" },
 ];
 
 const jobTypeOptions = [
-  "Water Hauling",
-  "Roustabout Crew",
-  "Sand Delivery",
-  "Equipment Repair",
-  "Site Inspection",
+  { id: "11111111-aaaa-bbbb-cccc-111111111111", label: "Drilling" },
+  { id: "22222222-bbbb-cccc-dddd-222222222222", label: "Well Maintenance" },
+  { id: "33333333-cccc-dddd-eeee-333333333333", label: "Inspection" },
+  { id: "44444444-dddd-eeee-ffff-444444444444", label: "Equipment Rental" },
 ];
 
 const wellOptions = [
-  { value: "well-1", label: "Well 1 - API 42-001-00001", gps: "31.7451, -102.5028" },
-  { value: "well-2", label: "Well 2 - API 42-001-00002", gps: "31.7500, -102.5100" },
-  { value: "well-3", label: "Well 3 - API 42-001-00003", gps: "31.7600, -102.5200" },
+  {
+    id: "w1111111-1111-1111-1111-111111111111",
+    label: "Well 1 - API 42-001-00001",
+    gps: "31.7451, -102.5028",
+  },
+  {
+    id: "w2222222-2222-2222-2222-222222222222",
+    label: "Well 2 - API 42-001-00002",
+    gps: "31.7500, -102.5100",
+  },
+  {
+    id: "w3333333-3333-3333-3333-333333333333",
+    label: "Well 3 - API 42-001-00003",
+    gps: "31.7600, -102.5200",
+  },
 ];
 
 const emptyForm = {
-  jobType: jobTypeOptions[0],
+  jobType: jobTypeOptions[0].id,
   volume: "",
   description: "",
-  vendor: vendorOptions[0],
-  well: wellOptions[0].value,
+  vendor: vendorOptions[0].id,
+  well: wellOptions[0].id,
   locationMethod: "well",
   gpsCoordinates: "",
   physicalAddress: "",
@@ -54,6 +66,10 @@ const emptyForm = {
   priority: "medium",
   recurring: false,
   recurringInterval: "",
+  street: "",
+  city: "",
+  state: "",
+  zip: "",
 };
 
 function CreateWorkOrderModal({ setShowModal }) {
@@ -72,13 +88,13 @@ function CreateWorkOrderModal({ setShowModal }) {
     const { name, value, type, checked } = e.target;
     // If changing locationMethod to 'well', fill GPS from well and set map
     if (name === "locationMethod" && value === "well") {
-      const selectedWell = wellOptions.find(w => w.value === formData.well);
+      const selectedWell = wellOptions.find((w) => w.value === formData.well);
       if (selectedWell && selectedWell.gps) {
         setFormData((prev) => ({
           ...prev,
           locationMethod: value,
           gpsCoordinates: selectedWell.gps,
-          physicalAddress: ""
+          physicalAddress: "",
         }));
         const [lat, lng] = selectedWell.gps.split(",").map(Number);
         if (!isNaN(lat) && !isNaN(lng)) setMarkerPos([lat, lng]);
@@ -87,13 +103,13 @@ function CreateWorkOrderModal({ setShowModal }) {
     }
     // If changing well and locationMethod is 'well', update GPS from new well
     if (name === "well" && formData.locationMethod === "well") {
-      const selectedWell = wellOptions.find(w => w.value === value);
+      const selectedWell = wellOptions.find((w) => w.value === value);
       if (selectedWell && selectedWell.gps) {
         setFormData((prev) => ({
           ...prev,
           well: value,
           gpsCoordinates: selectedWell.gps,
-          physicalAddress: ""
+          physicalAddress: "",
         }));
         const [lat, lng] = selectedWell.gps.split(",").map(Number);
         if (!isNaN(lat) && !isNaN(lng)) setMarkerPos([lat, lng]);
@@ -121,7 +137,7 @@ function CreateWorkOrderModal({ setShowModal }) {
     e.preventDefault();
     let locationDisplay = "";
     if (formData.locationMethod === "well") {
-      const selectedWell = wellOptions.find(w => w.value === formData.well);
+      const selectedWell = wellOptions.find((w) => w.value === formData.well);
       locationDisplay = selectedWell ? selectedWell.label : "";
     } else if (formData.locationMethod === "gps") {
       locationDisplay = formData.gpsCoordinates.trim();
@@ -130,15 +146,25 @@ function CreateWorkOrderModal({ setShowModal }) {
     }
 
     const newWorkOrder = {
-      jobType: formData.jobType,
-      title: `${formData.jobType}${formData.volume ? " - " + formData.volume : ""}`,
+      vendor_id: formData.vendor,
+      service_type_id: formData.jobType,
+      well_id: formData.well,
       description: formData.description.trim(),
-      vendor: formData.vendor,
-      well: formData.well,
-      location: locationDisplay,
+      volume: formData.volume,
+      location_method: formData.locationMethod,
+      gps_coordinates: formData.gpsCoordinates,
+      physical_address: formData.physicalAddress,
+      date: formData.date,
+      end_date: formData.endDate,
       priority: formData.priority,
-      status: "pending",
-      createdDate: new Date().toISOString().split("T")[0],
+      recurring: formData.recurring,
+      recurring_interval: formData.recurring
+        ? formData.recurringInterval
+        : null,
+      street: formData.street,
+      city: formData.city,
+      state: formData.state,
+      zip: formData.zip,
     };
 
     if (!locationDisplay || !formData.jobType) return;
@@ -192,8 +218,8 @@ function CreateWorkOrderModal({ setShowModal }) {
               onChange={handleFormChange}
             >
               {vendorOptions.map((v) => (
-                <option key={v} value={v}>
-                  {v}
+                <option key={v.id} value={v.id}>
+                  {v.label}
                 </option>
               ))}
             </select>
@@ -207,8 +233,8 @@ function CreateWorkOrderModal({ setShowModal }) {
                 onChange={handleFormChange}
               >
                 {jobTypeOptions.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
+                  <option key={type.id} value={type.id}>
+                    {type.label}
                   </option>
                 ))}
               </select>
@@ -240,22 +266,58 @@ function CreateWorkOrderModal({ setShowModal }) {
             <div className="workorder-location-options">
               <button
                 type="button"
-                className={formData.locationMethod === "well" ? "workorder-location-btn active" : "workorder-location-btn"}
-                onClick={() => handleFormChange({ target: { name: "locationMethod", value: "well", type: "radio" } })}
+                className={
+                  formData.locationMethod === "well"
+                    ? "workorder-location-btn active"
+                    : "workorder-location-btn"
+                }
+                onClick={() =>
+                  handleFormChange({
+                    target: {
+                      name: "locationMethod",
+                      value: "well",
+                      type: "radio",
+                    },
+                  })
+                }
               >
                 Same as Well Location
               </button>
               <button
                 type="button"
-                className={formData.locationMethod === "gps" ? "workorder-location-btn active" : "workorder-location-btn"}
-                onClick={() => handleFormChange({ target: { name: "locationMethod", value: "gps", type: "radio" } })}
+                className={
+                  formData.locationMethod === "gps"
+                    ? "workorder-location-btn active"
+                    : "workorder-location-btn"
+                }
+                onClick={() =>
+                  handleFormChange({
+                    target: {
+                      name: "locationMethod",
+                      value: "gps",
+                      type: "radio",
+                    },
+                  })
+                }
               >
                 GPS Coordinates
               </button>
               <button
                 type="button"
-                className={formData.locationMethod === "address" ? "workorder-location-btn active" : "workorder-location-btn"}
-                onClick={() => handleFormChange({ target: { name: "locationMethod", value: "address", type: "radio" } })}
+                className={
+                  formData.locationMethod === "address"
+                    ? "workorder-location-btn active"
+                    : "workorder-location-btn"
+                }
+                onClick={() =>
+                  handleFormChange({
+                    target: {
+                      name: "locationMethod",
+                      value: "address",
+                      type: "radio",
+                    },
+                  })
+                }
               >
                 Physical Address
               </button>
@@ -271,7 +333,9 @@ function CreateWorkOrderModal({ setShowModal }) {
                   style={{ marginLeft: 8 }}
                 >
                   {wellOptions.map((w) => (
-                    <option key={w.value} value={w.value}>{w.label}</option>
+                    <option key={w.id} value={w.id}>
+                      {w.label}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -292,9 +356,13 @@ function CreateWorkOrderModal({ setShowModal }) {
               >
                 <MapContainer
                   center={(() => {
-                    const selectedWell = wellOptions.find(w => w.value === formData.well);
+                    const selectedWell = wellOptions.find(
+                      (w) => w.id === formData.well,
+                    );
                     if (selectedWell && selectedWell.gps) {
-                      const [lat, lng] = selectedWell.gps.split(",").map(Number);
+                      const [lat, lng] = selectedWell.gps
+                        .split(",")
+                        .map(Number);
                       return [lat, lng];
                     }
                     return [31.7451, -102.5028];
@@ -307,9 +375,13 @@ function CreateWorkOrderModal({ setShowModal }) {
                     attribution="&copy; OpenStreetMap contributors"
                   />
                   {(() => {
-                    const selectedWell = wellOptions.find(w => w.value === formData.well);
+                    const selectedWell = wellOptions.find(
+                      (w) => w.id === formData.well,
+                    );
                     if (selectedWell && selectedWell.gps) {
-                      const [lat, lng] = selectedWell.gps.split(",").map(Number);
+                      const [lat, lng] = selectedWell.gps
+                        .split(",")
+                        .map(Number);
                       return <Marker position={[lat, lng]} />;
                     }
                     return null;
@@ -359,7 +431,10 @@ function CreateWorkOrderModal({ setShowModal }) {
             </div>
           )}
           {formData.locationMethod === "address" && (
-            <div className="workorder-address-fields" style={{ marginBottom: 16 }}>
+            <div
+              className="workorder-address-fields"
+              style={{ marginBottom: 16 }}
+            >
               <input
                 type="text"
                 name="street"
@@ -369,7 +444,7 @@ function CreateWorkOrderModal({ setShowModal }) {
                 required
                 style={{ marginBottom: 8 }}
               />
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                 <input
                   type="text"
                   name="city"
