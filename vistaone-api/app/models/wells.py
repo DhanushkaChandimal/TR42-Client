@@ -15,7 +15,7 @@ class Well(db.Model):
     well_number = mapped_column(db.String(50), unique=True, nullable=False)
     well_name = mapped_column(db.String(255), nullable=True)
 
-    operator_name = mapped_column(db.String(255), nullable=True)
+   
     field_name = mapped_column(db.String(255), nullable=True)
 
     latitude = mapped_column(db.String(50), nullable=True)
@@ -30,4 +30,5 @@ class Well(db.Model):
     last_modified_date = mapped_column(db.DateTime)
 
     # relationship
-    client = relationship("Client", back_populates="wells")
+    #client = relationship("Client", back_populates="wells")
+    workorders = relationship("WorkOrder", back_populates="well")

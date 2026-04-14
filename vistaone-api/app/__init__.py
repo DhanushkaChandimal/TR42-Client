@@ -5,6 +5,7 @@ from app.blueprints.controller import workorder_bp
 from app.utils.logging_util import logging_setup
 from flask_swagger_ui import get_swaggerui_blueprint
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 
 # Load .env file
@@ -21,10 +22,12 @@ swaggerui_blueprint = get_swaggerui_blueprint(
     }
 )
 
-def create_app(config_name="ProductionConfig"):
-#def create_app(config_name):
+
+def create_app(config_name):
     app = Flask(__name__)
     app.config.from_object(f'config.{config_name}')
+
+    app.url_map.strict_slashes
     
     # Initialize extensions
     ma.init_app(app)
@@ -37,6 +40,13 @@ def create_app(config_name="ProductionConfig"):
     app.register_blueprint(users_bp, url_prefix='/users')
     app.register_blueprint(workorder_bp, url_prefix='/workorders')
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+    
+    CORS(
+        app,
+        origins = ["http://localhost:5173"],
+        allow_headers = ["Content-Type", "Authorization"],
+        methods =["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    )
 
     @app.errorhandler(429)
     def handle_rate_limit(_):

@@ -17,8 +17,8 @@ class Client(db.Model):
     last_modified_by = mapped_column(db.String(100))
     last_modified_date = mapped_column(db.DateTime)
 
-    #  ONE CLIENT → MANY WELLS
-    wells = relationship("Well", back_populates="client")
+        # relationship
+    #wells = relationship("Well", back_populates="client")
     workorders = relationship("WorkOrder", back_populates="client")
 
     address_id = mapped_column(db.String(36), db.ForeignKey("address.address_id"))

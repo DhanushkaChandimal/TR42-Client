@@ -21,8 +21,6 @@ class Address(db.Model):
     last_modified_by = mapped_column(db.String(100))
     last_modified_date = mapped_column(db.DateTime)
 
-    # clients: Mapped[Client] = relationship('Client', back_populates='address')
-    # vendors: Mapped[Vendor]= relationship('Vendor', back_populates='address')
-    workorders: Mapped[List["WorkOrder"]] = relationship("WorkOrder",back_populates="address")
-
-    #workorders: Mapped[WorkOrder] = relationship('WorkOrder', back_populates='address')
+    # clients = relationship('Client', back_populates='address')
+    # vendors = relationship('Vendor', back_populates='address')
+    workorders = relationship("WorkOrder",back_populates="address")

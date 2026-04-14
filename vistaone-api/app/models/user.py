@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import DateTime, func
 from werkzeug.security import check_password_hash, generate_password_hash
-from app.extensions import Base, db
+from app.extensions import db
 import uuid
 
 

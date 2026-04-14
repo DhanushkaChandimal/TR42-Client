@@ -31,7 +31,7 @@ class WorkOrderService:
             logger.info(f"Validated workorder data: {LocationTypeEnum.ADDRESS}")
             # ---------------- ADDRESS ----------------
             if location_type == LocationTypeEnum.ADDRESS:
-                if not address_data.get("street") and not address_data.get("city") and not address_data.get("state") and not address_data.get("zip"):
+                if not address_data.get("street") or not address_data.get("city") or not address_data.get("state") or not address_data.get("zip"):
                     raise Exception("Invalid address location - street, city, state, zip are required")
                 
                 address = Address(
@@ -43,7 +43,7 @@ class WorkOrderService:
                         )
 
                 db.session.add(address)
-                db.session.flush()   # get address_id
+                db.session.flush()  # get address_id
 
                 work_order.address_id = address.address_id
 
@@ -66,12 +66,11 @@ class WorkOrderService:
 
         except Exception as e:
             logger.error(f"Error creating workorder: {str(e)}")
-            db.session.rollback() # Undo any partial DB changes if error occurs
             raise e
 
     @staticmethod
     def get_workorder(work_order_id: str, current_user_id):
-            workorder = WorkOrderRepository.get_by_id(work_order_id)
+            workorder = WorkOrderRepository.get_by_work_order_id(work_order_id)
             if not workorder:
                 raise ValueError("WorkOrder not found")
             return workorder
@@ -84,7 +83,7 @@ class WorkOrderService:
     @staticmethod
     def update_workorder(current_user_id,work_order_id: str, data):
         try:
-            workorder = WorkOrderRepository.get_by_id(work_order_id)
+            workorder = WorkOrderRepository.get_by_work_order_id(work_order_id)
             if not workorder:
                 raise Exception("WorkOrder not found")
     
@@ -93,34 +92,116 @@ class WorkOrderService:
             
             address_fields = ["street", "city", "state", "zip", "country"]
             
-    
-            ## Update other fields
-            for key, value in data.items():
-                setattr(workorder, key, value)
+            location_type = data.get("location_type", workorder.location_type)
 
-            if workorder.address:
-                for key in address_fields:
-                    if key in data:
-                        setattr(workorder.address, key, data[key])
-                workorder.address.last_modified_by = current_user_id
-                workorder.address.last_modified_date = datetime.now()
+            ALLOWED_FIELDS = {
+                            "status",
+                            "well_id",
+                            "vendor_id",
+                            "service_type_id",
+                            "description",
+                            "priority",
+                            "is_recurring",
+                            "recurrence_type",
+                            "estimated_start_date",
+                            "estimated_end_date",
+                            "latitude",
+                            "longitude",
+                            "address_id",
+                            "client_id",
+                            "units",
+                            "estimated_quantity",
+                            "location_type"   
+                        }
+                            
+            ##  Update WorkOrder fields
+            for key, value in data.items():
+                if key in ALLOWED_FIELDS:
+                    setattr(workorder, key, value)
+            
+            if hasattr(workorder, "is_recurring"):
+                if workorder.is_recurring is False or workorder.is_recurring == "false":
+                    workorder.recurrence_type = FrequencyEnum.ONE_TIME.value
+            
+            #---------------- LOCATION UPDATE LOGIC ----------------
+
+            if location_type == LocationTypeEnum.ADDRESS:
+
+                # clear other location types
+                workorder.latitude = None
+                workorder.longitude = None
+                workorder.well_id = None
+            
+                if workorder.address:
+                    for key in address_fields:
+                        if key in data:
+                            setattr(workorder.address, key, data[key])
+
+                    workorder.address.last_modified_by = current_user_id
+                    workorder.address.last_modified_date = datetime.now()
+
+                elif any(k in data for k in address_fields):
+                    address = Address(
+                    street=data.get("street"),
+                    city=data.get("city"),
+                    state=data.get("state"),
+                    zip=data.get("zip"),
+                    created_by=current_user_id)
+
+                    db.session.add(address)
+                    db.session.flush()   # get address_id
+                    workorder.address_id = address.address_id
+                    workorder.address = address # link relationship
+
+                    address.last_modified_by = current_user_id
+                    address.last_modified_date = datetime.now()
+             
+            # ---------------- GPS ----------------
+            elif location_type == LocationTypeEnum.GPS:
+
+                # clear other location types
+                workorder.address_id = None
+                workorder.well_id = None
+
+
+                lat = data.get("latitude")
+                lng = data.get("longitude")
+
+                if lat is None or lng is None:
+                    raise Exception("latitude & longitude required")
+
+                workorder.latitude = lat
+                workorder.longitude = lng
+            # ---------------- WELL ----------------
+            elif location_type == LocationTypeEnum.WELL:
+
+                # clear other location types
+                workorder.address_id = None
+                workorder.latitude = None
+                workorder.longitude = None
+
+                if not data.get("well_id"):
+                    raise Exception("well_id is required for WELL location")
+                
+                workorder.well_id = data.get("well_id")
+
 
             workorder.last_modified_by = current_user_id
             workorder.last_modified_date = datetime.now()
-            WorkOrderRepository.update()
+            WorkOrderRepository.update(workorder)
             return workorder
             
         except Exception as e:
-            db.session.rollback()
+            logger.error(f"Error updating workorder: {str(e)}")
             raise e
         
     # Delete    
     @staticmethod
-    def cancel_workorder(validate_delete_workorder, current_user_id):
+    def cancel_workorder(work_order_id, cancellation_reason, current_user_id):
         
         try:
-            logger.info(f"Attempting to cancel workorder with ID: {validate_delete_workorder["work_order_id"]} by user: {current_user_id}")            
-            workorder = WorkOrderRepository.get_by_id(validate_delete_workorder["work_order_id"])
+            logger.info(f"Attempting to cancel workorder with ID: {work_order_id}")            
+            workorder = WorkOrderRepository.get_by_work_order_id(work_order_id)
         except Exception as e:
             logger.error(f"Error retrieving workorder: {str(e)}")
             raise e
@@ -147,8 +228,22 @@ class WorkOrderService:
             workorder.last_modified_date = datetime.now()
             workorder.cancelled_by = current_user_id
             workorder.cancelled_date = datetime.now()
-            workorder.cancellation_reason = validate_delete_workorder["cancellation_reason"]
-            WorkOrderRepository.update()
+            workorder.cancellation_reason = cancellation_reason
+            WorkOrderRepository.update(workorder)
 
         return True
+    
+
+
+    @staticmethod
+    def search_workorders(search_text, status, page, per_page, sort_by, order):
+        return WorkOrderRepository.search(
+            search_text=search_text,
+            status=status,
+            page=page,
+            per_page=per_page,
+            sort_by=sort_by,
+            order=order
+        )
  
+

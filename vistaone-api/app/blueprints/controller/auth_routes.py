@@ -7,7 +7,7 @@ from app.utils.util import token_required
 import logging
 
 
-users_bp = Blueprint("users_bp", __name__, url_prefix="/auth")
+users_bp = Blueprint("users_bp", __name__)
 
 
 logger = logging.getLogger(__name__)

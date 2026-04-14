@@ -1,10 +1,13 @@
 from flask import request, jsonify,Blueprint
 from app.blueprints.schema.workorder_schema import workorder_schema, workorders_schema
 from app.blueprints.services.workorder_service import WorkOrderService
-from app.blueprints.schema.delete_workorder import delete_workorder_schema
+from app.blueprints.schema.cancel_workorder_schema import cancel_workorder_schema
 from marshmallow import ValidationError
 from app.utils.util import token_required
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 workorder_bp = Blueprint("workorder_bp", __name__)
 
@@ -68,20 +71,54 @@ def update_workorder(current_user_id, work_order_id):
         return jsonify({"error": str(e)}), 400
 
 # DELETE
-@workorder_bp.route("/", methods=["DELETE"])
+@workorder_bp.route("/<string:work_order_id>", methods=["DELETE"])
 @token_required
-def delete_workorder(current_user_id):
+def delete_workorder(current_user_id, work_order_id):
     if not current_user_id:
         raise Exception("current_user_id not provided!")
     
     json_data = request.get_json()
     
-    if not json_data.get("work_order_id") or not json_data.get("cancellation_reason"):
-        return jsonify({"error": "WorkOrder ID and cancellation reason are required"}), 400
+    if not json_data or not json_data.get("cancellation_reason"):
+        return jsonify({"error": "Cancellation reason is required"}), 400
     try:
-        validate_delete_workorder = delete_workorder_schema.load(json_data)
-        WorkOrderService.cancel_workorder(validate_delete_workorder, current_user_id)
-        return jsonify({"message": "Deleted successfully"}), 200
+        validate_data  = cancel_workorder_schema.load(json_data)
+        WorkOrderService.cancel_workorder(   work_order_id=work_order_id,  
+            cancellation_reason=validate_data["cancellation_reason"],  
+            current_user_id=current_user_id)
+            
+        return jsonify({"message": "Cancelled successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
     
+
+
+@workorder_bp.route("/search", methods=["GET"])
+@token_required
+def search_workorders(current_user_id):
+    if not current_user_id:
+        raise Exception("current_user_id not provided!")
+    try:
+        search_text = request.args.get("q", "")
+        status = request.args.get("status","UNASSIGNED")
+
+        page = int(request.args.get("page", 1))
+        per_page = int(request.args.get("per_page", 10))
+
+        sort_by = request.args.get("sort_by", "created_date")
+        order = request.args.get("order", "desc")
+
+        result = WorkOrderService.search_workorders(
+            search_text, status, page, per_page, sort_by, order
+        )
+
+        return jsonify({
+            "total": result.total,
+            "count": len(result.items),
+            "page": result.page,
+            "pages": result.pages,
+            "data": workorders_schema.dump(result.items)
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

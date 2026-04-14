@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 
 
-ma = Marshmallow()
+ma = Marshmallow() 
 limiter = Limiter(
     key_func=get_remote_address,
 )

@@ -58,12 +58,3 @@ def token_required(f):
         return f(user_id, *args, **kwargs)
 
     return decorated
-
-
-# def get_user_id_from_token(token):
-#     try:
-#         data = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-#         return data['sub']
-#     except Exception as e:
-#         logger.error(f"Error decoding token: {e}")
-#         return None
