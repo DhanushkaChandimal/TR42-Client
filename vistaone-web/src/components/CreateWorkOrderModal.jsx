@@ -54,7 +54,8 @@ const wellOptions = [
 
 const emptyForm = {
   jobType: jobTypeOptions[0].id,
-  volume: "",
+  quantity: "",
+  units: "",
   description: "",
   vendor: vendorOptions[0].id,
   well: wellOptions[0].id,
@@ -74,15 +75,10 @@ const emptyForm = {
 
 function CreateWorkOrderModal({ setShowModal }) {
   const [formData, setFormData] = useState(emptyForm);
-  // For map marker
   const [markerPos, setMarkerPos] = useState(null);
-  const {
-    // loading,
-    // fetchWorkOrders,
-    createWorkOrder,
-    // updateWorkOrder,
-    // removeWorkOrder
-  } = useWorkOrder();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { createWorkOrder } = useWorkOrder();
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -133,11 +129,13 @@ function CreateWorkOrderModal({ setShowModal }) {
     setMarkerPos([lat, lng]);
   };
 
-  const handleCreateWorkOrder = (e) => {
+  const handleCreateWorkOrder = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
     let locationDisplay = "";
     if (formData.locationMethod === "well") {
-      const selectedWell = wellOptions.find((w) => w.value === formData.well);
+      const selectedWell = wellOptions.find((w) => w.id === formData.well);
       locationDisplay = selectedWell ? selectedWell.label : "";
     } else if (formData.locationMethod === "gps") {
       locationDisplay = formData.gpsCoordinates.trim();
@@ -150,7 +148,8 @@ function CreateWorkOrderModal({ setShowModal }) {
       service_type_id: formData.jobType,
       well_id: formData.well,
       description: formData.description.trim(),
-      volume: formData.volume,
+      quantity: formData.quantity,
+      units: formData.units,
       location_method: formData.locationMethod,
       gps_coordinates: formData.gpsCoordinates,
       physical_address: formData.physicalAddress,
@@ -158,18 +157,26 @@ function CreateWorkOrderModal({ setShowModal }) {
       end_date: formData.endDate,
       priority: formData.priority,
       recurring: formData.recurring,
-      recurring_interval: formData.recurring
-        ? formData.recurringInterval
-        : null,
+      recurring_interval: formData.recurring ? formData.recurringInterval : null,
       street: formData.street,
       city: formData.city,
       state: formData.state,
       zip: formData.zip,
     };
 
-    if (!locationDisplay || !formData.jobType) return;
-    createWorkOrder(newWorkOrder);
-    handleCloseModal();
+    if (!locationDisplay || !formData.jobType) {
+      setError("Please fill all required fields.");
+      setLoading(false);
+      return;
+    }
+    try {
+      await createWorkOrder(newWorkOrder);
+      setLoading(false);
+      handleCloseModal();
+    } catch (err) {
+      setError("Failed to create work order. " + (err?.message || ""));
+      setLoading(false);
+    }
   };
 
   const handleCloseModal = () => {
@@ -210,6 +217,8 @@ function CreateWorkOrderModal({ setShowModal }) {
           onSubmit={handleCreateWorkOrder}
           autoComplete="off"
         >
+          {error && <div style={{ color: 'red', marginBottom: 8 }}>{error}</div>}
+          {loading && <div style={{ color: '#007bff', marginBottom: 8 }}>Creating work order...</div>}
           <label>
             Vendor
             <select
@@ -240,13 +249,27 @@ function CreateWorkOrderModal({ setShowModal }) {
               </select>
             </label>
             <label>
-              Volume / Units
+              Quantity
+              <input
+                type="number"
+                name="quantity"
+                placeholder="e.g., 120"
+                value={formData.quantity}
+                onChange={handleFormChange}
+                min="0"
+                step="any"
+                style={{ width: 100, marginRight: 8 }}
+              />
+            </label>
+            <label>
+              Units
               <input
                 type="text"
-                name="volume"
-                placeholder="e.g., 120 BBL"
-                value={formData.volume}
+                name="units"
+                placeholder="e.g., BBL"
+                value={formData.units}
                 onChange={handleFormChange}
+                style={{ width: 80 }}
               />
             </label>
           </div>
