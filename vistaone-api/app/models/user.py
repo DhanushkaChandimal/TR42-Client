@@ -7,16 +7,20 @@ import uuid
 
 
 class User(db.Model):
-    __tablename__ = 'users'
-    
-    id: Mapped[str] = mapped_column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(
+        db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
     first_name: Mapped[str] = mapped_column(db.String(255), nullable=False)
     last_name: Mapped[str] = mapped_column(db.String(255), nullable=False)
     email: Mapped[str] = mapped_column(db.String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(db.String(255), nullable=False)
-    role_id: Mapped[str] = mapped_column(db.String(36),nullable=False)
+    role_id: Mapped[str] = mapped_column(db.String(36), nullable=False)
     company_id: Mapped[str] = mapped_column(db.String(36), nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     def set_password(self, raw_password: str) -> None:
         self.password_hash = generate_password_hash(raw_password)
