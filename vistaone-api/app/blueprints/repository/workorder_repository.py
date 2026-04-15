@@ -9,7 +9,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-
 class WorkOrderRepository:
 
     @staticmethod
@@ -20,13 +19,15 @@ class WorkOrderRepository:
             db.session.refresh(workorder)
             return workorder
         except Exception as e:
-            db.session.rollback() # Undo any partial DB changes if error occurs
+            db.session.rollback()  # Undo any partial DB changes if error occurs
             logger.error(f"Error creating workorder: {str(e)}")
             raise e
 
     @staticmethod
     def get_by_work_order_id(work_order_id: str):
-        return db.session.query(WorkOrder).filter_by(work_order_id=work_order_id).first()
+        return (
+            db.session.query(WorkOrder).filter_by(work_order_id=work_order_id).first()
+        )
 
     @staticmethod
     def get_all():
@@ -43,18 +44,20 @@ class WorkOrderRepository:
             logger.error(f"Error updating workorder: {str(e)}")
             raise e
 
-
-       
-    #Usually we hide cancelled orders. Filter Cancelled Records in GET ALL
+    # Usually we hide cancelled orders. Filter Cancelled Records in GET ALL
     @staticmethod
     def get_all_uncancelled():
-        return WorkOrder.query.filter(
-        WorkOrder.status != StatusEnum.CANCELLED).all()
-    
-
+        return WorkOrder.query.filter(WorkOrder.status != StatusEnum.CANCELLED).all()
 
     @staticmethod
-    def search(search_text=None, status=None, page=1, per_page=10, sort_by="created_date", order="desc"):
+    def search(
+        search_text=None,
+        status=None,
+        page=1,
+        per_page=10,
+        sort_by="created_date",
+        order="desc",
+    ):
         try:
             query = WorkOrder.query.outerjoin(Address)
 
@@ -83,13 +86,14 @@ class WorkOrderRepository:
                             Address.street.ilike(pattern),
                             Address.zip.ilike(pattern),
                             Address.country.ilike(pattern),
-
                         )
                     )
 
                 query = query.filter(*filters)
 
-            logger.info(f"Value of status filter: {status}")  # Log the status filter value
+            logger.info(
+                f"Value of status filter: {status}"
+            )  # Log the status filter value
             #  NEW: Status filter
             if status:
                 query = query.filter(WorkOrder.status == status)
@@ -106,6 +110,6 @@ class WorkOrderRepository:
             paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
             return paginated
-        
+
         except Exception as e:
             raise Exception(f"Error during search: {str(e)}")

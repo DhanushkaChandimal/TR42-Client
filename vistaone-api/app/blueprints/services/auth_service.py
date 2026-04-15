@@ -3,7 +3,7 @@ from app.blueprints.repository.auth_repository import LoginRepository
 from app.utils.token_blacklist import blacklist
 import os
 from flask import request
-from jose import jwt
+import jwt
 import logging
 
 
@@ -18,7 +18,8 @@ class LoginService:
         user = LoginRepository.get_user_by_email(email)
 
         if user and user.check_password(password): # ensure password hash check
-    
+        
+            logger.info(f"User logged in: {user.id}")
             token = encode_token(user.id)
 
             return {
@@ -33,6 +34,7 @@ class LoginService:
     @staticmethod
     @token_required
     def logout_user(user_id):
+        logger.info(f"Logout attempt for user ID: {user_id}")
 
         # Extract token from request
         token = None
