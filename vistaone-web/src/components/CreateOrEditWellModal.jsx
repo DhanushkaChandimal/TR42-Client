@@ -2,15 +2,31 @@ import { useState, useMemo } from "react";
 import stateData from "../assets/state_codes.json";
 import MapPicker from "./MapPicker";
 
-export default function CreateWellModal({ setShowModal, onCreate }) {
-  const [form, setForm] = useState({
-    well_number: "",
-    well_name: "",
-    latitude: "",
-    longitude: "",
-    status: "ACTIVE",
-    client_id: "",
-  });
+export default function CreateOrEditWellModal({
+  setShowModal,
+  onSubmit,
+  initialData,
+  mode = "create",
+}) {
+  const [form, setForm] = useState(() =>
+    initialData
+      ? {
+          well_number: initialData.well_number || "",
+          well_name: initialData.well_name || "",
+          latitude: initialData.latitude ? String(initialData.latitude) : "",
+          longitude: initialData.longitude ? String(initialData.longitude) : "",
+          status: initialData.status || "ACTIVE",
+          client_id: initialData.client_id || "",
+        }
+      : {
+          well_number: "",
+          well_name: "",
+          latitude: "",
+          longitude: "",
+          status: "ACTIVE",
+          client_id: "",
+        },
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   // For map marker position
@@ -95,10 +111,10 @@ export default function CreateWellModal({ setShowModal, onCreate }) {
         ...form,
         client_id: "11111111-1111-1111-1111-111111111111",
       };
-      await onCreate(formWithClient);
+      await onSubmit(formWithClient);
     } catch (err) {
       console.error(err);
-      setError("Failed to create well.");
+      setError(`Failed to ${mode === "edit" ? "update" : "create"} well.`);
     }
     setLoading(false);
   };
@@ -113,7 +129,9 @@ export default function CreateWellModal({ setShowModal, onCreate }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="workorders-modal-header workorder-modal-header">
-          <h2 className="workorder-modal-title">Create Well</h2>
+          <h2 className="workorder-modal-title">
+            {mode === "edit" ? "Edit Well" : "Create Well"}
+          </h2>
           <button
             className="workorders-close-btn workorder-close-btn"
             onClick={() => setShowModal(false)}
@@ -212,7 +230,7 @@ export default function CreateWellModal({ setShowModal, onCreate }) {
             </select>
           </label>
           <button type="submit" className="workorder-submit-btn">
-            <span>Create Well</span>
+            <span>{mode === "edit" ? "Update Well" : "Create Well"}</span>
           </button>
         </form>
       </div>

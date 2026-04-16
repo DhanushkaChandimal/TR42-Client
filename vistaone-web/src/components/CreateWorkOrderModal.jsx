@@ -62,7 +62,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
   useEffect(() => {
     setWellOptions(
       wells.map((w) => ({
-        id: w.id || w.well_id,
+        id: w.id,
         label: w.well_name
           ? `${w.well_name} - ${w.well_number}`
           : w.well_number,
@@ -72,7 +72,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
     if (wells.length && !formData.well) {
       setFormData((prev) => ({
         ...prev,
-        well: wells[0].id || wells[0].well_id,
+        well: wells[0].id,
       }));
     }
   }, [wells]);
