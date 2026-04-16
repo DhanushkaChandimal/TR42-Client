@@ -7,7 +7,7 @@ from app.extensions import db
 class WellRepository:
     @staticmethod
     def get_all():
-        return Well.query.all()
+        return db.session.query(Well).all()
 
     @staticmethod
     def get_by_id(well_id: UUID | str):
@@ -16,7 +16,7 @@ class WellRepository:
         except ValueError:
             return None
 
-        return Well.query.filter_by(id=well_uuid).first()
+        return db.session.query(Well).filter_by(id=well_uuid).first()
 
     @staticmethod
     def create(well: Well):
