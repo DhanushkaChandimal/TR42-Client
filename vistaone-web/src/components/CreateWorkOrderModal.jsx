@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -34,23 +34,7 @@ const jobTypeOptions = [
   { id: "44444444-dddd-eeee-ffff-444444444444", label: "Equipment Rental" },
 ];
 
-const wellOptions = [
-  {
-    id: "w1111111-1111-1111-1111-111111111111",
-    label: "Well 1 - API 42-001-00001",
-    gps: "31.7451, -102.5028",
-  },
-  {
-    id: "w2222222-2222-2222-2222-222222222222",
-    label: "Well 2 - API 42-001-00002",
-    gps: "31.7500, -102.5100",
-  },
-  {
-    id: "w3333333-3333-3333-3333-333333333333",
-    label: "Well 3 - API 42-001-00003",
-    gps: "31.7600, -102.5200",
-  },
-];
+import { useWell } from "../hooks/useWell";
 
 const emptyForm = {
   client_id: "",
@@ -69,15 +53,39 @@ const emptyForm = {
   date: "",
   endDate: "",
   address_id: "",
-  well: wellOptions[0].id,
+  well: "",
 };
 
 function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
   const [formData, setFormData] = useState(emptyForm);
+  const { wells, fetchWells } = useWell();
+  const [wellOptions, setWellOptions] = useState([]);
   const [markerPos, setMarkerPos] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const { createWorkOrder } = useWorkOrder();
+
+  useEffect(() => {
+    fetchWells();
+  }, [fetchWells]);
+
+  useEffect(() => {
+    setWellOptions(
+      wells.map((w) => ({
+        id: w.id || w.well_id,
+        label: w.well_name
+          ? `${w.well_name} - ${w.well_number}`
+          : w.well_number,
+        gps: w.latitude && w.longitude ? `${w.latitude}, ${w.longitude}` : "",
+      })),
+    );
+    if (wells.length && !formData.well) {
+      setFormData((prev) => ({
+        ...prev,
+        well: wells[0].id || wells[0].well_id,
+      }));
+    }
+  }, [wells]);
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -98,7 +106,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
     }
     // If changing well and locationMethod is 'well', update GPS from new well
     if (name === "well" && formData.locationMethod === "well") {
-      const selectedWell = wellOptions.find((w) => w.value === value);
+      const selectedWell = wellOptions.find((w) => w.id === value);
       if (selectedWell && selectedWell.gps) {
         setFormData((prev) => ({
           ...prev,
@@ -373,7 +381,13 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
                 <select
                   name="well"
                   value={formData.well}
-                  onChange={handleFormChange}
+                  onChange={(e) => {
+                    if (e.target.value === "__create_well__") {
+                      window.location.href = "/wells";
+                    } else {
+                      handleFormChange(e);
+                    }
+                  }}
                   style={{ marginLeft: 8 }}
                 >
                   {wellOptions.map((w) => (
@@ -381,6 +395,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
                       {w.label}
                     </option>
                   ))}
+                  <option value="__create_well__">+ Create Well...</option>
                 </select>
               </label>
             )}
