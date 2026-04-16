@@ -83,7 +83,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
     const { name, value, type, checked } = e.target;
     // If changing locationMethod to 'well', fill GPS from well and set map
     if (name === "locationMethod" && value === "well") {
-      const selectedWell = wellOptions.find((w) => w.value === formData.well);
+      const selectedWell = wellOptions.find((w) => w.id === formData.well);
       if (selectedWell && selectedWell.gps) {
         setFormData((prev) => ({
           ...prev,
@@ -172,10 +172,10 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
       is_recurring: !!formData.recurring,
       recurrence_type: formData.recurring
         ? formData.recurringInterval?.toUpperCase() || "ONE_TIME"
-        : null,
+        : "ONE_TIME",
       estimated_start_date: formData.date,
       estimated_end_date: formData.endDate ? formData.endDate : formData.date,
-      address_id: formData.address_id || "a1010101-1010-1010-1010-101010101010",
+      address_id: formData.address_id || null,
     };
 
     if (!locationDisplay || !formData.jobType) {
