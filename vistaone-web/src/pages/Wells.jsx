@@ -1,21 +1,27 @@
 import { useEffect, useState, useMemo } from "react";
 import AppShell from "../components/AppShell";
-import CreateWellModal from "../components/CreateWellModal";
+import CreateOrEditWellModal from "../components/CreateWellModal";
 import { useWell } from "../hooks/useWell";
 import "../styles/workorder.css";
 
 export default function Wells() {
   const [showModal, setShowModal] = useState(false);
+  const [editWell, setEditWell] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const { wells, loading, fetchWells, createWell } = useWell();
+  const { wells, loading, fetchWells, createWell, updateWell } = useWell();
 
   useEffect(() => {
     fetchWells();
   }, [fetchWells]);
 
-  const handleCreateWell = async (wellData) => {
-    await createWell(wellData);
+  const handleSubmitWell = async (wellData) => {
+    if (editWell) {
+      await updateWell(editWell.id, wellData);
+    } else {
+      await createWell(wellData);
+    }
     setShowModal(false);
+    setEditWell(null);
   };
 
   const filteredWells = useMemo(() => {
@@ -45,7 +51,10 @@ export default function Wells() {
       </section>
       <button
         className="fab-create-workorder"
-        onClick={() => setShowModal(true)}
+        onClick={() => {
+          setEditWell(null);
+          setShowModal(true);
+        }}
       >
         <svg
           width="24"
@@ -78,7 +87,14 @@ export default function Wells() {
             </thead>
             <tbody>
               {filteredWells.map((well) => (
-                <tr key={well.well_id}>
+                <tr
+                  key={well.id}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => {
+                    setEditWell(well);
+                    setShowModal(true);
+                  }}
+                >
                   <td>{well.well_number}</td>
                   <td>{well.well_name}</td>
                   <td>{well.latitude}</td>
@@ -91,9 +107,11 @@ export default function Wells() {
         )}
       </section>
       {showModal && (
-        <CreateWellModal
+        <CreateOrEditWellModal
           setShowModal={setShowModal}
-          onCreate={handleCreateWell}
+          onSubmit={handleSubmitWell}
+          initialData={editWell}
+          mode={editWell ? "edit" : "create"}
         />
       )}
     </AppShell>
