@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import AppShell from "../components/AppShell";
-import CreateOrEditWellModal from "../components/CreateWellModal";
+import CreateOrEditWellModal from "../components/CreateOrEditWellModal";
 import { useWell } from "../hooks/useWell";
 import "../styles/workorder.css";
 
