@@ -3,14 +3,13 @@ from sqlalchemy.orm import mapped_column, relationship
 from app.extensions import db
 from app.blueprints.enum.enums import WellStatusEnum
 import uuid
+from sqlalchemy.dialects.postgresql import UUID
 
 
 class Well(db.Model):
     __tablename__ = "wells"
 
-    id = mapped_column(
-        db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = mapped_column(
         db.String(36), db.ForeignKey("clients.client_id"), nullable=False
     )
