@@ -2,6 +2,7 @@ from flask import Flask, app, jsonify
 from app.extensions import ma, limiter, db
 from app.blueprints.controller import users_bp
 from app.blueprints.controller import workorder_bp
+from app.blueprints.controller import vendor_bp
 from app.utils.logging_util import logging_setup
 from flask_swagger_ui import get_swaggerui_blueprint
 from dotenv import load_dotenv
@@ -39,6 +40,7 @@ def create_app(config_name):
     # Register blueprints
     app.register_blueprint(users_bp, url_prefix='/users')
     app.register_blueprint(workorder_bp, url_prefix='/workorders')
+    app.register_blueprint(vendor_bp, url_prefix='/vendors')
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
     
     CORS(
