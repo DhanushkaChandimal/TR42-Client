@@ -1,0 +1,33 @@
+{
+  "states": [
+    {
+      "state_code": "01",
+      "state_name": "ALABAMA",
+      "counties": [
+        { "county_code": "001", "county_name": "AUTAUGA" },
+        { "county_code": "003", "county_name": "BALDWIN" },
+        { "county_code": "005", "county_name": "BARBOUR" },
+        { "county_code": "007", "county_name": "BIBB" },
+        { "county_code": "009", "county_name": "BLOUNT" }
+      ]
+    },
+    {
+      "state_code": "02",
+      "state_name": "ARIZONA",
+      "counties": [
+        { "county_code": "001", "county_name": "APACHE" },
+        { "county_code": "003", "county_name": "COCHISE" },
+        { "county_code": "005", "county_name": "COCONINO" }
+      ]
+    },
+    {
+      "state_code": "42",
+      "state_name": "TEXAS",
+      "counties": [
+        { "county_code": "001", "county_name": "ANDERSON" },
+        { "county_code": "003", "county_name": "ANDREWS" },
+        { "county_code": "005", "county_name": "ANGELINA" }
+      ]
+    }
+  ]
+}

@@ -13,7 +13,7 @@ const Login = () => {
     const [formError, setFormError] = useState('')
 
     const previewCards = [
-        { label: 'Active Service Orders', value: '142', trend: '+8 today' },
+        { label: 'Active Work Orders', value: '142', trend: '+8 today' },
         { label: 'Approved Vendors', value: '38', trend: '2 pending review' },
         { label: 'Pending Invoices', value: '27', trend: '$124k outstanding' },
         { label: 'Fraud Alerts', value: '4', trend: 'High priority' },

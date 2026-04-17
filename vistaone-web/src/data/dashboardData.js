@@ -117,9 +117,9 @@ export const recentInvoices = [
 // sidebar menu items split into main and account sections
 export const sidebarNav = {
   main: [
-    { label: "Dashboard", icon: "grid", active: true },
-    { label: "Jobs", icon: "list", active: false },
-    { label: "Work Orders", icon: "clipboard", active: false },
+    { to: '/dashboard', label: "Dashboard", icon: "grid", active: true },
+    { to: '/wells', label: "Oil Wells", icon: "list", active: false },
+    { to: '/workorders', label: "Work Orders", icon: "clipboard", active: false },
     { label: "Invoices", icon: "file", active: false },
   ],
   account: [

@@ -1,0 +1,455 @@
+:root {
+	--wo-card: #ffffff;
+	--wo-border: #e9ecef;
+	--wo-text: #1a1a1a;
+	--wo-muted: #6c757d;
+}
+
+/* Work Order Modal Card Styles */
+.workorder-modal-card {
+	background: #fff;
+	border-radius: 1.25rem;
+	box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18), 0 1.5px 4px 0 rgba(0,0,0,0.08);
+	border: none;
+	padding: 2.8rem 2.5rem 2.2rem 2.5rem;
+	max-width: 1100px;
+	min-width: 700px;
+	width: 900px;
+	position: relative;
+}
+
+.workorder-modal-header {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-bottom: 1.2rem;
+	border-bottom: 1px solid #f1f3f5;
+	padding-bottom: 1rem;
+}
+
+.workorder-modal-icon {
+	background: #e7f1ff;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 48px;
+	height: 48px;
+}
+
+.workorder-modal-title {
+	font-size: 1.3rem;
+	font-weight: 700;
+	color: #1a1a1a;
+	margin: 0;
+	flex: 1;
+}
+
+.workorder-close-btn {
+	font-size: 1.3rem;
+	color: #888;
+	background: none;
+	border: none;
+	border-radius: 0.5rem;
+	padding: 0.3rem 0.7rem;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.workorder-close-btn:hover {
+	background: #f1f3f5;
+	color: #007bff;
+}
+
+.workorder-form label,
+.workorder-form .workorders-form-row label {
+	font-weight: 500;
+	color: #222;
+	font-size: 1rem;
+}
+
+.workorder-form input,
+.workorder-form textarea,
+.workorder-form select {
+	border-radius: 0.7rem;
+	border: 1.5px solid #e3e8ee;
+	background: #f8fafc;
+	font-size: 1rem;
+	color: #222;
+	transition: border 0.18s;
+}
+
+.workorder-form input:focus,
+.workorder-form textarea:focus,
+.workorder-form select:focus {
+	border-color: #007bff;
+	background: #fff;
+}
+
+.workorder-submit-btn {
+	margin-top: 0.7rem;
+	width: 100%;
+	background: linear-gradient(90deg, #007bff 60%, #0056b3 100%);
+	color: #fff;
+	border: none;
+	border-radius: 0.7rem;
+	padding: 0.85rem 0;
+	font-size: 1.08rem;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.7rem;
+	cursor: pointer;
+	box-shadow: 0 2px 8px 0 rgba(0,123,255,0.10);
+	transition: background 0.18s, box-shadow 0.18s;
+}
+
+.workorder-submit-btn:hover {
+	background: linear-gradient(90deg, #0056b3 60%, #007bff 100%);
+	box-shadow: 0 4px 16px 0 rgba(0,123,255,0.13);
+}
+
+/* Work Order Location Method Styles */
+.workorder-location-method {
+	margin-bottom: 1.1rem;
+}
+
+.workorder-location-label {
+	display: block;
+	font-weight: 600;
+	color: #41566d;
+	font-size: 1rem;
+	margin-bottom: 0.5rem;
+}
+
+.workorder-location-options {
+	display: flex;
+	gap: 0.7rem;
+}
+
+.workorder-location-btn {
+	background: #f8fafc;
+	border: 1.5px solid #e3e8ee;
+	color: #222;
+	border-radius: 0.7rem;
+	padding: 0.6rem 1.2rem;
+	font-size: 1rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.16s, border 0.16s, color 0.16s;
+}
+
+.workorder-location-btn.active, .workorder-location-btn:hover {
+	background: #e7f1ff;
+	border-color: #007bff;
+	color: #007bff;
+}
+
+.workorders-controls {
+	display: grid;
+	grid-template-columns: 1fr 220px;
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+}
+
+.workorders-search,
+.workorders-filter,
+.workorders-form input,
+.workorders-form textarea,
+.workorders-form select {
+	width: 100%;
+	border: 1px solid var(--wo-border);
+	background: var(--wo-card);
+	border-radius: 0.7rem;
+	padding: 0.62rem 0.75rem;
+	color: var(--wo-text);
+	font-family: inherit;
+	font-size: 0.95rem;
+}
+
+.workorders-search:focus,
+.workorders-filter:focus,
+.workorders-form input:focus,
+.workorders-form textarea:focus,
+.workorders-form select:focus {
+	outline: none;
+	border-color: #a8b0b8;
+	box-shadow: 0 0 0 0.2rem rgba(73, 80, 87, 0.12);
+}
+
+.workorders-table-wrap {
+	border: 1px solid var(--wo-border);
+	border-radius: 0.85rem;
+	overflow: hidden;
+	background: var(--wo-card);
+}
+
+.workorders-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.workorders-table th,
+.workorders-table td {
+	padding: 0.8rem;
+	text-align: left;
+	border-bottom: 1px solid #f1f3f5;
+	vertical-align: middle;
+}
+
+.workorders-table th {
+	background: #f8f9fa;
+	font-size: 0.86rem;
+	color: #495057;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 700;
+}
+
+.workorders-table td {
+	color: #1a1a1a;
+}
+
+.workorders-table tbody tr:hover {
+	background: #fafbfc;
+}
+
+.status-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.26rem 0.65rem;
+	border-radius: 999px;
+	font-size: 0.78rem;
+	font-weight: 700;
+	text-transform: capitalize;
+}
+
+.workorders-state {
+	padding: 2.5rem 1rem;
+	text-align: center;
+	color: var(--wo-muted);
+	font-weight: 600;
+}
+
+.workorders-modal-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 999;
+	display: grid;
+	place-items: center;
+	padding: 1rem;
+	background: rgba(8, 15, 26, 0.55);
+	animation: wo-fade-in 0.2s ease-out;
+}
+
+.workorders-modal {
+	width: min(560px, 100%);
+	background: #ffffff;
+	border-radius: 1rem;
+	border: 1px solid #dee2e6;
+	padding: 1rem;
+	box-shadow: 0 25px 50px rgba(15, 23, 42, 0.25);
+	animation: wo-slide-up 0.22s ease-out;
+	max-height: 90vh;
+	overflow-y: auto;
+}
+
+.workorders-modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 0.6rem;
+	padding-bottom: 0.75rem;
+	border-bottom: 1px solid var(--wo-border);
+}
+
+.workorders-modal-header h2 {
+	margin: 0;
+	font-size: 1.25rem;
+	color: var(--wo-text);
+}
+
+.workorders-close-btn {
+	border: 0;
+	background: transparent;
+	font-size: 1rem;
+	font-weight: 700;
+	color: #6c757d;
+	padding: 0.35rem 0.55rem;
+	border-radius: 0.5rem;
+	cursor: pointer;
+	transition: background-color 0.15s ease;
+}
+
+.workorders-close-btn:hover {
+	background: #e9ecef;
+	color: #495057;
+}
+
+.workorders-form {
+	display: grid;
+	gap: 0.72rem;
+}
+
+.workorders-form label {
+	display: grid;
+	gap: 0.35rem;
+	font-weight: 600;
+	color: #41566d;
+	font-size: 0.92rem;
+}
+
+.workorders-form-row {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 0.72rem;
+}
+
+.workorders-actions-cell {
+	display: flex;
+	gap: 0.45rem;
+	white-space: nowrap;
+}
+
+.workorders-action-btn {
+	border: 1px solid #dee2e6;
+	background: #f8f9fa;
+	color: #495057;
+	border-radius: 0.5rem;
+	padding: 0.3rem 0.55rem;
+	font-size: 0.76rem;
+	font-weight: 700;
+	line-height: 1.1;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.workorders-action-btn:hover {
+	background: #e9ecef;
+	border-color: #adb5bd;
+}
+
+.workorders-action-btn-secondary {
+	border-color: #dee2e6;
+	background: #f1f3f5;
+	color: #495057;
+}
+
+/* Recurring Work Order Row */
+.workorder-recurring-row {
+	display: flex;
+	align-items: center;
+	margin: 1rem 0 0.5rem 0;
+  gap:10px;
+}
+
+.workorder-recurring-label {
+	display: flex;
+	align-items: center;
+	font-size: 1.15rem;
+	font-weight: 600;
+	gap: 0.7rem;
+	cursor: pointer;
+}
+
+.workorder-recurring-checkbox {
+	width: 1.35em;
+	height: 1.35em;
+	accent-color: #007bff;
+	margin-right: 0.5em;
+	cursor: pointer;
+}
+
+/* Floating Action Button for Create Work Order */
+.fab-create-workorder {
+	position: fixed;
+	right: 2.5rem;
+	bottom: 2.5rem;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	background: #fff;
+	border: none;
+	box-shadow: 0 4px 24px 0 rgba(0,0,0,0.10), 0 1.5px 4px 0 rgba(0,0,0,0.08);
+	border-radius: 2rem;
+	padding: 0.5rem 1.25rem 0.5rem 0.5rem;
+	cursor: pointer;
+	transition: box-shadow 0.18s, background 0.18s;
+	font-size: 1rem;
+	font-weight: 500;
+	color: #222;
+	outline: none;
+}
+.fab-create-workorder svg {
+	display: block;
+	margin-right: 0.5rem;
+	background: #007bff;
+	border-radius: 50%;
+	box-shadow: 0 2px 8px 0 rgba(0,123,255,0.10);
+}
+.fab-create-workorder:hover, .fab-create-workorder:focus {
+	background: #f4f8ff;
+	box-shadow: 0 6px 32px 0 rgba(0,123,255,0.13), 0 2px 8px 0 rgba(0,0,0,0.10);
+}
+.fab-label {
+	display: inline-block;
+	margin-left: 0.5rem;
+	color: #007bff;
+	font-weight: 600;
+	font-size: 1.05rem;
+	letter-spacing: 0.01em;
+}
+
+@keyframes wo-fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes wo-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes wo-slide-up {
+	from {
+		opacity: 0;
+		transform: translateY(16px) scale(0.99);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+@media (max-width: 860px) {
+	.workorders-controls {
+		grid-template-columns: 1fr;
+	}
+
+	.workorders-table-wrap {
+		overflow-x: auto;
+	}
+
+	.workorders-table {
+		min-width: 700px;
+	}
+}
+
+@media (max-width: 576px) {
+	.workorders-form-row {
+		grid-template-columns: 1fr;
+	}
+}
