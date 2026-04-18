@@ -1,4 +1,5 @@
-from app.models.clientapp_model import Vendor, VendorStatus, ComplianceStatus
+from app.models.vendor import Vendor
+from app.blueprints.enum.enums import VendorStatus, ComplianceStatus
 from app.blueprints.repository.vendor_repository import VendorRepository
 from app.blueprints.schema.vendor_schema import vendor_schema, vendors_schema
 

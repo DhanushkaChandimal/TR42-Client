@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from app.extensions import db
-from app.models.clientapp_model import Vendor
+from app.models.vendor import Vendor
 
 
 # Vendor repository - all database queries for the vendor table

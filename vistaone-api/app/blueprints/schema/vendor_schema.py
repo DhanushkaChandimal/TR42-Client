@@ -1,5 +1,5 @@
 from app.extensions import ma
-from app.models.clientapp_model import Vendor
+from app.models.vendor import Vendor
 from marshmallow import fields
 
 

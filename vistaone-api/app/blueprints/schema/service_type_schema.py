@@ -1,5 +1,5 @@
 from app.extensions import ma
-from app.models.clientapp_model import ServiceType
+from app.models.service_type import ServiceType
 
 class ServiceTypeSchema(ma.SQLAlchemyAutoSchema):
     class Meta:

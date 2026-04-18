@@ -1,9 +1,16 @@
-
 from .user import User
 from .workorder import WorkOrder
-from app.blueprints.enum.enums import StatusEnum, PriorityEnum, FrequencyEnum, LocationTypeEnum, WellStatusEnum
 from .address import Address
 from .wells import Well
-from .clientapp_model import Client, Vendor, ServiceType
-
-
+from .vendor import Vendor
+from .client import Client
+from .service_type import ServiceType
+from app.blueprints.enum.enums import (
+    StatusEnum,
+    PriorityEnum,
+    FrequencyEnum,
+    LocationTypeEnum,
+    WellStatusEnum,
+    VendorStatus,
+    ComplianceStatus,
+)
