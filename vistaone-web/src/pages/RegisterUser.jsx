@@ -119,7 +119,7 @@ function RegisterUser() {
 
     if (!firstName) {
       newErrors.firstName = "First name is required";
-    } else if (/^[a-zA-Z\s'-]+$/.test(firstName)) {
+    } else if (!/^[a-zA-Z\s'-]+$/.test(firstName)) {
       newErrors.firstName = "Only letters are allowed";
     }
 
@@ -485,6 +485,11 @@ function RegisterUser() {
                         className="form-control"
                         placeholder="Middle name (optional)"
                       />
+                      {errors.middleName && (
+                        <div className="invalid-feedback d-block">
+                          {errors.middleName}
+                        </div>
+                      )}
                     </div>
                     <div className="col-md-4 mb-3">
                       <label className="form-label login-label">
@@ -547,6 +552,11 @@ function RegisterUser() {
                           placeholder="(555) 987-6543 (optional)"
                         />
                       </div>
+                      {errors.alternateNumber && (
+                        <div className="invalid-feedback d-block">
+                          {errors.alternateNumber}
+                        </div>
+                      )}
                     </div>
                   </div>
                   {/* DOB and SSN */}
