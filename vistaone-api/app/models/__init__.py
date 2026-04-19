@@ -6,6 +6,7 @@ from .vendor import Vendor
 from .client import Client
 from .service_type import ServiceType
 from .vendor_services import VendorServiceLink
+from .msa import Msa
 from app.blueprints.enum.enums import (
     StatusEnum,
     PriorityEnum,
