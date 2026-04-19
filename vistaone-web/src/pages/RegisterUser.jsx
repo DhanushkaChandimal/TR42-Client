@@ -45,6 +45,7 @@ function RegisterUser() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [step, setStep] = useState(1);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -219,6 +220,8 @@ function RegisterUser() {
     e.preventDefault();
     if (!validateStep2()) return;
     // TODO: Send formData to backend
+    // On successful backend response:
+    setRegistrationComplete(true);
   };
 
   const selectedCompany = companies.find((c) => c.id === formData.companyId);
@@ -259,468 +262,494 @@ function RegisterUser() {
           {/* Right registration panel */}
           <section className="col-lg-5 order-1 order-md-2 d-flex align-items-center justify-content-center px-4 px-lg-5 py-5">
             <div className="login-panel w-100 shadow-lg">
-              {step === 1 && (
-                <form onSubmit={handleNext} noValidate>
-                  {/* Company Select */}
-                  <div className="mb-3">
-                    <label className="form-label login-label">Company</label>
-                    <select
-                      name="companyId"
-                      value={formData.companyId}
-                      onChange={handleChange}
-                      className={`form-select${errors.companyId ? " is-invalid" : ""}`}
-                    >
-                      <option value="">Select your company</option>
-                      {companies.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.companyId && (
-                      <div className="invalid-feedback d-block">
-                        {errors.companyId}
-                      </div>
-                    )}
-                    {/* Show company web address if available */}
-                    {selectedCompany?.web && (
-                      <div className="mt-2 small text-primary">
-                        Website:{" "}
-                        <a
-                          href={selectedCompany.web}
-                          target="_blank"
-                          rel="noopener noreferrer"
+              {registrationComplete ? (
+                <div className="text-center py-5">
+                  <h2 className="mb-3">Registration Successful!</h2>
+                  <p className="mb-4">
+                    Thank you for registering. Please check your email and
+                    follow the instructions to verify your account before
+                    logging in.
+                  </p>
+                  <Link to="/login" className="btn btn-primary">
+                    Go to Login
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {step === 1 && (
+                    <form onSubmit={handleNext} noValidate>
+                      {/* Company Select */}
+                      <div className="mb-3">
+                        <label className="form-label login-label">
+                          Company
+                        </label>
+                        <select
+                          name="companyId"
+                          value={formData.companyId}
+                          onChange={handleChange}
+                          className={`form-select${errors.companyId ? " is-invalid" : ""}`}
                         >
-                          {selectedCompany.web}
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                  {/* Username */}
-                  <div className="mb-3">
-                    <label className="form-label login-label">Username</label>
-                    <div className="input-group login-input-group">
-                      <span className="input-group-text">
-                        <User size={18} />
-                      </span>
-                      <input
-                        type="text"
-                        name="username"
-                        value={formData.username}
-                        onChange={handleChange}
-                        className={`form-control${errors.username ? " is-invalid" : ""}`}
-                        placeholder="Choose a username"
-                      />
-                    </div>
-                    {errors.username && (
-                      <div className="invalid-feedback d-block">
-                        {errors.username}
-                      </div>
-                    )}
-                  </div>
-                  {/* Email */}
-                  <div className="mb-3">
-                    <label className="form-label login-label">Email</label>
-                    <div className="input-group login-input-group">
-                      <span className="input-group-text">
-                        <Mail size={18} />
-                      </span>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        className={`form-control${errors.email ? " is-invalid" : ""}`}
-                        placeholder="you@company.com"
-                      />
-                    </div>
-                    {errors.email && (
-                      <div className="invalid-feedback d-block">
-                        {errors.email}
-                      </div>
-                    )}
-                  </div>
-                  {/* Password */}
-                  <div className="mb-3">
-                    <label className="form-label login-label">Password</label>
-                    <div className="input-group login-input-group">
-                      <span className="input-group-text">
-                        <LockKeyhole size={18} />
-                      </span>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        className={`form-control${errors.password ? " is-invalid" : ""}`}
-                        placeholder="Create a password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((v) => !v)}
-                        className="btn"
-                        tabIndex={-1}
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
-                      >
-                        {showPassword ? (
-                          <EyeOff size={18} />
-                        ) : (
-                          <Eye size={18} />
+                          <option value="">Select your company</option>
+                          {companies.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        {errors.companyId && (
+                          <div className="invalid-feedback d-block">
+                            {errors.companyId}
+                          </div>
                         )}
-                      </button>
-                    </div>
-                    {errors.password && (
-                      <div className="invalid-feedback d-block">
-                        {errors.password}
-                      </div>
-                    )}
-                  </div>
-                  {/* Confirm Password */}
-                  <div className="mb-3">
-                    <label className="form-label login-label">
-                      Confirm Password
-                    </label>
-                    <div className="input-group login-input-group">
-                      <span className="input-group-text">
-                        <LockKeyhole size={18} />
-                      </span>
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        className={`form-control${errors.confirmPassword ? " is-invalid" : ""}`}
-                        placeholder="Re-enter password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword((v) => !v)}
-                        className="btn"
-                        tabIndex={-1}
-                        aria-label={
-                          showConfirmPassword
-                            ? "Hide password"
-                            : "Show password"
-                        }
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff size={18} />
-                        ) : (
-                          <Eye size={18} />
+                        {/* Show company web address if available */}
+                        {selectedCompany?.web && (
+                          <div className="mt-2 small text-primary">
+                            Website:{" "}
+                            <a
+                              href={selectedCompany.web}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {selectedCompany.web}
+                            </a>
+                          </div>
                         )}
+                      </div>
+                      {/* Username */}
+                      <div className="mb-3">
+                        <label className="form-label login-label">
+                          Username
+                        </label>
+                        <div className="input-group login-input-group">
+                          <span className="input-group-text">
+                            <User size={18} />
+                          </span>
+                          <input
+                            type="text"
+                            name="username"
+                            value={formData.username}
+                            onChange={handleChange}
+                            className={`form-control${errors.username ? " is-invalid" : ""}`}
+                            placeholder="Choose a username"
+                          />
+                        </div>
+                        {errors.username && (
+                          <div className="invalid-feedback d-block">
+                            {errors.username}
+                          </div>
+                        )}
+                      </div>
+                      {/* Email */}
+                      <div className="mb-3">
+                        <label className="form-label login-label">Email</label>
+                        <div className="input-group login-input-group">
+                          <span className="input-group-text">
+                            <Mail size={18} />
+                          </span>
+                          <input
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            className={`form-control${errors.email ? " is-invalid" : ""}`}
+                            placeholder="you@company.com"
+                          />
+                        </div>
+                        {errors.email && (
+                          <div className="invalid-feedback d-block">
+                            {errors.email}
+                          </div>
+                        )}
+                      </div>
+                      {/* Password */}
+                      <div className="mb-3">
+                        <label className="form-label login-label">
+                          Password
+                        </label>
+                        <div className="input-group login-input-group">
+                          <span className="input-group-text">
+                            <LockKeyhole size={18} />
+                          </span>
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            className={`form-control${errors.password ? " is-invalid" : ""}`}
+                            placeholder="Create a password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            className="btn"
+                            tabIndex={-1}
+                            aria-label={
+                              showPassword ? "Hide password" : "Show password"
+                            }
+                          >
+                            {showPassword ? (
+                              <EyeOff size={18} />
+                            ) : (
+                              <Eye size={18} />
+                            )}
+                          </button>
+                        </div>
+                        {errors.password && (
+                          <div className="invalid-feedback d-block">
+                            {errors.password}
+                          </div>
+                        )}
+                      </div>
+                      {/* Confirm Password */}
+                      <div className="mb-3">
+                        <label className="form-label login-label">
+                          Confirm Password
+                        </label>
+                        <div className="input-group login-input-group">
+                          <span className="input-group-text">
+                            <LockKeyhole size={18} />
+                          </span>
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            className={`form-control${errors.confirmPassword ? " is-invalid" : ""}`}
+                            placeholder="Re-enter password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            className="btn"
+                            tabIndex={-1}
+                            aria-label={
+                              showConfirmPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff size={18} />
+                            ) : (
+                              <Eye size={18} />
+                            )}
+                          </button>
+                        </div>
+                        {errors.confirmPassword && (
+                          <div className="invalid-feedback d-block">
+                            {errors.confirmPassword}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="submit"
+                        className="btn login-submit-btn w-100 d-inline-flex align-items-center justify-content-center gap-2 mt-3"
+                      >
+                        Next
                       </button>
-                    </div>
-                    {errors.confirmPassword && (
-                      <div className="invalid-feedback d-block">
-                        {errors.confirmPassword}
+                    </form>
+                  )}
+                  {step === 2 && (
+                    <form onSubmit={handleSubmit} noValidate>
+                      {/* Profile Photo */}
+                      <div className="mb-3">
+                        <label className="form-label login-label">
+                          Profile Photo
+                        </label>
+                        <div className="input-group login-input-group">
+                          <span className="input-group-text">
+                            <ImageIcon size={18} />
+                          </span>
+                          <input
+                            type="file"
+                            name="profilePhoto"
+                            accept="image/*"
+                            className="form-control"
+                            onChange={handleChange}
+                          />
+                        </div>
+                        {photoPreview && (
+                          <img
+                            src={photoPreview}
+                            alt="Preview"
+                            className="profile-photo-preview mt-2"
+                          />
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn login-submit-btn w-100 d-inline-flex align-items-center justify-content-center gap-2 mt-3"
-                  >
-                    Next
-                  </button>
-                </form>
+                      {/* First, Middle, Last Name */}
+                      <div className="row g-2">
+                        <div className="col-md-4 mb-3">
+                          <label className="form-label login-label">
+                            First Name
+                          </label>
+                          <input
+                            type="text"
+                            name="firstName"
+                            value={formData.firstName}
+                            onChange={handleChange}
+                            className={`form-control${errors.firstName ? " is-invalid" : ""}`}
+                            placeholder="First name"
+                          />
+                          {errors.firstName && (
+                            <div className="invalid-feedback d-block">
+                              {errors.firstName}
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-md-4 mb-3">
+                          <label className="form-label login-label">
+                            Middle Name
+                          </label>
+                          <input
+                            type="text"
+                            name="middleName"
+                            value={formData.middleName}
+                            onChange={handleChange}
+                            className="form-control"
+                            placeholder="Middle name (optional)"
+                          />
+                          {errors.middleName && (
+                            <div className="invalid-feedback d-block">
+                              {errors.middleName}
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-md-4 mb-3">
+                          <label className="form-label login-label">
+                            Last Name
+                          </label>
+                          <input
+                            type="text"
+                            name="lastName"
+                            value={formData.lastName}
+                            onChange={handleChange}
+                            className={`form-control${errors.lastName ? " is-invalid" : ""}`}
+                            placeholder="Last name"
+                          />
+                          {errors.lastName && (
+                            <div className="invalid-feedback d-block">
+                              {errors.lastName}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* Contact Numbers */}
+                      <div className="row g-2">
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label login-label">
+                            Contact Number
+                          </label>
+                          <div className="input-group login-input-group">
+                            <span className="input-group-text">
+                              <Phone size={18} />
+                            </span>
+                            <input
+                              type="tel"
+                              name="contactNumber"
+                              value={formData.contactNumber}
+                              onChange={handleChange}
+                              className={`form-control${errors.contactNumber ? " is-invalid" : ""}`}
+                              placeholder="(555) 123-4567"
+                            />
+                          </div>
+                          {errors.contactNumber && (
+                            <div className="invalid-feedback d-block">
+                              {errors.contactNumber}
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label login-label">
+                            Alternate Number
+                          </label>
+                          <div className="input-group login-input-group">
+                            <span className="input-group-text">
+                              <Phone size={18} />
+                            </span>
+                            <input
+                              type="tel"
+                              name="alternateNumber"
+                              value={formData.alternateNumber}
+                              onChange={handleChange}
+                              className="form-control"
+                              placeholder="(555) 987-6543 (optional)"
+                            />
+                          </div>
+                          {errors.alternateNumber && (
+                            <div className="invalid-feedback d-block">
+                              {errors.alternateNumber}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* DOB and SSN */}
+                      <div className="row g-2">
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label login-label">
+                            Date of Birth
+                          </label>
+                          <div className="input-group login-input-group">
+                            <span className="input-group-text">
+                              <Calendar size={18} />
+                            </span>
+                            <input
+                              type="date"
+                              name="dob"
+                              value={formData.dob}
+                              onChange={handleChange}
+                              className={`form-control${errors.dob ? " is-invalid" : ""}`}
+                            />
+                          </div>
+                          {errors.dob && (
+                            <div className="invalid-feedback d-block">
+                              {errors.dob}
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-md-6 mb-3">
+                          <label className="form-label login-label">
+                            SSN Last 4
+                          </label>
+                          <div className="input-group login-input-group">
+                            <span className="input-group-text">
+                              <IdCard size={18} />
+                            </span>
+                            <input
+                              type="text"
+                              name="ssnLastFour"
+                              maxLength={4}
+                              value={formData.ssnLastFour}
+                              onChange={handleChange}
+                              className={`form-control${errors.ssnLastFour ? " is-invalid" : ""}`}
+                              placeholder="1234"
+                            />
+                          </div>
+                          {errors.ssnLastFour && (
+                            <div className="invalid-feedback d-block">
+                              {errors.ssnLastFour}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* Address Fields */}
+                      <div className="mb-3">
+                        <label className="form-label login-label">
+                          Address Line 1
+                        </label>
+                        <div className="input-group login-input-group">
+                          <span className="input-group-text">
+                            <MapPin size={18} />
+                          </span>
+                          <input
+                            type="text"
+                            name="addressLine1"
+                            value={formData.addressLine1}
+                            onChange={handleChange}
+                            className={`form-control${errors.addressLine1 ? " is-invalid" : ""}`}
+                            placeholder="123 Main St"
+                          />
+                        </div>
+                        {errors.addressLine1 && (
+                          <div className="invalid-feedback d-block">
+                            {errors.addressLine1}
+                          </div>
+                        )}
+                      </div>
+                      <div className="row g-2">
+                        <div className="col-md-4 mb-3">
+                          <label className="form-label login-label">City</label>
+                          <input
+                            type="text"
+                            name="city"
+                            value={formData.city}
+                            onChange={handleChange}
+                            className={`form-control${errors.city ? " is-invalid" : ""}`}
+                            placeholder="City"
+                          />
+                          {errors.city && (
+                            <div className="invalid-feedback d-block">
+                              {errors.city}
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-md-3 mb-3">
+                          <label className="form-label login-label">
+                            State
+                          </label>
+                          <input
+                            type="text"
+                            name="state"
+                            value={formData.state}
+                            onChange={handleChange}
+                            className={`form-control${errors.state ? " is-invalid" : ""}`}
+                            placeholder="State"
+                          />
+                          {errors.state && (
+                            <div className="invalid-feedback d-block">
+                              {errors.state}
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-md-3 mb-3">
+                          <label className="form-label login-label">ZIP</label>
+                          <input
+                            type="text"
+                            name="zip"
+                            value={formData.zip}
+                            onChange={handleChange}
+                            className={`form-control${errors.zip ? " is-invalid" : ""}`}
+                            placeholder="ZIP"
+                          />
+                          {errors.zip && (
+                            <div className="invalid-feedback d-block">
+                              {errors.zip}
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-md-2 mb-3">
+                          <label className="form-label login-label">
+                            Country
+                          </label>
+                          <input
+                            type="text"
+                            name="country"
+                            value={formData.country}
+                            onChange={handleChange}
+                            className={`form-control${errors.country ? " is-invalid" : ""}`}
+                            placeholder="Country"
+                          />
+                          {errors.country && (
+                            <div className="invalid-feedback d-block">
+                              {errors.country}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="d-flex gap-2 mt-3">
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary w-50"
+                          onClick={handleBack}
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn login-submit-btn w-50 d-inline-flex align-items-center justify-content-center gap-2"
+                        >
+                          Register
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                  <p className="form-footer-text mt-3">
+                    Already have an account?{" "}
+                    <Link to="/" className="form-footer-link">
+                      Sign in
+                    </Link>
+                  </p>
+                </>
               )}
-              {step === 2 && (
-                <form onSubmit={handleSubmit} noValidate>
-                  {/* Profile Photo */}
-                  <div className="mb-3">
-                    <label className="form-label login-label">
-                      Profile Photo
-                    </label>
-                    <div className="input-group login-input-group">
-                      <span className="input-group-text">
-                        <ImageIcon size={18} />
-                      </span>
-                      <input
-                        type="file"
-                        name="profilePhoto"
-                        accept="image/*"
-                        className="form-control"
-                        onChange={handleChange}
-                      />
-                    </div>
-                    {photoPreview && (
-                      <img
-                        src={photoPreview}
-                        alt="Preview"
-                        className="profile-photo-preview mt-2"
-                      />
-                    )}
-                  </div>
-                  {/* First, Middle, Last Name */}
-                  <div className="row g-2">
-                    <div className="col-md-4 mb-3">
-                      <label className="form-label login-label">
-                        First Name
-                      </label>
-                      <input
-                        type="text"
-                        name="firstName"
-                        value={formData.firstName}
-                        onChange={handleChange}
-                        className={`form-control${errors.firstName ? " is-invalid" : ""}`}
-                        placeholder="First name"
-                      />
-                      {errors.firstName && (
-                        <div className="invalid-feedback d-block">
-                          {errors.firstName}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-md-4 mb-3">
-                      <label className="form-label login-label">
-                        Middle Name
-                      </label>
-                      <input
-                        type="text"
-                        name="middleName"
-                        value={formData.middleName}
-                        onChange={handleChange}
-                        className="form-control"
-                        placeholder="Middle name (optional)"
-                      />
-                      {errors.middleName && (
-                        <div className="invalid-feedback d-block">
-                          {errors.middleName}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-md-4 mb-3">
-                      <label className="form-label login-label">
-                        Last Name
-                      </label>
-                      <input
-                        type="text"
-                        name="lastName"
-                        value={formData.lastName}
-                        onChange={handleChange}
-                        className={`form-control${errors.lastName ? " is-invalid" : ""}`}
-                        placeholder="Last name"
-                      />
-                      {errors.lastName && (
-                        <div className="invalid-feedback d-block">
-                          {errors.lastName}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Contact Numbers */}
-                  <div className="row g-2">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label login-label">
-                        Contact Number
-                      </label>
-                      <div className="input-group login-input-group">
-                        <span className="input-group-text">
-                          <Phone size={18} />
-                        </span>
-                        <input
-                          type="tel"
-                          name="contactNumber"
-                          value={formData.contactNumber}
-                          onChange={handleChange}
-                          className={`form-control${errors.contactNumber ? " is-invalid" : ""}`}
-                          placeholder="(555) 123-4567"
-                        />
-                      </div>
-                      {errors.contactNumber && (
-                        <div className="invalid-feedback d-block">
-                          {errors.contactNumber}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label login-label">
-                        Alternate Number
-                      </label>
-                      <div className="input-group login-input-group">
-                        <span className="input-group-text">
-                          <Phone size={18} />
-                        </span>
-                        <input
-                          type="tel"
-                          name="alternateNumber"
-                          value={formData.alternateNumber}
-                          onChange={handleChange}
-                          className="form-control"
-                          placeholder="(555) 987-6543 (optional)"
-                        />
-                      </div>
-                      {errors.alternateNumber && (
-                        <div className="invalid-feedback d-block">
-                          {errors.alternateNumber}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* DOB and SSN */}
-                  <div className="row g-2">
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label login-label">
-                        Date of Birth
-                      </label>
-                      <div className="input-group login-input-group">
-                        <span className="input-group-text">
-                          <Calendar size={18} />
-                        </span>
-                        <input
-                          type="date"
-                          name="dob"
-                          value={formData.dob}
-                          onChange={handleChange}
-                          className={`form-control${errors.dob ? " is-invalid" : ""}`}
-                        />
-                      </div>
-                      {errors.dob && (
-                        <div className="invalid-feedback d-block">
-                          {errors.dob}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-md-6 mb-3">
-                      <label className="form-label login-label">
-                        SSN Last 4
-                      </label>
-                      <div className="input-group login-input-group">
-                        <span className="input-group-text">
-                          <IdCard size={18} />
-                        </span>
-                        <input
-                          type="text"
-                          name="ssnLastFour"
-                          maxLength={4}
-                          value={formData.ssnLastFour}
-                          onChange={handleChange}
-                          className={`form-control${errors.ssnLastFour ? " is-invalid" : ""}`}
-                          placeholder="1234"
-                        />
-                      </div>
-                      {errors.ssnLastFour && (
-                        <div className="invalid-feedback d-block">
-                          {errors.ssnLastFour}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Address Fields */}
-                  <div className="mb-3">
-                    <label className="form-label login-label">
-                      Address Line 1
-                    </label>
-                    <div className="input-group login-input-group">
-                      <span className="input-group-text">
-                        <MapPin size={18} />
-                      </span>
-                      <input
-                        type="text"
-                        name="addressLine1"
-                        value={formData.addressLine1}
-                        onChange={handleChange}
-                        className={`form-control${errors.addressLine1 ? " is-invalid" : ""}`}
-                        placeholder="123 Main St"
-                      />
-                    </div>
-                    {errors.addressLine1 && (
-                      <div className="invalid-feedback d-block">
-                        {errors.addressLine1}
-                      </div>
-                    )}
-                  </div>
-                  <div className="row g-2">
-                    <div className="col-md-4 mb-3">
-                      <label className="form-label login-label">City</label>
-                      <input
-                        type="text"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleChange}
-                        className={`form-control${errors.city ? " is-invalid" : ""}`}
-                        placeholder="City"
-                      />
-                      {errors.city && (
-                        <div className="invalid-feedback d-block">
-                          {errors.city}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-md-3 mb-3">
-                      <label className="form-label login-label">State</label>
-                      <input
-                        type="text"
-                        name="state"
-                        value={formData.state}
-                        onChange={handleChange}
-                        className={`form-control${errors.state ? " is-invalid" : ""}`}
-                        placeholder="State"
-                      />
-                      {errors.state && (
-                        <div className="invalid-feedback d-block">
-                          {errors.state}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-md-3 mb-3">
-                      <label className="form-label login-label">ZIP</label>
-                      <input
-                        type="text"
-                        name="zip"
-                        value={formData.zip}
-                        onChange={handleChange}
-                        className={`form-control${errors.zip ? " is-invalid" : ""}`}
-                        placeholder="ZIP"
-                      />
-                      {errors.zip && (
-                        <div className="invalid-feedback d-block">
-                          {errors.zip}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-md-2 mb-3">
-                      <label className="form-label login-label">Country</label>
-                      <input
-                        type="text"
-                        name="country"
-                        value={formData.country}
-                        onChange={handleChange}
-                        className={`form-control${errors.country ? " is-invalid" : ""}`}
-                        placeholder="Country"
-                      />
-                      {errors.country && (
-                        <div className="invalid-feedback d-block">
-                          {errors.country}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="d-flex gap-2 mt-3">
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary w-50"
-                      onClick={handleBack}
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn login-submit-btn w-50 d-inline-flex align-items-center justify-content-center gap-2"
-                    >
-                      Register
-                    </button>
-                  </div>
-                </form>
-              )}
-              <p className="form-footer-text mt-3">
-                Already have an account?{" "}
-                <Link to="/" className="form-footer-link">
-                  Sign in
-                </Link>
-              </p>
             </div>
           </section>
         </div>
