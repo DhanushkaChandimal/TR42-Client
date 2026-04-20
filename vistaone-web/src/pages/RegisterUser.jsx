@@ -164,11 +164,9 @@ function RegisterUser() {
       }
     }
 
-    if (!ssnLastFour) {
-      newErrors.ssnLastFour = "Last 4 of SSN required";
-    } else if (!/^\d{4}$/.test(ssnLastFour)) {
+    if (ssnLastFour && !/^\d{4}$/.test(ssnLastFour)) {
       newErrors.ssnLastFour = "Must be 4 digits";
-    } else if (ssnLastFour === "0000") {
+    } else if (ssnLastFour && ssnLastFour === "0000") {
       newErrors.ssnLastFour = "Invalid SSN";
     }
 
