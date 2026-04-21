@@ -3,7 +3,6 @@ from app.blueprints.repository.address_repository import AddressRepository
 from app.models.user import User
 from app.blueprints.enum.enums import UserStatus, UserType
 from app.utils.email_util import send_verification_email
-import itsdangerous
 from flask import current_app
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from app.utils.util import encode_token, token_required
@@ -89,7 +88,25 @@ class LoginService:
             user.set_password(password)
         created_user = UserRepository.create_user(user)
         # Generate a token for email verification
-        s = itsdangerous.URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+        s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
         token = s.dumps(created_user.email, salt="email-verify")
         send_verification_email(created_user, token)
         return created_user
+
+    @staticmethod
+    def verify_email(token):
+        s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+        if not token:
+            return {"message": "Missing token"}, 400
+        try:
+            email = s.loads(token, salt="email-verify", max_age=3600 * 24)
+        except SignatureExpired:
+            return {"message": "Token expired"}, 400
+        except BadSignature:
+            return {"message": "Invalid token"}, 400
+        user = UserRepository.get_user_by_email(email)
+        if not user:
+            return {"message": "User not found"}, 404
+        # Set user status to ACTIVE after email verification
+        UserRepository.update_user_status(user, UserStatus.ACTIVE)
+        return {"message": "Email verified", "status": user.status.value}, 200
