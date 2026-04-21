@@ -3,7 +3,7 @@ const REGISTER_ENDPOINT = '/api/users/register';
 const VERIFY_EMAIL_ENDPOINT = '/api/users/verify-email';
 
 export const authService = {
-  login: async ({ email, password }) => {
+    login: async ({ email, password }) => {
         try {
             const response = await fetch(LOGIN_ENDPOINT, {
                 method: 'POST',
@@ -13,7 +13,12 @@ export const authService = {
                 body: JSON.stringify({ email, password }),
             });
 
-            const payload = await response.json().catch(() => ({}));
+            let payload = {};
+            try {
+                payload = await response.json();
+            } catch (e) {
+                // If response is not JSON, leave payload as {}
+            }
 
             if (!response.ok) {
                 throw new Error(payload?.message || 'Invalid email or password.');
@@ -22,8 +27,10 @@ export const authService = {
             return payload;
 
         } catch (err) {
-            console.error(err);
-            throw new Error('Unable to reach server. Please try again later.');
+            if (err instanceof TypeError) {
+                throw new Error('Unable to reach server. Please try again later.');
+            }
+            throw err;
         }
     },
 
