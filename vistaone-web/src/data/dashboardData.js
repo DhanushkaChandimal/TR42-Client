@@ -123,7 +123,7 @@ export const sidebarNav = {
     { label: "Invoices", icon: "file", active: false },
   ],
   account: [
-    { label: "Vendors", icon: "users", active: false },
+    { to: "/vendors", label: "Vendors", icon: "users", active: false },
     { label: "Contracts / MSA", icon: "folder", active: false },
   ],
 };

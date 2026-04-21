@@ -4,6 +4,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import WorkOrders from "./pages/WorkOrders";
 import Wells from "./pages/Wells";
+import Vendors from "./pages/Vendors";
+import VendorDetail from "./pages/VendorDetail";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
 function App() {
@@ -31,6 +33,22 @@ function App() {
         element={
           <ProtectedRoute>
             <Wells />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendors"
+        element={
+          <ProtectedRoute>
+            <Vendors />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendors/:vendorId"
+        element={
+          <ProtectedRoute>
+            <VendorDetail />
           </ProtectedRoute>
         }
       />
