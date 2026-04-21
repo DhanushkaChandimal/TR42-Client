@@ -8,11 +8,15 @@ import Vendors from "./pages/Vendors";
 import VendorDetail from "./pages/VendorDetail";
 import Contracts from "./pages/Contracts";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import RegisterUser from "./pages/RegisterUser";
+import VerifyEmail from "./pages/VerifyEmail";
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<RegisterUser />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route
         path="/dashboard"
         element={
