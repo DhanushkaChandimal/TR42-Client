@@ -1,7 +1,8 @@
 const LOGIN_ENDPOINT = '/api/users/login';
+const REGISTER_ENDPOINT = '/api/users/register';
 
 export const authService = {
-    login: async ({ email, password }) => {
+  login: async ({ email, password }) => {
         try {
             const response = await fetch(LOGIN_ENDPOINT, {
                 method: 'POST',
@@ -11,11 +12,6 @@ export const authService = {
                 body: JSON.stringify({ email, password }),
             });
 
-            // backend not running returns 502 through the vite proxy
-            if (response.status === 502) {
-                return { token: 'demo-token', status: 'success', message: 'Demo mode' };
-            }
-
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok) {
@@ -23,9 +19,55 @@ export const authService = {
             }
 
             return payload;
+
         } catch (err) {
-            // network error - backend completely unreachable
-            return { token: 'demo-token', status: 'success', message: 'Demo mode' };
+            console.error(err);
+            throw new Error('Unable to reach server. Please try again later.');
+        }
+    },
+
+    register: async (formData) => {
+        try {
+            // Build address object
+            const address = {
+                street: formData.street || "",
+                city: formData.city || "",
+                state: formData.state || "",
+                zip: formData.zip || "",
+                country: formData.country || ""
+            };
+
+            const payload = {};
+            Object.entries(formData).forEach(([key, value]) => {
+                if (
+                    value !== null &&
+                    value !== undefined &&
+                    key !== 'confirmPassword' &&
+                    key !== 'street' &&
+                    key !== 'city' &&
+                    key !== 'state' &&
+                    key !== 'zip' &&
+                    key !== 'country'
+                ) {
+                    payload[key] = value;
+                }
+            });
+            payload.address = address;
+            const response = await fetch(REGISTER_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            const respPayload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(respPayload?.message || 'Registration failed');
+            }
+            return respPayload;
+        } catch (err) {
+            console.error(err);
+            throw new Error('Unable to reach server. Please try again later.');
         }
     },
 };
