@@ -50,7 +50,9 @@ function Sidebar({ navData }) {
           {navData.account.map((item) => (
             <li
               key={item.label}
-              className="sidebar-item"
+              className={`sidebar-item ${isActive(item.to) ? "active" : ""}`}
+              onClick={() => item.to && navigate(item.to)}
+              style={{ cursor: item.to ? "pointer" : "default" }}
             >
               <span className="sidebar-icon">{getIcon(item.icon)}</span>
               <span>{item.label}</span>

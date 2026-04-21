@@ -6,6 +6,7 @@ import WorkOrders from "./pages/WorkOrders";
 import Wells from "./pages/Wells";
 import Vendors from "./pages/Vendors";
 import VendorDetail from "./pages/VendorDetail";
+import Contracts from "./pages/Contracts";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
 function App() {
@@ -49,6 +50,14 @@ function App() {
         element={
           <ProtectedRoute>
             <VendorDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contracts"
+        element={
+          <ProtectedRoute>
+            <Contracts />
           </ProtectedRoute>
         }
       />

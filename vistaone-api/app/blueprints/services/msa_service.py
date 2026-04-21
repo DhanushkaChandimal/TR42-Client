@@ -47,9 +47,10 @@ class MsaService:
         if not version:
             return {"message": "version is required"}, 400
         if not file or file.filename == "":
-            return {"message": "A PDF file is required"}, 400
-        if not file.filename.lower().endswith(".pdf"):
-            return {"message": "Only PDF files are allowed"}, 400
+            return {"message": "A file is required"}, 400
+        allowed_extensions = (".pdf", ".doc", ".docx")
+        if not file.filename.lower().endswith(allowed_extensions):
+            return {"message": "Only PDF and Word documents are allowed"}, 400
 
         ensure_upload_dir()
         safe_name = secure_filename(file.filename)

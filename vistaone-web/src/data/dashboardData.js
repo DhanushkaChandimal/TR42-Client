@@ -124,21 +124,9 @@ export const sidebarNav = {
   ],
   account: [
     { to: "/vendors", label: "Vendors", icon: "users", active: false },
-    { label: "Contracts / MSA", icon: "folder", active: false },
+    { to: "/contracts", label: "Contracts / MSA", icon: "folder", active: false },
   ],
 };
 
-export const initialNotifications = [
-    {
-        id: 'n1',
-        title: 'High fraud risk detected for SandCore Transport',
-        time: '5 min ago',
-        isRead: false,
-    },
-    {
-        id: 'n2',
-        title: 'Invoice INV-8231 is pending your approval',
-        time: '22 min ago',
-        isRead: false,
-    },
-];
+// notifications will be populated from the API when the notification feature is built
+export const initialNotifications = [];
