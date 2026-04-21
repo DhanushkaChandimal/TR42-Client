@@ -50,3 +50,11 @@ class ComplianceStatus(str, Enum):
 
     def __str__(self):
         return self.value
+
+
+class InvoiceStatusEnum(Enum):
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    PAID = "PAID"

@@ -5,6 +5,7 @@ from app.blueprints.controller import workorder_bp
 from app.blueprints.controller import well_bp
 from app.blueprints.controller import vendor_bp
 from app.blueprints.controller import msa_bp
+from app.blueprints.controller import invoice_bp
 from app.utils.logging_util import logging_setup
 from flask_swagger_ui import get_swaggerui_blueprint
 from dotenv import load_dotenv
@@ -40,6 +41,7 @@ def create_app(config_name="ProductionConfig"):
     app.register_blueprint(well_bp, url_prefix="/wells")
     app.register_blueprint(vendor_bp, url_prefix='/vendors')
     app.register_blueprint(msa_bp, url_prefix="/msa")
+    app.register_blueprint(invoice_bp, url_prefix="/invoices")
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     CORS(
