@@ -1,5 +1,6 @@
 const LOGIN_ENDPOINT = '/api/users/login';
 const REGISTER_ENDPOINT = '/api/users/register';
+const VERIFY_EMAIL_ENDPOINT = '/api/users/verify-email';
 
 export const authService = {
   login: async ({ email, password }) => {
@@ -28,7 +29,6 @@ export const authService = {
 
     register: async (formData) => {
         try {
-            // Build address object
             const address = {
                 street: formData.street || "",
                 city: formData.city || "",
@@ -68,6 +68,22 @@ export const authService = {
         } catch (err) {
             console.error(err);
             throw new Error('Unable to reach server. Please try again later.');
+        }
+    },
+
+    verifyEmail: async (token) => {
+        try {
+            const response = await fetch(`VERIFY_EMAIL_ENDPOINT?token=${token}`);
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.message || 'Verification failed.');
+            }
+            return { success: true, message: payload.message };
+        } catch (err) {
+            if (err instanceof Error) {
+                return { success: false, message: err.message };
+            }
+            return { success: false, message: 'Unable to reach server. Please try again later.' };
         }
     },
 };
