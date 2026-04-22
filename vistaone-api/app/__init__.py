@@ -10,6 +10,7 @@ from app.utils.logging_util import logging_setup
 from flask_swagger_ui import get_swaggerui_blueprint
 from dotenv import load_dotenv
 from flask_cors import CORS
+from app.extensions import mail
 
 # Load .env file
 load_dotenv()
@@ -32,6 +33,7 @@ def create_app(config_name="ProductionConfig"):
     ma.init_app(app)
     db.init_app(app)
     limiter.init_app(app)
+    mail.init_app(app)
 
     logging_setup()
 

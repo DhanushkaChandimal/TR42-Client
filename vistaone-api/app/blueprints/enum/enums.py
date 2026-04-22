@@ -52,6 +52,19 @@ class ComplianceStatus(str, Enum):
         return self.value
 
 
+class UserType(str, Enum):
+    CLIENT = "client"
+    VENDOR = "vendor"
+    CONTRACTOR = "contractor"
+
+
+class UserStatus(str, Enum):
+    PENDING_EMAIL_VERIFICATION = "pending_email_verification"
+    PENDING_APPROVAL = "pending_approval"
+    ACTIVE = "active"
+    REJECTED = "rejected"
+    INACTIVE = "inactive"
+    DELETED = "deleted"
 class InvoiceStatusEnum(Enum):
     DRAFT = "DRAFT"
     SUBMITTED = "SUBMITTED"

@@ -1,26 +1,17 @@
-from typing import List
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.extensions import db
-from sqlalchemy.sql import func
+from app.models.audit_mixin import AuditMixin
 
 
-class Address(db.Model):
+class Address(db.Model, AuditMixin):
     __tablename__ = "address"
 
-    id = mapped_column(
+    id: Mapped[str] = mapped_column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    street = mapped_column(db.String(255))
-    city = mapped_column(db.String(100))
-    state = mapped_column(db.String(20))
-    zip = mapped_column(db.String(10))
-    country = mapped_column(db.String(2))
-    created_by = mapped_column(db.String(100))
-    created_date = mapped_column(db.DateTime, server_default=func.now())
-    last_modified_by = mapped_column(db.String(100))
-    last_modified_date = mapped_column(db.DateTime)
-
-    # clients = relationship('Client', back_populates='address')
-    # vendors = relationship('Vendor', back_populates='address')
-    workorders = relationship("WorkOrder", back_populates="address")
+    street: Mapped[str] = mapped_column(db.String(255), nullable=False)
+    city: Mapped[str] = mapped_column(db.String(100), nullable=False)
+    state: Mapped[str] = mapped_column(db.String(50))
+    zip: Mapped[str] = mapped_column(db.String(20), nullable=False)
+    country: Mapped[str] = mapped_column(db.String(100), nullable=False)

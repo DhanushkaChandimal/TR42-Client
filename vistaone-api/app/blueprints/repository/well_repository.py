@@ -1,6 +1,6 @@
 from uuid import UUID
 from sqlalchemy.exc import SQLAlchemyError
-from app.models.wells import Well
+from app.models.well import Well
 from app.extensions import db
 
 

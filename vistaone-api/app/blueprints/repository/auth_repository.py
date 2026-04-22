@@ -1,5 +1,4 @@
 from sqlalchemy import select
-#from app.models import db, User
 from app.extensions import db
 from app.models import User
 

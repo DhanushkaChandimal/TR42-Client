@@ -1,14 +1,14 @@
-from sqlalchemy.orm import mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.orm import mapped_column, relationship, Mapped
 import uuid
 from app.extensions import db
 from app.blueprints.enum.enums import VendorStatus, ComplianceStatus
+from app.models.audit_mixin import AuditMixin
 
 
-class Vendor(db.Model):
-    __tablename__ = "vendors"
+class Vendor(db.Model, AuditMixin):
+    __tablename__ = "vendor"
 
-    vendor_id = mapped_column(
+    id: Mapped[str] = mapped_column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
 
@@ -39,12 +39,9 @@ class Vendor(db.Model):
     onboarding = mapped_column(db.Boolean, nullable=False, default=True)
     description = mapped_column(db.Text, nullable=True)
 
-    created_by = mapped_column(db.String(100))
-    created_date = mapped_column(db.DateTime, server_default=func.now())
-    last_modified_by = mapped_column(db.String(100))
-    last_modified_date = mapped_column(db.DateTime)
-
     address_id = mapped_column(db.String(36), db.ForeignKey("address.id"))
     address = relationship("Address")
 
     workorders = relationship("WorkOrder", back_populates="vendor")
+
+    vendor_services = relationship("VendorService", back_populates="vendor")

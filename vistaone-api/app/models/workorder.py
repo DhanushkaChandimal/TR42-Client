@@ -1,5 +1,4 @@
-from sqlalchemy.orm import mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.orm import mapped_column, relationship, Mapped
 from app.blueprints.enum.enums import (
     PriorityEnum,
     StatusEnum,
@@ -9,32 +8,29 @@ from app.blueprints.enum.enums import (
 import uuid
 from app.extensions import db
 from sqlalchemy import Sequence
+from app.models.audit_mixin import AuditMixin
 
 
-class WorkOrder(db.Model):
-    __tablename__ = "work_orders"
+class WorkOrder(db.Model, AuditMixin):
+    __tablename__ = "work_order"
 
-    id = mapped_column(
+    id: Mapped[str] = mapped_column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     work_order_id = mapped_column(db.Integer, Sequence("work_order_id_seq"))
 
-    client_id = mapped_column(
-        db.String(36), db.ForeignKey("clients.client_id"), nullable=False
-    )
-    vendor_id = mapped_column(
-        db.String(36), db.ForeignKey("vendors.vendor_id"), nullable=False
-    )  ## assigned_vendor (text)
+    client_id = mapped_column(db.String(36), db.ForeignKey("client.id"), nullable=False)
+    vendor_id = mapped_column(db.String(36), db.ForeignKey("vendor.id"), nullable=False)
     service_type_id = mapped_column(
-        db.String(36), db.ForeignKey("service_types.service_type_id"), nullable=False
-    )  ## service_type (text)
+        db.String(36), db.ForeignKey("service_type.id"), nullable=False
+    )
 
     description = mapped_column(db.String(500))
 
     location_type = mapped_column(db.Enum(LocationTypeEnum), nullable=False)
 
     well_id = mapped_column(
-        db.String(36), db.ForeignKey("wells.id")
+        db.String(36), db.ForeignKey("well.id")
     )  ## well table reference if location_type is WELL
 
     latitude = mapped_column(db.Float, nullable=True)
@@ -54,10 +50,6 @@ class WorkOrder(db.Model):
 
     estimated_start_date = mapped_column(db.DateTime, nullable=True)
     estimated_end_date = mapped_column(db.DateTime, nullable=True)
-    created_by = mapped_column(db.String(100))
-    created_date = mapped_column(db.DateTime, server_default=func.now())
-    last_modified_by = mapped_column(db.String(100))
-    last_modified_date = mapped_column(db.DateTime)
     cancelled_by = mapped_column(db.String(100))
     cancelled_date = mapped_column(db.DateTime)
     cancellation_reason = mapped_column(db.String(255), nullable=True)
@@ -69,6 +61,6 @@ class WorkOrder(db.Model):
     ## Relationships
     client = relationship("Client", back_populates="workorders")
     vendor = relationship("Vendor", back_populates="workorders")
-    service_type = relationship("ServiceType", back_populates="workorders")
-    well = relationship("Well", back_populates="workorders")
-    address = relationship("Address", back_populates="workorders")
+    service_type = relationship("ServiceType")
+    well = relationship("Well")
+    address = relationship("Address")

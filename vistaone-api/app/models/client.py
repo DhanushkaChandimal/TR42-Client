@@ -1,23 +1,31 @@
-from sqlalchemy.orm import mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.orm import mapped_column, Mapped
 import uuid
 from app.extensions import db
+from app.models.audit_mixin import AuditMixin
 
 
-class Client(db.Model):
-    __tablename__ = "clients"
+class Client(db.Model, AuditMixin):
+    __tablename__ = "client"
 
-    client_id = mapped_column(
+    id: Mapped[str] = mapped_column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    name = mapped_column(db.String(255), nullable=False)
-    created_by = mapped_column(db.String(100))
-    created_date = mapped_column(db.DateTime, server_default=func.now())
-    last_modified_by = mapped_column(db.String(100))
-    last_modified_date = mapped_column(db.DateTime)
+    client_name: Mapped[str] = mapped_column(db.String(255), nullable=False)
+    client_code: Mapped[str] = mapped_column(
+        db.String(255), nullable=False, unique=True
+    )
+    primary_contact_name: Mapped[str] = mapped_column(db.String(80), nullable=False)
+    company_email: Mapped[str] = mapped_column(db.String(100), nullable=False)
+    company_contact_number: Mapped[str] = mapped_column(db.String(30), nullable=False)
+    company_web_address: Mapped[str] = mapped_column(db.String(100), nullable=True)
 
-    wells = relationship("Well", back_populates="client")
-    workorders = relationship("WorkOrder", back_populates="client")
+    address_id: Mapped[str] = mapped_column(
+        db.String(36), db.ForeignKey("address.id"), unique=True
+    )
+    address = db.relationship("Address")
 
-    address_id = mapped_column(db.String(36), db.ForeignKey("address.id"))
-    address = relationship("Address")
+    users = db.relationship(
+        "User", foreign_keys="User.client_id", back_populates="client"
+    )
+    wells = db.relationship("Well", back_populates="client")
+    workorders = db.relationship("WorkOrder", back_populates="client")

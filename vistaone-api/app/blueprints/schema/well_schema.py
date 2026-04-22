@@ -1,5 +1,5 @@
 from app.extensions import ma
-from app.models.wells import Well
+from app.models.well import Well
 from marshmallow_enum import EnumField
 from app.blueprints.enum.enums import WellStatusEnum
 

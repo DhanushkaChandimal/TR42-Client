@@ -1,5 +1,5 @@
 from uuid import UUID
-from app.models.wells import Well
+from app.models.well import Well
 from app.blueprints.repository.well_repository import WellRepository
 from app.extensions import db
 import logging
