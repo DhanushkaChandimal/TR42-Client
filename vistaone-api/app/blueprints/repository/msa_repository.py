@@ -49,7 +49,7 @@ class MsaRepository:
 
     @staticmethod
     def get_vendor_name(vendor_id):
-        query = select(Vendor.company_name).where(Vendor.vendor_id == vendor_id)
+        query = select(Vendor.company_name).where(Vendor.id == vendor_id)
         return db.session.execute(query).scalars().first()
 
     @staticmethod

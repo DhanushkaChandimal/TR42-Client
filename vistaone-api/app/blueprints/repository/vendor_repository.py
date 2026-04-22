@@ -23,7 +23,7 @@ class VendorRepository:
     @staticmethod
     def get_by_id(vendor_id):
         """Return a single vendor by vendor_id, or None."""
-        query = select(Vendor).where(Vendor.vendor_id == vendor_id)
+        query = select(Vendor).where(Vendor.id == vendor_id)
         return db.session.execute(query).scalars().first()
 
     @staticmethod

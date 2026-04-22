@@ -10,9 +10,7 @@ class Msa(db.Model):
     id = mapped_column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    vendor_id = mapped_column(
-        db.String(36), db.ForeignKey("vendors.vendor_id"), nullable=False
-    )
+    vendor_id = mapped_column(db.String(36), db.ForeignKey("vendor.id"), nullable=False)
     version = mapped_column(db.String(10), nullable=True)
     effective_date = mapped_column(db.Date, nullable=True)
     expiration_date = mapped_column(db.Date, nullable=True)
