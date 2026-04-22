@@ -4,6 +4,7 @@ from .vendor_routes import vendor_bp
 from .well_routes import well_bp
 from .msa_routes import msa_bp
 from .invoice_routes import invoice_bp
+from .client_routes import clients_bp
 
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "well_bp",
     "msa_bp",
     "invoice_bp",
+    "clients_bp",
 ]
