@@ -4,12 +4,21 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import WorkOrders from "./pages/WorkOrders";
 import Wells from "./pages/Wells";
+import Vendors from "./pages/Vendors";
+import VendorMarketplace from "./pages/VendorMarketplace";
+import VendorFavorites from "./pages/VendorFavorites";
+import VendorDetail from "./pages/VendorDetail";
+import Contracts from "./pages/Contracts";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import RegisterUser from "./pages/RegisterUser";
+import VerifyEmail from "./pages/VerifyEmail";
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<RegisterUser />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route
         path="/dashboard"
         element={
@@ -31,6 +40,46 @@ function App() {
         element={
           <ProtectedRoute>
             <Wells />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendors"
+        element={
+          <ProtectedRoute>
+            <Vendors />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendor-marketplace"
+        element={
+          <ProtectedRoute>
+            <VendorMarketplace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendor-favorites"
+        element={
+          <ProtectedRoute>
+            <VendorFavorites />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendors/:vendorId"
+        element={
+          <ProtectedRoute>
+            <VendorDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contracts"
+        element={
+          <ProtectedRoute>
+            <Contracts />
           </ProtectedRoute>
         }
       />

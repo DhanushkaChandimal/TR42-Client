@@ -4,6 +4,7 @@ from app.extensions import limiter
 from app.blueprints.schema.auth_schema import login_schema
 from app.blueprints.schema.register_user_schema import register_user_schema
 from app.blueprints.services.auth_service import LoginService
+from app.models.user import User
 from app.utils.util import token_required
 import logging
 
@@ -36,6 +37,23 @@ def login():
     response, status_code = LoginService.login_user(email, password)
 
     return jsonify(response), status_code
+
+
+# GET current user profile including company_id
+@users_bp.route("/me", methods=["GET"])
+@token_required
+def get_current_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "id": user.id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "company_id": user.company_id,
+        "role_id": user.role_id,
+    }), 200
 
 
 @users_bp.route("/logout", methods=["POST"])
