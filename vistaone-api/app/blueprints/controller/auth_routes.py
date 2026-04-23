@@ -54,7 +54,7 @@ def get_current_user(user_id):
                 "last_name": user.last_name,
                 "email": user.email,
                 "company_id": user.client_id,
-                "role_id": user.role_id,
+                "roles": [r.name for r in user.roles],
             }
         ),
         200,
