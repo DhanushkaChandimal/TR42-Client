@@ -53,7 +53,7 @@ def get_favorites(user_id, client_id):
         result, code = VendorService.get_all_vendors()
         all_vendors = result
         favorite_ids = {link.vendor_id for link in links}
-        favorites = [v for v in all_vendors if v["vendor_id"] in favorite_ids]
+        favorites = [v for v in all_vendors if v["id"] in favorite_ids]
         return jsonify(favorites), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
