@@ -128,22 +128,64 @@ class LoginService:
     def register_client(client_data):
         from app.blueprints.repository.client_repository import ClientRepository
         from app.models.client import Client
+        from app.models.user import User
+        from app.models.role import Role
+        from app.extensions import db
 
-        existing = ClientRepository.get_client_by_email(client_data["company_email"])
-        if existing:
+        if ClientRepository.get_client_by_email(client_data["company_email"]):
             return {"message": "A client with this email is already registered."}, 409
 
-        existing_code = ClientRepository.get_client_by_code(client_data["client_code"])
-        if existing_code:
+        if ClientRepository.get_client_by_code(client_data["client_code"]):
             return {"message": "A client with this code is already registered."}, 409
 
-        address_data = client_data.pop("address", {})
-        address = AddressRepository.get_or_create_address(address_data)
-        client_data["address_id"] = address.id
+        admin_data = client_data.pop("admin_user")
 
-        client = Client(**client_data)
-        created_client = ClientRepository.create_client(client)
-        return created_client, 201
+        if UserRepository.get_user_by_email(admin_data["email"]):
+            return {"message": "A user with this email is already registered."}, 409
+
+        if User.query.filter_by(username=admin_data["username"]).first():
+            return {"message": "A user with this username is already registered."}, 409
+
+        try:
+            address_data = client_data.pop("address", {})
+            address = AddressRepository.get_or_create_address(address_data)
+
+            client_data["address_id"] = address.id
+            client = Client(**client_data)
+            db.session.add(client)
+            db.session.flush()
+
+            role = Role.query.filter_by(name="CLIENT_ADMIN").first()
+            if not role:
+                role = Role(
+                    name="CLIENT_ADMIN",
+                    description="Administrator for a client company",
+                )
+                db.session.add(role)
+                db.session.flush()
+
+            password = admin_data.pop("password")
+            admin_user = User(
+                **admin_data,
+                client_id=client.id,
+                address_id=address.id,
+                status=UserStatus.PENDING_EMAIL_VERIFICATION,
+                user_type=UserType.CLIENT,
+            )
+            admin_user.set_password(password)
+            admin_user.roles.append(role)
+            db.session.add(admin_user)
+            db.session.commit()
+
+            s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+            token = s.dumps(admin_user.email, salt="email-verify")
+            send_verification_email(admin_user, token)
+
+            return client, 201
+
+        except Exception:
+            db.session.rollback()
+            raise
 
     @staticmethod
     def verify_email(token):
