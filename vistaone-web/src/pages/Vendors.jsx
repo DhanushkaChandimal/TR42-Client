@@ -252,9 +252,9 @@ export default function Vendors() {
             <tbody>
               {filteredVendors.map((vendor) => (
                 <tr
-                  key={vendor.vendor_id}
+                  key={vendor.id}
                   className="vendors-row-clickable"
-                  onClick={() => navigate(`/vendors/${vendor.vendor_id}`)}
+                  onClick={() => navigate(`/vendors/${vendor.id}`)}
                 >
                   <td>{vendor.company_name || vendor.name}</td>
                   <td>{vendor.company_code || "-"}</td>

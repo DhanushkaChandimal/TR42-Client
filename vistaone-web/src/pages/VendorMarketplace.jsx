@@ -58,7 +58,7 @@ export default function VendorMarketplace() {
           if (user.company_id) {
             setClientId(user.company_id);
             const favs = await vendorService.getFavorites(user.company_id);
-            setFavoriteIds(new Set(favs.map((v) => v.vendor_id)));
+            setFavoriteIds(new Set(favs.map((v) => v.id)));
           }
         }
       } catch {
@@ -166,12 +166,12 @@ export default function VendorMarketplace() {
           <div className="vm-empty">No vendors match your search</div>
         ) : (
           processedVendors.map((vendor) => (
-            <div key={vendor.vendor_id} className="vm-card">
+            <div key={vendor.id} className="vm-card">
               <div className="vm-card-header">
                 <div>
                   <h3
                     className="vm-card-name"
-                    onClick={() => navigate(`/vendors/${vendor.vendor_id}`)}
+                    onClick={() => navigate(`/vendors/${vendor.id}`)}
                   >
                     {vendor.company_name || vendor.name}
                   </h3>
@@ -200,19 +200,19 @@ export default function VendorMarketplace() {
               <div className="vm-card-footer">
                 <button
                   className="vm-card-view"
-                  onClick={() => navigate(`/vendors/${vendor.vendor_id}`)}
+                  onClick={() => navigate(`/vendors/${vendor.id}`)}
                 >
                   View Details
                 </button>
-                {clientId && !favoriteIds.has(vendor.vendor_id) && (
+                {clientId && !favoriteIds.has(vendor.id) && (
                   <button
                     className="vm-card-fav"
-                    onClick={() => handleAddFavorite(vendor.vendor_id)}
+                    onClick={() => handleAddFavorite(vendor.id)}
                   >
                     + Add to Favorites
                   </button>
                 )}
-                {clientId && favoriteIds.has(vendor.vendor_id) && (
+                {clientId && favoriteIds.has(vendor.id) && (
                   <span className="vm-card-fav-added">In Favorites</span>
                 )}
               </div>

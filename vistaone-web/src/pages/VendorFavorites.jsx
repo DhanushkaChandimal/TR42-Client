@@ -43,7 +43,7 @@ export default function VendorFavorites() {
     if (!clientId) return;
     try {
       await vendorService.removeFavorite(clientId, vendorId);
-      setFavorites((prev) => prev.filter((v) => v.vendor_id !== vendorId));
+      setFavorites((prev) => prev.filter((v) => v.id !== vendorId));
     } catch (err) {
       setError("Failed to remove from favorites");
     }
@@ -80,12 +80,12 @@ export default function VendorFavorites() {
       ) : (
         <section className="vm-grid">
           {favorites.map((vendor) => (
-            <div key={vendor.vendor_id} className="vm-card">
+            <div key={vendor.id} className="vm-card">
               <div className="vm-card-header">
                 <div>
                   <h3
                     className="vm-card-name"
-                    onClick={() => navigate(`/vendors/${vendor.vendor_id}`)}
+                    onClick={() => navigate(`/vendors/${vendor.id}`)}
                   >
                     {vendor.company_name || vendor.name}
                   </h3>
@@ -114,13 +114,13 @@ export default function VendorFavorites() {
               <div className="vm-card-footer">
                 <button
                   className="vm-card-view"
-                  onClick={() => navigate(`/vendors/${vendor.vendor_id}`)}
+                  onClick={() => navigate(`/vendors/${vendor.id}`)}
                 >
                   View History
                 </button>
                 <button
                   className="vm-card-remove"
-                  onClick={() => handleRemoveFavorite(vendor.vendor_id)}
+                  onClick={() => handleRemoveFavorite(vendor.id)}
                 >
                   Remove from Favorites
                 </button>

@@ -225,7 +225,7 @@ export default function Contracts() {
                 >
                   <option value="">Select vendor</option>
                   {vendors.map((v) => (
-                    <option key={v.vendor_id} value={v.vendor_id}>
+                    <option key={v.id} value={v.id}>
                       {v.company_name || v.name}
                     </option>
                   ))}

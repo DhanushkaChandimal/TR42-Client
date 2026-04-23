@@ -558,9 +558,9 @@ function RegisterUser() {
                                                         className="form-control"
                                                         placeholder="Middle name (optional)"
                                                     />
-                                                    {errors.middleName && (
+                                                    {errors.middle_name && (
                                                         <div className="invalid-feedback d-block">
-                                                            {errors.middleName}
+                                                            {errors.middle_name}
                                                         </div>
                                                     )}
                                                 </div>
