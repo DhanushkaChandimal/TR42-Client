@@ -365,16 +365,25 @@ export default function Contracts() {
                                     <td>{msa.expiration_date || "-"}</td>
                                     <td>
                                         {msa.file_name ? (
-                                            <a
-                                                href={msaService.getDownloadUrl(
-                                                    msa.id,
-                                                )}
+                                            <button
+                                                type="button"
                                                 className="contracts-file-link"
-                                                target="_blank"
-                                                rel="noreferrer"
+                                                onClick={async () => {
+                                                    try {
+                                                        await msaService.download(
+                                                            msa.id,
+                                                            msa.file_name,
+                                                        );
+                                                    } catch (err) {
+                                                        alert(
+                                                            err.message ||
+                                                                "Failed to download document",
+                                                        );
+                                                    }
+                                                }}
                                             >
                                                 Download
-                                            </a>
+                                            </button>
                                         ) : (
                                             <span className="contracts-no-file">
                                                 No document
