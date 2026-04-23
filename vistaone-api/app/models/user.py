@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Date
 from werkzeug.security import check_password_hash, generate_password_hash
 from app.extensions import db
@@ -6,6 +6,7 @@ import uuid
 from app.blueprints.enum.enums import UserType, UserStatus
 from datetime import date
 from app.models.audit_mixin import AuditMixin
+from app.models.role import user_role
 
 
 class User(db.Model, AuditMixin):
@@ -37,6 +38,8 @@ class User(db.Model, AuditMixin):
         db.String(36), db.ForeignKey("address.id"), nullable=False
     )
     address = db.relationship("Address", foreign_keys=[address_id])
+
+    roles = relationship('Role', secondary=user_role, back_populates='users')
 
     def set_password(self, raw_password: str) -> None:
         self.password_hash = generate_password_hash(raw_password)
