@@ -54,4 +54,34 @@ export const msaService = {
   getDownloadUrl: (msaId) => {
     return `${API_BASE}${MSA_ENDPOINT}/${msaId}/download`;
   },
+
+  /**
+   * Download an MSA document. The endpoint requires a Bearer token, so a
+   * plain <a href> navigation fails — fetch the file with auth, then trigger
+   * a browser download from the blob.
+   */
+  download: async (msaId, suggestedFilename) => {
+    const response = await fetch(
+      `${API_BASE}${MSA_ENDPOINT}/${msaId}/download`,
+      { method: "GET", headers: getAuthHeaders(false) },
+    );
+    if (!response.ok) throw new Error("Failed to download MSA");
+
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+    const filename =
+      (match && decodeURIComponent(match[1])) ||
+      suggestedFilename ||
+      `msa-${msaId}`;
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  },
 };
