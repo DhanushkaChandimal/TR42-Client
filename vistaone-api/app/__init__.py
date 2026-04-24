@@ -37,6 +37,7 @@ def create_app(config_name="ProductionConfig"):
     mail.init_app(app)
 
     logging_setup()
+    _register_audit_hooks(db)
 
     # Register blueprints
     app.register_blueprint(users_bp, url_prefix="/users")
@@ -72,3 +73,39 @@ def create_app(config_name="ProductionConfig"):
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
     return app
+
+
+_audit_hooks_registered = False
+
+
+def _register_audit_hooks(db):
+    """Auto-populate created_by / updated_by on every flush (idempotent)."""
+    global _audit_hooks_registered
+    if _audit_hooks_registered:
+        return
+    _audit_hooks_registered = True
+
+    from sqlalchemy import event
+
+    @event.listens_for(db.session, "before_flush")
+    def _set_audit_fields(session, flush_context, instances):
+        from flask import g, has_request_context
+        from app.models.user import User
+
+        actor_id = getattr(g, "current_user_id", None) if has_request_context() else None
+
+        for obj in session.new:
+            if not hasattr(obj, "created_by"):
+                continue
+            if obj.created_by is None:
+                if actor_id:
+                    obj.created_by = actor_id
+                elif isinstance(obj, User):
+                    # Self-registration: no JWT, use the new user's own generated ID
+                    obj.created_by = obj.id
+            if hasattr(obj, "updated_by") and obj.updated_by is None:
+                obj.updated_by = actor_id or (obj.id if isinstance(obj, User) else None)
+
+        for obj in session.dirty:
+            if hasattr(obj, "updated_by") and actor_id:
+                obj.updated_by = actor_id
