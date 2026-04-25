@@ -120,12 +120,15 @@ export const sidebarNav = {
     { to: '/dashboard', label: "Dashboard", icon: "grid", active: true },
     { to: '/wells', label: "Oil Wells", icon: "list", active: false },
     { to: '/workorders', label: "Work Orders", icon: "clipboard", active: false },
+    { to: "/tickets", label: "Tickets", icon: "clipboard", active: false },
     { to: "/invoices", label: "Invoices", icon: "file", active: false },
     { to: "/vendor-favorites", label: "Vendors", icon: "users", active: false },
   ],
   account: [
     { to: "/vendor-marketplace", label: "Vendor Marketplace", icon: "users", active: false },
     { to: "/contracts", label: "Contracts / MSA", icon: "folder", active: false },
+    { to: "/analytics", label: "Analytics", icon: "grid", active: false },
+    { to: "/fraud", label: "Fraud & Anomalies", icon: "file", active: false },
   ],
 };
 

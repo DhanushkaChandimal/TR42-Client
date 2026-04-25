@@ -64,3 +64,6 @@ class WorkOrder(db.Model, AuditMixin):
     service_type = relationship("ServiceType")
     well = relationship("Well")
     address = relationship("Address")
+    tickets = relationship(
+        "Ticket", back_populates="work_order", cascade="all, delete-orphan"
+    )

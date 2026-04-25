@@ -132,7 +132,7 @@ export default function WorkOrders() {
                   <td>{order.service_type.service}</td>
                   <td>{order.location_type}</td>
                   <td>{`${order.latitude}, ${order.longitude}`}</td>
-                  <td>{formatDate(order.created_date)}</td>
+                  <td>{formatDate(order.created_at)}</td>
                   <td>
                     <span
                       className={`status-badge status-${order.status?.toLowerCase()}`}

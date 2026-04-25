@@ -31,7 +31,7 @@ class InvoiceSchema(ma.SQLAlchemyAutoSchema):
         unknown = EXCLUDE
 
     id = fields.String(dump_only=True)
-    work_order_id = fields.Integer(required=True)
+    work_order_id = fields.String(required=True)
     vendor_id = fields.String(required=True)
     client_id = fields.String(required=True)
     invoice_date = fields.DateTime(required=True)

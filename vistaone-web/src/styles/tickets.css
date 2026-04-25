@@ -1,0 +1,323 @@
+.tickets-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tickets-search {
+  flex: 1;
+  min-width: 240px;
+  padding: 10px 14px;
+  border: 1px solid #d6dde6;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.tickets-filter {
+  padding: 10px 14px;
+  border: 1px solid #d6dde6;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+}
+
+.tickets-error {
+  background: #fdecec;
+  color: #b42318;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.tickets-action-message {
+  background: #eef6ff;
+  color: #1f4e8c;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.tickets-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 10px;
+}
+
+.tickets-section {
+  margin-bottom: 24px;
+}
+
+.tickets-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #1f2937;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  margin-bottom: 12px;
+  transition: background 0.15s ease;
+}
+
+.tickets-section-header:hover {
+  background: #111827;
+}
+
+.tickets-section-header.collapsed {
+  margin-bottom: 0;
+}
+
+.tickets-section-chevron {
+  display: inline-block;
+  width: 14px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.tickets-section-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.tickets-section-meta {
+  font-size: 12px;
+  color: #d1d5db;
+  font-weight: 500;
+}
+
+.tickets-group {
+  background: #fff;
+  border: 1px solid #e5e9f0;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.tickets-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-bottom: 1px solid #eef1f5;
+  background: #fafbfd;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.tickets-group-header:hover {
+  background: #f1f4f9;
+}
+
+.tickets-group-header.collapsed {
+  border-bottom: none;
+}
+
+.tickets-group-chevron {
+  display: inline-block;
+  width: 14px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.tickets-group-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  font-size: 15px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.tickets-group-subtitle {
+  margin-top: 2px;
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.tickets-group-meta {
+  font-size: 12px;
+  color: #4b5563;
+  background: #eef1f5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.tickets-table-wrap {
+  overflow-x: auto;
+}
+
+.tickets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tickets-table th,
+.tickets-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #eef1f5;
+  vertical-align: top;
+}
+
+.tickets-table th {
+  background: #fafbfd;
+  font-weight: 600;
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.tickets-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tickets-title {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.tickets-description {
+  color: #6b7280;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.tickets-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #eef1f5;
+  color: #4b5563;
+  text-transform: capitalize;
+}
+
+.tickets-status.status-APPROVED {
+  background: #def7ec;
+  color: #046c4e;
+}
+
+.tickets-status.status-REJECTED {
+  background: #fde8e8;
+  color: #b42318;
+}
+
+.tickets-status.status-PENDING_APPROVAL,
+.tickets-status.status-COMPLETED {
+  background: #fff3cd;
+  color: #92400e;
+}
+
+.tickets-status.status-IN_PROGRESS {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.tickets-status.status-ASSIGNED {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.tickets-rejection-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #b42318;
+}
+
+.tickets-actions {
+  white-space: nowrap;
+}
+
+.tickets-btn {
+  border: none;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.tickets-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tickets-btn-approve {
+  background: #10b981;
+  color: #fff;
+}
+
+.tickets-btn-approve:hover:not(:disabled) {
+  background: #059669;
+}
+
+.tickets-btn-reject {
+  background: #ef4444;
+  color: #fff;
+}
+
+.tickets-btn-reject:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.tickets-btn-cancel {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+
+.tickets-btn-cancel:hover:not(:disabled) {
+  background: #d1d5db;
+}
+
+.tickets-no-action {
+  color: #9ca3af;
+}
+
+.tickets-reject-row {
+  background: #fff8f8;
+}
+
+.tickets-reject-row label {
+  display: block;
+  font-size: 13px;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.tickets-reject-row textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid #d6dde6;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.tickets-reject-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
