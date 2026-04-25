@@ -1,10 +1,6 @@
-from datetime import datetime, timezone
 from app.models.ticket import Ticket
-from app.models.vendor import Vendor
 from app.blueprints.repository.ticket_repository import TicketRepository
 from app.blueprints.enum.enums import TicketStatusEnum
-from app.utils.notifications import send_vendor_notification
-from app.extensions import db
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,7 +30,7 @@ class TicketService:
         ticket = Ticket(**validated_data)
         ticket.created_by = current_user_id
         if not ticket.status:
-            ticket.status = TicketStatusEnum.DRAFT
+            ticket.status = TicketStatusEnum.UNASSIGNED
         saved = TicketRepository.create(ticket)
         logger.info(f"Ticket created: {saved.id}")
         return saved
@@ -51,69 +47,3 @@ class TicketService:
         saved = TicketRepository.update(ticket)
         logger.info(f"Ticket updated: {saved.id}")
         return saved
-
-    @staticmethod
-    def approve_ticket(ticket_id, current_user_id):
-        ticket = TicketRepository.get_by_id(ticket_id)
-        if not ticket:
-            raise ValueError("Ticket not found")
-        if ticket.status == TicketStatusEnum.APPROVED:
-            raise ValueError("Ticket is already approved")
-
-        ticket.status = TicketStatusEnum.APPROVED
-        ticket.approved_by = current_user_id
-        ticket.approved_at = datetime.now(timezone.utc)
-        ticket.rejected_at = None
-        ticket.rejection_reason = None
-        ticket.updated_by = current_user_id
-        saved = TicketRepository.update(ticket)
-        logger.info(f"Ticket approved: {saved.id}")
-
-        vendor = db.session.get(Vendor, saved.vendor_id)
-        if vendor and vendor.company_email:
-            send_vendor_notification(
-                to_email=vendor.company_email,
-                subject=f"Ticket #{saved.ticket_number} approved",
-                body=(
-                    f"Ticket '{saved.title}' on work order {saved.work_order_id} "
-                    f"has been approved by the client."
-                ),
-            )
-        return saved
-
-    @staticmethod
-    def reject_ticket(ticket_id, current_user_id, rejection_reason):
-        ticket = TicketRepository.get_by_id(ticket_id)
-        if not ticket:
-            raise ValueError("Ticket not found")
-        if not rejection_reason or not rejection_reason.strip():
-            raise ValueError("Rejection reason is required")
-
-        ticket.status = TicketStatusEnum.REJECTED
-        ticket.rejection_reason = rejection_reason.strip()
-        ticket.rejected_at = datetime.now(timezone.utc)
-        ticket.approved_by = None
-        ticket.approved_at = None
-        ticket.updated_by = current_user_id
-        saved = TicketRepository.update(ticket)
-        logger.info(f"Ticket rejected: {saved.id}")
-
-        vendor = db.session.get(Vendor, saved.vendor_id)
-        if vendor and vendor.company_email:
-            send_vendor_notification(
-                to_email=vendor.company_email,
-                subject=f"Ticket #{saved.ticket_number} rejected",
-                body=(
-                    f"Ticket '{saved.title}' on work order {saved.work_order_id} "
-                    f"has been rejected by the client.\n\n"
-                    f"Reason: {saved.rejection_reason}"
-                ),
-            )
-        return saved
-
-    @staticmethod
-    def all_tickets_approved_for_work_order(work_order_id):
-        tickets = TicketRepository.get_by_work_order(work_order_id)
-        if not tickets:
-            return False
-        return all(t.status == TicketStatusEnum.APPROVED for t in tickets)

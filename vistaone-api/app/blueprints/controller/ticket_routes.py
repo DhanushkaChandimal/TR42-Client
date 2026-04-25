@@ -67,27 +67,3 @@ def update_ticket(current_user_id, ticket_id):
         return jsonify({"error": "Ticket not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-
-
-@ticket_bp.route("/<string:ticket_id>/approve", methods=["PUT"])
-@token_required
-def approve_ticket(current_user_id, ticket_id):
-    try:
-        ticket = TicketService.approve_ticket(ticket_id, current_user_id)
-        return ticket_schema.jsonify(ticket), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-
-@ticket_bp.route("/<string:ticket_id>/reject", methods=["PUT"])
-@token_required
-def reject_ticket(current_user_id, ticket_id):
-    json_data = request.get_json() or {}
-    rejection_reason = json_data.get("rejection_reason", "")
-    try:
-        ticket = TicketService.reject_ticket(
-            ticket_id, current_user_id, rejection_reason
-        )
-        return ticket_schema.jsonify(ticket), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400

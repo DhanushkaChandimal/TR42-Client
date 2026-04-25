@@ -9,31 +9,40 @@ from app.extensions import db
 from app.models.user import User
 from app.models.workorder import WorkOrder
 from app.models.ticket import Ticket
-from app.blueprints.enum.enums import TicketStatusEnum
+from app.blueprints.enum.enums import TicketStatusEnum, PriorityEnum
 
 app = create_app("DevelopmentConfig")
 
 SAMPLES = [
     {
-        "title": "Initial site inspection and prep",
-        "description": "Walk-through, hazard ID, equipment staging.",
-        "contractor_name": "Diego Salinas",
-        "status": TicketStatusEnum.APPROVED,
-        "offset_days": -7,
-    },
-    {
-        "title": "Primary work execution",
-        "description": "Complete the scoped work per the WO description.",
-        "contractor_name": "Maria Cortez",
-        "status": TicketStatusEnum.PENDING_APPROVAL,
-        "offset_days": -2,
-    },
-    {
-        "title": "Site cleanup and turnover",
-        "description": "Remove staging, photograph site, sign off with operator.",
-        "contractor_name": "Jorge Ramirez",
+        "description": "Initial site inspection and prep — walk-through, hazard ID, equipment staging.",
+        "assigned_contractor": "Diego Salinas",
         "status": TicketStatusEnum.COMPLETED,
-        "offset_days": 0,
+        "priority": PriorityEnum.MEDIUM,
+        "offset_days": -7,
+        "duration_hours": 8,
+        "estimated_quantity": 1.0,
+        "unit": "site",
+    },
+    {
+        "description": "Primary work execution — complete the scoped work per the WO description.",
+        "assigned_contractor": "Maria Cortez",
+        "status": TicketStatusEnum.IN_PROGRESS,
+        "priority": PriorityEnum.HIGH,
+        "offset_days": -2,
+        "duration_hours": 16,
+        "estimated_quantity": 4.0,
+        "unit": "hours",
+    },
+    {
+        "description": "Site cleanup and turnover — remove staging, photograph site, sign off with operator.",
+        "assigned_contractor": "Jorge Ramirez",
+        "status": TicketStatusEnum.ASSIGNED,
+        "priority": PriorityEnum.LOW,
+        "offset_days": 1,
+        "duration_hours": 4,
+        "estimated_quantity": 1.0,
+        "unit": "site",
     },
 ]
 
@@ -58,32 +67,29 @@ with app.app_context():
             continue
 
         for sample in SAMPLES:
-            scheduled_start = now + timedelta(days=sample["offset_days"])
+            start_time = now + timedelta(days=sample["offset_days"])
+            duration = timedelta(hours=sample["duration_hours"])
+            due_date = start_time + duration
             ticket = Ticket(
                 work_order_id=wo.id,
                 vendor_id=wo.vendor_id,
-                title=sample["title"],
+                service_type=wo.service_type_id,
                 description=sample["description"],
-                contractor_name=sample["contractor_name"],
+                assigned_contractor=sample["assigned_contractor"],
+                priority=sample["priority"],
                 status=sample["status"],
-                scheduled_start=scheduled_start,
-                scheduled_end=scheduled_start + timedelta(days=1),
-                completed_at=(
-                    scheduled_start + timedelta(hours=8)
-                    if sample["status"]
-                    in (
-                        TicketStatusEnum.COMPLETED,
-                        TicketStatusEnum.PENDING_APPROVAL,
-                        TicketStatusEnum.APPROVED,
-                    )
+                start_time=start_time,
+                due_date=due_date,
+                assigned_at=start_time if sample["status"] != TicketStatusEnum.UNASSIGNED else None,
+                end_time=(
+                    start_time + duration
+                    if sample["status"] == TicketStatusEnum.COMPLETED
                     else None
                 ),
-                approved_at=(
-                    scheduled_start + timedelta(hours=12)
-                    if sample["status"] == TicketStatusEnum.APPROVED
-                    else None
-                ),
-                approved_by=(actor_id if sample["status"] == TicketStatusEnum.APPROVED else None),
+                estimated_duration=duration,
+                estimated_quantity=sample["estimated_quantity"],
+                unit=sample["unit"],
+                anomaly_flag=False,
                 created_by=actor_id or "system",
             )
             db.session.add(ticket)

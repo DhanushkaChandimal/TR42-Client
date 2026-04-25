@@ -1,8 +1,7 @@
 from sqlalchemy.orm import mapped_column, relationship, Mapped
-from sqlalchemy import Sequence
 import uuid
 from app.extensions import db
-from app.blueprints.enum.enums import TicketStatusEnum
+from app.blueprints.enum.enums import PriorityEnum, TicketStatusEnum
 from app.models.audit_mixin import AuditMixin
 
 
@@ -12,31 +11,48 @@ class Ticket(db.Model, AuditMixin):
     id: Mapped[str] = mapped_column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    ticket_number = mapped_column(db.Integer, Sequence("ticket_number_seq"))
 
     work_order_id = mapped_column(
         db.String(36), db.ForeignKey("work_order.id"), nullable=False
     )
-    vendor_id = mapped_column(db.String(36), db.ForeignKey("vendor.id"), nullable=False)
-
-    title = mapped_column(db.String(255), nullable=False)
-    description = mapped_column(db.Text, nullable=True)
-    contractor_name = mapped_column(db.String(255), nullable=True)
-
+    invoice_id = mapped_column(
+        db.String(36), db.ForeignKey("invoice.id"), nullable=True
+    )
+    description = mapped_column(db.Text, nullable=False)
+    # FK to contractor.id once Contractor model exists
+    assigned_contractor = mapped_column(db.String(255), nullable=True)
+    priority = mapped_column(db.Enum(PriorityEnum), nullable=False)
     status = mapped_column(
-        db.Enum(TicketStatusEnum), nullable=False, default=TicketStatusEnum.DRAFT
+        db.Enum(TicketStatusEnum),
+        nullable=False,
+        default=TicketStatusEnum.UNASSIGNED,
+    )
+    vendor_id = mapped_column(
+        db.String(36), db.ForeignKey("vendor.id"), nullable=False
     )
 
-    scheduled_start = mapped_column(db.DateTime(timezone=True), nullable=True)
-    scheduled_end = mapped_column(db.DateTime(timezone=True), nullable=True)
-    completed_at = mapped_column(db.DateTime(timezone=True), nullable=True)
+    start_time = mapped_column(db.DateTime(timezone=True), nullable=True)
+    due_date = mapped_column(db.DateTime(timezone=True), nullable=False)
+    assigned_at = mapped_column(db.DateTime(timezone=True), nullable=True)
+    end_time = mapped_column(db.DateTime(timezone=True), nullable=True)
+    estimated_duration = mapped_column(db.Interval, nullable=True)
 
-    approved_by = mapped_column(db.String(36), db.ForeignKey("user.id"), nullable=True)
-    approved_at = mapped_column(db.DateTime(timezone=True), nullable=True)
-    rejected_at = mapped_column(db.DateTime(timezone=True), nullable=True)
-    rejection_reason = mapped_column(db.String(500), nullable=True)
+    service_type = mapped_column(
+        db.String(36), db.ForeignKey("service_type.id"), nullable=False
+    )
 
     notes = mapped_column(db.Text, nullable=True)
+    contractor_start_location = mapped_column(db.Text, nullable=True)
+    contractor_end_location = mapped_column(db.Text, nullable=True)
+    estimated_quantity = mapped_column(db.Float, nullable=True)
+    unit = mapped_column(db.String(100), nullable=True)
+    special_requirements = mapped_column(db.Text, nullable=True)
+    anomaly_flag = mapped_column(db.Boolean, nullable=True, default=False)
+    anomaly_reason = mapped_column(db.Text, nullable=True)
+    additional_information = mapped_column(db.JSON, nullable=True)
+    route = mapped_column(db.Text, nullable=True)
 
     work_order = relationship("WorkOrder", back_populates="tickets")
     vendor = relationship("Vendor")
+    invoice = relationship("Invoice")
+    service = relationship("ServiceType", foreign_keys=[service_type])

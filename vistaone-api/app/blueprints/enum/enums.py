@@ -74,10 +74,7 @@ class InvoiceStatusEnum(Enum):
 
 
 class TicketStatusEnum(Enum):
-    DRAFT = "DRAFT"
+    UNASSIGNED = "UNASSIGNED"
     ASSIGNED = "ASSIGNED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
-    PENDING_APPROVAL = "PENDING_APPROVAL"
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
