@@ -150,6 +150,19 @@
   background: #007bff;
   color: #fff;
 }
+.vm-card-create-wo {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #10b981;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.vm-card-create-wo:hover {
+  background: #059669;
+}
 .vm-card-fav {
   padding: 6px 14px;
   border: none;

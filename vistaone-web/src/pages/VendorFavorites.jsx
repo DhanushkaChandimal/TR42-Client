@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
 import { vendorService } from "../services/vendorService";
 import "../styles/vendor-marketplace.css";
 
@@ -10,6 +11,7 @@ export default function VendorFavorites() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [clientId, setClientId] = useState(null);
+    const [createWOForVendor, setCreateWOForVendor] = useState(null);
 
     useEffect(() => {
         fetchFavorites();
@@ -131,18 +133,36 @@ export default function VendorFavorites() {
                                 >
                                     View History
                                 </button>
+                                {vendor.status === "active" &&
+                                    vendor.compliance_status === "complete" && (
+                                        <button
+                                            className="vm-card-create-wo"
+                                            onClick={() =>
+                                                setCreateWOForVendor(vendor.id)
+                                            }
+                                        >
+                                            + Work Order
+                                        </button>
+                                    )}
                                 <button
                                     className="vm-card-remove"
                                     onClick={() =>
                                         handleRemoveFavorite(vendor.id)
                                     }
                                 >
-                                    Remove from Favorites
+                                    Remove
                                 </button>
                             </div>
                         </div>
                     ))}
                 </section>
+            )}
+
+            {createWOForVendor && (
+                <CreateWorkOrderModal
+                    setShowModal={() => setCreateWOForVendor(null)}
+                    prefilledVendorId={createWOForVendor}
+                />
             )}
         </AppShell>
     );

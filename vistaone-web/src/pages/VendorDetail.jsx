@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
 import { vendorService } from "../services/vendorService";
 import "../styles/vendors.css";
 
@@ -10,6 +11,7 @@ export default function VendorDetail() {
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showCreateWO, setShowCreateWO] = useState(false);
 
   useEffect(() => {
     const loadVendor = async () => {
@@ -42,12 +44,23 @@ export default function VendorDetail() {
     >
       {vendor && (
         <div className="vendor-detail">
-          <button
-            className="vendor-detail-back"
-            onClick={() => navigate(-1)}
-          >
-            Back
-          </button>
+          <div className="vendor-detail-actions">
+            <button
+              className="vendor-detail-back"
+              onClick={() => navigate(-1)}
+            >
+              Back
+            </button>
+            {vendor.status === "active" &&
+              vendor.compliance_status === "complete" && (
+                <button
+                  className="vendor-detail-create-wo"
+                  onClick={() => setShowCreateWO(true)}
+                >
+                  + Create Work Order
+                </button>
+              )}
+          </div>
 
           <div className="vendor-detail-grid">
             <div className="vendor-detail-card">
@@ -80,6 +93,13 @@ export default function VendorDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {showCreateWO && (
+        <CreateWorkOrderModal
+          setShowModal={setShowCreateWO}
+          prefilledVendorId={vendorId}
+        />
       )}
     </AppShell>
   );

@@ -236,7 +236,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
     }
     try {
       await createWorkOrder(newWorkOrder);
-      await fetchWorkOrders();
+      if (fetchWorkOrders) await fetchWorkOrders();
       setLoading(false);
       handleCloseModal();
     } catch (err) {
