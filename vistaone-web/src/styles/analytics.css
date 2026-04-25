@@ -1,0 +1,121 @@
+.analytics-error {
+  background: #fdecec;
+  color: #b42318;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.analytics-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.analytics-kpi {
+  background: #fff;
+  border: 1px solid #e5e9f0;
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.analytics-kpi-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #6b7280;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.analytics-kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-top: 4px;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 14px;
+}
+
+.analytics-card {
+  background: #fff;
+  border: 1px solid #e5e9f0;
+  border-radius: 10px;
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.analytics-card.analytics-wide {
+  grid-column: 1 / -1;
+}
+
+.analytics-card h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4b5563;
+  font-weight: 700;
+}
+
+.analytics-empty {
+  color: #6b7280;
+  font-size: 13px;
+  padding: 30px 10px;
+  text-align: center;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.analytics-table th,
+.analytics-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.analytics-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #6b7280;
+  background: #fafbfd;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.analytics-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.analytics-rate {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.analytics-rate.rate-low {
+  background: #def7ec;
+  color: #046c4e;
+}
+
+.analytics-rate.rate-mid {
+  background: #fff3cd;
+  color: #92400e;
+}
+
+.analytics-rate.rate-high {
+  background: #fde8e8;
+  color: #b42318;
+}

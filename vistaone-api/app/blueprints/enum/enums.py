@@ -71,3 +71,13 @@ class InvoiceStatusEnum(Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     PAID = "PAID"
+
+
+class TicketStatusEnum(Enum):
+    DRAFT = "DRAFT"
+    ASSIGNED = "ASSIGNED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"

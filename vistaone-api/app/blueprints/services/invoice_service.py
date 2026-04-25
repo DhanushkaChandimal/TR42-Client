@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 from app.models.invoice import Invoice
 from app.models.line_item import LineItem
 from app.blueprints.repository.invoice_repository import InvoiceRepository
-from app.blueprints.enum.enums import InvoiceStatusEnum
+from app.blueprints.repository.ticket_repository import TicketRepository
+from app.blueprints.enum.enums import InvoiceStatusEnum, TicketStatusEnum
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,22 @@ class InvoiceService:
     def create_invoice(validated_data, current_user_id):
         try:
             line_items_data = validated_data.pop("line_items", [])
+
+            work_order_id = validated_data.get("work_order_id")
+            if work_order_id:
+                tickets = TicketRepository.get_by_work_order(work_order_id)
+                if not tickets:
+                    raise ValueError(
+                        "Cannot create invoice: work order has no tickets"
+                    )
+                unapproved = [
+                    t for t in tickets if t.status != TicketStatusEnum.APPROVED
+                ]
+                if unapproved:
+                    raise ValueError(
+                        f"Cannot create invoice: {len(unapproved)} ticket(s) "
+                        f"on this work order are not yet approved"
+                    )
 
             invoice = Invoice(**validated_data)
             invoice.created_by = current_user_id

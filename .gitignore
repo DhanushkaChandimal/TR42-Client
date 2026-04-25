@@ -4,4 +4,7 @@ __pycache__/
 .vscode/
 ../.vscode/
 /logs/
+vistaone-api/uploads/
+vistaone-api/logs/
+vistaone-api/logs\\client-web.log
 
