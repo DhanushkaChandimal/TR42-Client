@@ -29,7 +29,39 @@ export default function UserProfile() {
     };
 
     const handleSave = async () => {
-        await updateProfile(formData);
+        // Strip empty fields so the backend's strict validation (required
+        // address sub-fields, typed date) doesn't reject the payload.
+        const payload = {};
+        const editableFields = [
+            "first_name",
+            "middle_name",
+            "last_name",
+            "contact_number",
+            "alternate_number",
+            "date_of_birth",
+        ];
+        editableFields.forEach((f) => {
+            const v = formData[f];
+            if (v !== undefined && v !== null && v !== "") payload[f] = v;
+        });
+
+        // Only include address if all 5 fields are present (AddressSchema
+        // requires all of them).
+        const addr = formData.address || {};
+        const addrComplete = ADDRESS_FIELDS.every(
+            (f) => addr[f] && String(addr[f]).trim() !== "",
+        );
+        if (addrComplete) {
+            payload.address = {
+                street: addr.street,
+                city: addr.city,
+                state: addr.state,
+                zip: addr.zip,
+                country: addr.country,
+            };
+        }
+
+        await updateProfile(payload);
         if (!error) setEditMode(false);
     };
 
