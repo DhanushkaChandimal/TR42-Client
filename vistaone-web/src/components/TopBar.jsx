@@ -95,7 +95,7 @@ function TopBar({ title, subtitle }) {
                         </button>
                         {isProfileOpen && (
                             <div className="dropdown-menu show p-2 shadow topbar-dropdown topbar-dropdown-profile">
-                                <button className="dropdown-item" type="button">View Profile</button>
+                                <button className="dropdown-item" type="button" onClick={() => { setIsProfileOpen(false); navigate('/profile'); }}>View Profile</button>
                                 <button className="dropdown-item" type="button" onClick={() => { setIsProfileOpen(false); navigate('/settings'); }}>Settings</button>
                                 <button className="dropdown-item text-danger" type="button" onClick={() => { logout(); setIsProfileOpen(false); navigate('/login', { replace: true }); }}>Logout</button>
                             </div>
