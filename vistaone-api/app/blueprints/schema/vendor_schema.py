@@ -16,6 +16,16 @@ class VendorSchema(ma.SQLAlchemyAutoSchema):
     status = fields.String()
     compliance_status = fields.String()
 
+    # Flatten vendor_services -> list of {id, service} for service_type
+    services = fields.Method("get_services")
+
+    def get_services(self, obj):
+        return [
+            {"id": vs.service_type.id, "service": vs.service_type.service}
+            for vs in (obj.vendor_services or [])
+            if vs.service_type
+        ]
+
 
 vendor_schema = VendorSchema()
 vendors_schema = VendorSchema(many=True)

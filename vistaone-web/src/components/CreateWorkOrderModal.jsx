@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import MapPicker from "./MapPicker";
 import { useWorkOrder } from "../hooks/useWorkOrder";
+import { vendorService } from "../services/vendorService";
+import { useWell } from "../hooks/useWell";
 
 const recurringOptions = [
   { value: "daily", label: "Daily" },
@@ -8,28 +10,10 @@ const recurringOptions = [
   { value: "monthly", label: "Monthly" },
 ];
 
-const vendorOptions = [
-  { id: "aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaa1", label: "Delta Services" },
-  {
-    id: "bbbbbbb2-bbbb-bbbb-bbbb-bbbbbbbbbbb2",
-    label: "Epsilon Drilling",
-  },
-  { id: "ccccccc3-cccc-cccc-cccc-ccccccccccc3", label: "Zeta Field Solutions" },
-];
-
-const jobTypeOptions = [
-  { id: "11111111-aaaa-bbbb-cccc-111111111111", label: "Drilling" },
-  { id: "22222222-bbbb-cccc-dddd-222222222222", label: "Well Maintenance" },
-  { id: "33333333-cccc-dddd-eeee-333333333333", label: "Inspection" },
-  { id: "44444444-dddd-eeee-ffff-444444444444", label: "Equipment Rental" },
-];
-
-import { useWell } from "../hooks/useWell";
-
 const emptyForm = {
   client_id: "",
-  vendor: vendorOptions[0].id,
-  jobType: jobTypeOptions[0].id,
+  vendor: "",
+  jobType: "",
   description: "",
   locationMethod: "gps",
   gpsCoordinates: "",
@@ -46,14 +30,65 @@ const emptyForm = {
   well: "",
 };
 
-function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
-  const [formData, setFormData] = useState(emptyForm);
+function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId }) {
+  const [formData, setFormData] = useState({
+    ...emptyForm,
+    vendor: prefilledVendorId || "",
+  });
   const { wells, fetchWells } = useWell();
   const [wellOptions, setWellOptions] = useState([]);
   const [markerPos, setMarkerPos] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const { createWorkOrder } = useWorkOrder();
+  const [vendors, setVendors] = useState([]);
+  const [vendorsLoading, setVendorsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    vendorService
+      .getAll()
+      .then((data) => {
+        if (!cancelled) setVendors(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setVendors([]);
+      })
+      .finally(() => {
+        if (!cancelled) setVendorsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Build vendor and service option lists with cross-filter logic.
+  // Selecting a vendor narrows job type list to that vendor's services.
+  // Selecting a job type narrows vendor list to vendors offering that service.
+  const allServices = useMemo(() => {
+    const map = new Map();
+    vendors.forEach((v) =>
+      (v.services || []).forEach((s) => {
+        if (s?.id && !map.has(s.id)) map.set(s.id, s);
+      }),
+    );
+    return Array.from(map.values()).sort((a, b) =>
+      (a.service || "").localeCompare(b.service || ""),
+    );
+  }, [vendors]);
+
+  const vendorOptions = useMemo(() => {
+    if (!formData.jobType) return vendors;
+    return vendors.filter((v) =>
+      (v.services || []).some((s) => s.id === formData.jobType),
+    );
+  }, [vendors, formData.jobType]);
+
+  const jobTypeOptions = useMemo(() => {
+    if (!formData.vendor) return allServices;
+    const v = vendors.find((x) => x.id === formData.vendor);
+    return v ? v.services || [] : [];
+  }, [vendors, allServices, formData.vendor]);
 
   useEffect(() => {
     fetchWells();
@@ -79,6 +114,24 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
+    // If picking a vendor that doesn't offer the currently selected job type,
+    // clear job type so the user re-picks. Same in reverse.
+    if (name === "vendor" && value && formData.jobType) {
+      const v = vendors.find((x) => x.id === value);
+      const offers = (v?.services || []).some((s) => s.id === formData.jobType);
+      if (!offers) {
+        setFormData((prev) => ({ ...prev, vendor: value, jobType: "" }));
+        return;
+      }
+    }
+    if (name === "jobType" && value && formData.vendor) {
+      const v = vendors.find((x) => x.id === formData.vendor);
+      const offers = (v?.services || []).some((s) => s.id === value);
+      if (!offers) {
+        setFormData((prev) => ({ ...prev, jobType: value, vendor: "" }));
+        return;
+      }
+    }
     // If changing locationMethod to 'well', fill GPS from well and set map
     if (name === "locationMethod" && value === "well") {
       const selectedWell = wellOptions.find((w) => w.id === formData.well);
@@ -176,14 +229,14 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
       address_id: formData.address_id || null,
     };
 
-    if (!locationDisplay || !formData.jobType) {
+    if (!locationDisplay || !formData.jobType || !formData.vendor) {
       setError("Please fill all required fields.");
       setLoading(false);
       return;
     }
     try {
       await createWorkOrder(newWorkOrder);
-      await fetchWorkOrders();
+      if (fetchWorkOrders) await fetchWorkOrders();
       setLoading(false);
       handleCloseModal();
     } catch (err) {
@@ -244,10 +297,15 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
               name="vendor"
               value={formData.vendor}
               onChange={handleFormChange}
+              required
+              disabled={vendorsLoading}
             >
+              <option value="">
+                {vendorsLoading ? "Loading vendors..." : "Select a vendor"}
+              </option>
               {vendorOptions.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.label}
+                  {v.company_name || v.name}
                 </option>
               ))}
             </select>
@@ -259,10 +317,17 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders }) {
                 name="jobType"
                 value={formData.jobType}
                 onChange={handleFormChange}
+                required
+                disabled={vendorsLoading || jobTypeOptions.length === 0}
               >
+                <option value="">
+                  {jobTypeOptions.length === 0 && formData.vendor
+                    ? "No services for this vendor"
+                    : "Select a job type"}
+                </option>
                 {jobTypeOptions.map((type) => (
                   <option key={type.id} value={type.id}>
-                    {type.label}
+                    {type.service || type.label}
                   </option>
                 ))}
               </select>

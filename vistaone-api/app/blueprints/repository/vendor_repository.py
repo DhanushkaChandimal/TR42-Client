@@ -1,6 +1,8 @@
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models.vendor import Vendor
+from app.models.vendor_service import VendorService
 
 
 # Vendor repository - all database queries for the vendor table
@@ -10,7 +12,9 @@ class VendorRepository:
     @staticmethod
     def get_all(status=None, compliance=None):
         """Return all vendors with optional status and compliance filters."""
-        query = select(Vendor)
+        query = select(Vendor).options(
+            joinedload(Vendor.vendor_services).joinedload(VendorService.service_type)
+        )
 
         if status:
             query = query.where(Vendor.status == status)
@@ -18,13 +22,21 @@ class VendorRepository:
         if compliance:
             query = query.where(Vendor.compliance_status == compliance)
 
-        return db.session.execute(query).scalars().all()
+        return db.session.execute(query).unique().scalars().all()
 
     @staticmethod
     def get_by_id(vendor_id):
         """Return a single vendor by vendor_id, or None."""
-        query = select(Vendor).where(Vendor.id == vendor_id)
-        return db.session.execute(query).scalars().first()
+        query = (
+            select(Vendor)
+            .where(Vendor.id == vendor_id)
+            .options(
+                joinedload(Vendor.vendor_services).joinedload(
+                    VendorService.service_type
+                )
+            )
+        )
+        return db.session.execute(query).unique().scalars().first()
 
     @staticmethod
     def create(vendor):
