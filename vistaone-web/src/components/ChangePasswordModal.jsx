@@ -1,17 +1,20 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { authService } from "../services/authServices";
 
-function ChangePasswordModal() {
+export default function ChangePasswordModal({ isOpen, onClose }) {
     const [form, setForm] = useState({
         old_password: "",
         new_password: "",
         confirm_password: "",
     });
-
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
 
-    const handleSubmit = async () => {
+    if (!isOpen) return null;
+
+    const handleSubmit = async (e) => {
+        e?.preventDefault();
         setError(null);
         setSuccess(null);
 
@@ -29,88 +32,121 @@ function ChangePasswordModal() {
             return;
         }
 
+        setSubmitting(true);
         try {
             await authService.changePassword(form);
-
             setSuccess("Password updated successfully!");
-
-            // reset form
             setForm({
                 old_password: "",
                 new_password: "",
                 confirm_password: "",
             });
-
-            // auto close modal after 1.5s
-            setTimeout(() => {
-                const modal = document.getElementById("changePasswordModal");
-                if (modal) {
-                    const bsModal = window.bootstrap.Modal.getInstance(modal);
-                    bsModal?.hide();
-                }
-            }, 1500);
+            setTimeout(() => onClose?.(), 1500);
         } catch (err) {
             setError(err.message || "Password update failed");
+        } finally {
+            setSubmitting(false);
         }
     };
 
+    const handleClose = () => {
+        setForm({
+            old_password: "",
+            new_password: "",
+            confirm_password: "",
+        });
+        setError(null);
+        setSuccess(null);
+        onClose?.();
+    };
+
     return (
-        <div className="modal fade" id="changePasswordModal" tabIndex="-1">
-            <div className="modal-dialog">
-                <div className="modal-content p-3">
-                    <h5 className="mb-3">Change Password</h5>
-
-                    {/* ERROR MESSAGE INSIDE MODAL */}
-                    {error && <div className="alert alert-danger">{error}</div>}
-
-                    {/* SUCCESS MESSAGE */}
-                    {success && (
-                        <div className="alert alert-success">{success}</div>
-                    )}
-
-                    <input
-                        type="password"
-                        placeholder="Old Password"
-                        value={form.old_password}
-                        onChange={(e) =>
-                            setForm({ ...form, old_password: e.target.value })
-                        }
-                        className="form-control mb-2"
-                    />
-
-                    <input
-                        type="password"
-                        placeholder="New Password"
-                        value={form.new_password}
-                        onChange={(e) =>
-                            setForm({ ...form, new_password: e.target.value })
-                        }
-                        className="form-control mb-2"
-                    />
-
-                    <input
-                        type="password"
-                        placeholder="Confirm Password"
-                        value={form.confirm_password}
-                        onChange={(e) =>
-                            setForm({
-                                ...form,
-                                confirm_password: e.target.value,
-                            })
-                        }
-                        className="form-control mb-3"
-                    />
-
+        <div className="profile-modal-overlay" onClick={handleClose}>
+            <div
+                className="profile-modal"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="profile-modal-header">
+                    <h3>Change Password</h3>
                     <button
-                        className="btn btn-primary w-100"
-                        onClick={handleSubmit}
+                        type="button"
+                        className="profile-modal-close"
+                        onClick={handleClose}
+                        aria-label="Close"
                     >
-                        Update Password
+                        ×
                     </button>
                 </div>
+
+                <form className="profile-modal-form" onSubmit={handleSubmit}>
+                    {error && <div className="profile-error">{error}</div>}
+                    {success && (
+                        <div className="profile-success">{success}</div>
+                    )}
+
+                    <label>
+                        Old Password
+                        <input
+                            type="password"
+                            value={form.old_password}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    old_password: e.target.value,
+                                })
+                            }
+                            autoComplete="current-password"
+                        />
+                    </label>
+
+                    <label>
+                        New Password
+                        <input
+                            type="password"
+                            value={form.new_password}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    new_password: e.target.value,
+                                })
+                            }
+                            autoComplete="new-password"
+                        />
+                    </label>
+
+                    <label>
+                        Confirm Password
+                        <input
+                            type="password"
+                            value={form.confirm_password}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    confirm_password: e.target.value,
+                                })
+                            }
+                            autoComplete="new-password"
+                        />
+                    </label>
+
+                    <div className="profile-modal-actions">
+                        <button
+                            type="button"
+                            className="profile-btn-cancel"
+                            onClick={handleClose}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="profile-btn-primary"
+                            disabled={submitting}
+                        >
+                            {submitting ? "Updating..." : "Update Password"}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
 }
-
-export default ChangePasswordModal;

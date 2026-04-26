@@ -171,9 +171,9 @@ export const authService = {
     },
 
     getProfile: async () => {
-        const res = await fetch(PROFILE_ENDPOINT, {
+        const res = await fetch("/api" + PROFILE_ENDPOINT, {
             headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                Authorization: `Bearer ${localStorage.getItem("authToken")}`,
             },
         });
         let data = {};
@@ -191,11 +191,11 @@ export const authService = {
     },
 
     updateProfile: async (data) => {
-        const res = await fetch(PROFILE_ENDPOINT, {
+        const res = await fetch("/api" + PROFILE_ENDPOINT, {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                Authorization: `Bearer ${localStorage.getItem("authToken")}`,
             },
             body: JSON.stringify(data),
         });
@@ -213,11 +213,11 @@ export const authService = {
         return result;
     },
     changePassword: async (data) => {
-        const res = await fetch(PROFILE_ENDPOINT + "change-password", {
+        const res = await fetch("/api" + PROFILE_ENDPOINT + "change-password", {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                Authorization: `Bearer ${localStorage.getItem("authToken")}`,
             },
             body: JSON.stringify(data),
         });
