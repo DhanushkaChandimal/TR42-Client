@@ -50,7 +50,7 @@ export default function Contracts() {
                 setMsaRecords(msaData);
                 setVendors(vendorData);
             } catch (err) {
-                setError("Failed to load contract data");
+                setError(err.message || "Failed to load contract data");
             } finally {
                 setLoading(false);
             }

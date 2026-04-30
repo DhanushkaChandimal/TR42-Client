@@ -1,8 +1,65 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CheckCircle, XCircle, Edit2, Save, X, ArrowRightLeft, Globe } from 'lucide-react';
 import { authService } from '../services/authServices';
 import AppShell from '../components/AppShell';
 import { useAuthContext } from '../context/AuthContext';
+
+function MultiRoleSelect({ roles, selected, onChange }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const toggle = (name) => {
+        onChange(selected.includes(name) ? selected.filter((r) => r !== name) : [...selected, name]);
+    };
+
+    const label = selected.length === 0 ? 'No roles selected' : selected.join(', ');
+
+    return (
+        <div ref={ref} style={{ position: 'relative', minWidth: 200 }}>
+            <button
+                type="button"
+                className="form-select form-select-sm text-start text-truncate"
+                onClick={() => setOpen((o) => !o)}
+                title={label}
+            >
+                {label}
+            </button>
+            {open && (
+                <div
+                    className="border rounded bg-white shadow-sm py-1"
+                    style={{ position: 'absolute', zIndex: 1050, minWidth: '100%', maxHeight: 260, overflowY: 'auto' }}
+                >
+                    {roles.length === 0 && (
+                        <span className="px-3 py-2 text-muted small d-block">No roles available</span>
+                    )}
+                    {roles.map((r) => (
+                        <label
+                            key={r.id}
+                            className="d-flex align-items-center gap-2 px-3 py-1 small mb-0 w-100"
+                            style={{ cursor: 'pointer', userSelect: 'none' }}
+                        >
+                            <input
+                                type="checkbox"
+                                className="form-check-input mt-0 flex-shrink-0"
+                                checked={selected.includes(r.name)}
+                                onChange={() => toggle(r.name)}
+                            />
+                            {r.name}
+                        </label>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 const STATUS_BADGE = {
     active: 'bg-success-subtle text-success',
@@ -122,9 +179,9 @@ export default function UserManagement() {
 
     const startRoleEdit = (user) => {
         setRoleEditId(user.id);
-        const nonMasterRoles = user.roles.filter((r) => r !== 'MASTER');
-        setSelectedRoles(nonMasterRoles.length > 0 ? [nonMasterRoles[0]] : []);
+        setSelectedRoles(user.roles.filter((r) => r !== 'MASTER'));
     };
+
 
     const saveRoles = async (userId) => {
         setError('');
@@ -341,17 +398,11 @@ export default function UserManagement() {
                                         </td>
                                         <td className="px-3 py-3 align-middle">
                                             {roleEditId === user.id ? (
-                                                <select
-                                                    className="form-select form-select-sm"
-                                                    style={{ maxWidth: 180 }}
-                                                    value={selectedRoles[0] || ''}
-                                                    onChange={(e) => setSelectedRoles(e.target.value ? [e.target.value] : [])}
-                                                >
-                                                    <option value="" disabled>— No role —</option>
-                                                    {assignableRoles(user).map((r) => (
-                                                        <option key={r.id} value={r.name}>{r.name}</option>
-                                                    ))}
-                                                </select>
+                                                <MultiRoleSelect
+                                                    roles={assignableRoles(user)}
+                                                    selected={selectedRoles}
+                                                    onChange={setSelectedRoles}
+                                                />
                                             ) : (
                                                 <div className="d-flex flex-wrap gap-1">
                                                     {user.roles.length === 0 && <span className="text-muted small">No roles</span>}

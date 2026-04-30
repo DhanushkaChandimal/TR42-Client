@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from app.blueprints.services.vendor_service import VendorService
 from app.blueprints.repository.client_vendor_repository import ClientVendorRepository
 from app.models.client_vendor import ClientVendor
-from app.utils.util import token_required
+from app.utils.util import permission_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ vendor_bp = Blueprint("vendor", __name__)
 
 
 @vendor_bp.route("/", methods=["GET"])
-@token_required
+@permission_required("vendors", "read")
 def list_vendors(user_id):
     status = request.args.get("status")
     compliance = request.args.get("compliance")
@@ -22,14 +22,14 @@ def list_vendors(user_id):
 
 
 @vendor_bp.route("/<vendor_id>", methods=["GET"])
-@token_required
+@permission_required("vendors", "read")
 def get_vendor(user_id, vendor_id):
     result, code = VendorService.get_vendor_by_id(vendor_id)
     return jsonify(result), code
 
 
 @vendor_bp.route("/", methods=["POST"])
-@token_required
+@permission_required("vendors", "write")
 def create_vendor(user_id):
     body = request.get_json() or {}
     result, code = VendorService.create_vendor(body, user_id)
@@ -37,16 +37,15 @@ def create_vendor(user_id):
 
 
 @vendor_bp.route("/<vendor_id>", methods=["PATCH"])
-@token_required
+@permission_required("vendors", "write")
 def update_vendor(user_id, vendor_id):
     body = request.get_json() or {}
     result, code = VendorService.update_vendor(vendor_id, body, user_id)
     return jsonify(result), code
 
 
-# GET favorite vendors for a client
 @vendor_bp.route("/favorites/<client_id>", methods=["GET"])
-@token_required
+@permission_required("vendors", "read")
 def get_favorites(user_id, client_id):
     try:
         links = ClientVendorRepository.get_by_client(client_id)
@@ -59,9 +58,8 @@ def get_favorites(user_id, client_id):
         return jsonify({"error": str(e)}), 400
 
 
-# ADD vendor to client favorites
 @vendor_bp.route("/favorites", methods=["POST"])
-@token_required
+@permission_required("vendors", "write")
 def add_favorite(user_id):
     body = request.get_json() or {}
     client_id = body.get("client_id")
@@ -83,9 +81,8 @@ def add_favorite(user_id):
         return jsonify({"error": str(e)}), 400
 
 
-# REMOVE vendor from client favorites
 @vendor_bp.route("/favorites/<client_id>/<vendor_id>", methods=["DELETE"])
-@token_required
+@permission_required("vendors", "delete")
 def remove_favorite(user_id, client_id, vendor_id):
     link = ClientVendorRepository.get_by_client_and_vendor(client_id, vendor_id)
     if not link:

@@ -2,8 +2,7 @@ from flask import request, jsonify, Blueprint
 from app.blueprints.schema.invoice_schema import invoice_schema, invoices_schema
 from app.blueprints.services.invoice_service import InvoiceService
 from marshmallow import ValidationError
-from app.utils.util import token_required, role_required
-from app.utils.roles import MASTER, ADMIN
+from app.utils.util import permission_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,9 +10,8 @@ logger = logging.getLogger(__name__)
 invoice_bp = Blueprint("invoice_bp", __name__)
 
 
-# CREATE Invoice
 @invoice_bp.route("/", methods=["POST"])
-@token_required
+@permission_required("invoices", "write")
 def create_invoice(current_user_id):
     json_data = request.get_json()
     if not json_data:
@@ -29,9 +27,8 @@ def create_invoice(current_user_id):
         return jsonify({"error": str(e)}), 400
 
 
-# GET all invoices
 @invoice_bp.route("/", methods=["GET"])
-@token_required
+@permission_required("invoices", "read")
 def get_all_invoices(current_user_id):
     vendor_id = request.args.get("vendor_id")
     client_id = request.args.get("client_id")
@@ -43,9 +40,8 @@ def get_all_invoices(current_user_id):
     return invoices_schema.jsonify(invoices), 200
 
 
-# GET invoice by ID
 @invoice_bp.route("/<string:invoice_id>", methods=["GET"])
-@token_required
+@permission_required("invoices", "read")
 def get_invoice(current_user_id, invoice_id):
     try:
         invoice = InvoiceService.get_invoice(invoice_id)
@@ -56,9 +52,8 @@ def get_invoice(current_user_id, invoice_id):
         return jsonify({"error": str(e)}), 400
 
 
-# UPDATE invoice
 @invoice_bp.route("/<string:invoice_id>", methods=["PUT"])
-@token_required
+@permission_required("invoices", "write")
 def update_invoice(current_user_id, invoice_id):
     json_data = request.get_json()
     if not json_data:
@@ -78,9 +73,8 @@ def update_invoice(current_user_id, invoice_id):
         return jsonify({"error": str(e)}), 400
 
 
-# APPROVE invoice (also serves as override from REJECTED/PENDING)
 @invoice_bp.route("/<string:invoice_id>/approve", methods=["PUT"])
-@role_required(MASTER, ADMIN)
+@permission_required("invoices", "write")
 def approve_invoice(current_user_id, invoice_id):
     try:
         invoice = InvoiceService.approve_invoice(invoice_id, current_user_id)
@@ -91,9 +85,8 @@ def approve_invoice(current_user_id, invoice_id):
         return jsonify({"error": str(e)}), 400
 
 
-# REJECT invoice (also serves as override from APPROVED/PENDING)
 @invoice_bp.route("/<string:invoice_id>/reject", methods=["PUT"])
-@role_required(MASTER, ADMIN)
+@permission_required("invoices", "write")
 def reject_invoice(current_user_id, invoice_id):
     try:
         invoice = InvoiceService.reject_invoice(invoice_id, current_user_id)
@@ -104,9 +97,8 @@ def reject_invoice(current_user_id, invoice_id):
         return jsonify({"error": str(e)}), 400
 
 
-# RESET invoice back to PENDING (override from APPROVED/REJECTED)
 @invoice_bp.route("/<string:invoice_id>/set-pending", methods=["PUT"])
-@role_required(MASTER, ADMIN)
+@permission_required("invoices", "write")
 def set_pending_invoice(current_user_id, invoice_id):
     try:
         invoice = InvoiceService.set_pending_invoice(invoice_id, current_user_id)

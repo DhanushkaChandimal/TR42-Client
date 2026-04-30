@@ -1,5 +1,11 @@
 import { authFetch } from "./apiClient";
+
 const VENDOR_ENDPOINT = "/vendors";
+
+async function parseError(res, fallback) {
+  const data = await res.json().catch(() => ({}));
+  throw new Error(data?.message || fallback);
+}
 
 export const vendorService = {
   getAll: async (params = {}) => {
@@ -9,19 +15,13 @@ export const vendorService = {
     const qs = query.toString();
     const url = qs ? `${VENDOR_ENDPOINT}?${qs}` : VENDOR_ENDPOINT;
     const response = await authFetch(url, { method: "GET" });
-    if (!response.ok) {
-      throw new Error("Failed to fetch vendors");
-    }
+    if (!response.ok) await parseError(response, "Failed to fetch vendors");
     return await response.json();
   },
 
   getById: async (vendorId) => {
-    const response = await authFetch(`${VENDOR_ENDPOINT}/${vendorId}`, {
-      method: "GET",
-    });
-    if (!response.ok) {
-      throw new Error("Failed to fetch vendor");
-    }
+    const response = await authFetch(`${VENDOR_ENDPOINT}/${vendorId}`, { method: "GET" });
+    if (!response.ok) await parseError(response, "Failed to fetch vendor");
     return await response.json();
   },
 
@@ -30,9 +30,7 @@ export const vendorService = {
       method: "POST",
       body: JSON.stringify(data),
     });
-    if (!response.ok) {
-      throw new Error("Failed to create vendor");
-    }
+    if (!response.ok) await parseError(response, "Failed to create vendor");
     return await response.json();
   },
 
@@ -41,17 +39,13 @@ export const vendorService = {
       method: "PATCH",
       body: JSON.stringify(data),
     });
-    if (!response.ok) {
-      throw new Error("Failed to update vendor");
-    }
+    if (!response.ok) await parseError(response, "Failed to update vendor");
     return await response.json();
   },
 
   getFavorites: async (clientId) => {
-    const response = await authFetch(`${VENDOR_ENDPOINT}/favorites/${clientId}`, {
-      method: "GET",
-    });
-    if (!response.ok) throw new Error("Failed to fetch favorites");
+    const response = await authFetch(`${VENDOR_ENDPOINT}/favorites/${clientId}`, { method: "GET" });
+    if (!response.ok) await parseError(response, "Failed to fetch favorites");
     return await response.json();
   },
 
@@ -60,7 +54,7 @@ export const vendorService = {
       method: "POST",
       body: JSON.stringify({ client_id: clientId, vendor_id: vendorId }),
     });
-    if (!response.ok) throw new Error("Failed to add favorite");
+    if (!response.ok) await parseError(response, "Failed to add favorite");
     return await response.json();
   },
 
@@ -69,7 +63,7 @@ export const vendorService = {
       `${VENDOR_ENDPOINT}/favorites/${clientId}/${vendorId}`,
       { method: "DELETE" }
     );
-    if (!response.ok) throw new Error("Failed to remove favorite");
+    if (!response.ok) await parseError(response, "Failed to remove favorite");
     return await response.json();
   },
 };

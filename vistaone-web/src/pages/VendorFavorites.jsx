@@ -37,7 +37,7 @@ export default function VendorFavorites() {
             }
             setError("");
         } catch (err) {
-            setError("Failed to load favorites");
+            setError(err.message || "Failed to load favorites");
         } finally {
             setLoading(false);
         }
@@ -49,7 +49,7 @@ export default function VendorFavorites() {
             await vendorService.removeFavorite(clientId, vendorId);
             setFavorites((prev) => prev.filter((v) => v.id !== vendorId));
         } catch (err) {
-            setError("Failed to remove from favorites");
+            setError(err.message || "Failed to remove from favorites");
         }
     };
 

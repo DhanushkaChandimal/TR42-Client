@@ -115,6 +115,25 @@ def get_user_permissions(user):
     return PermissionRepository.aggregate_permissions(role_ids)
 
 
+_ACTION_LABELS = {
+    "read": "view",
+    "write": "create or modify",
+    "delete": "delete",
+}
+
+_RESOURCE_LABELS = {
+    "wells": "wells",
+    "workorders": "work orders",
+    "vendors": "vendors",
+    "vendor_marketplace": "vendor marketplace",
+    "contracts": "contracts",
+    "invoices": "invoices",
+    "users": "users",
+    "dashboard": "dashboard",
+    "promote_admin": "admin promotions",
+}
+
+
 def permission_required(resource, action="read"):
     """Decorator that checks the user has a specific permission on a resource.
     MASTER bypasses all checks.
@@ -139,7 +158,11 @@ def permission_required(resource, action="read"):
                 perms = get_user_permissions(user)
                 resource_perms = perms.get(resource, {})
                 if not resource_perms.get(action, False):
-                    return jsonify({"message": "Insufficient permissions"}), 403
+                    action_label = _ACTION_LABELS.get(action, action)
+                    resource_label = _RESOURCE_LABELS.get(resource, resource)
+                    return jsonify({
+                        "message": f"You do not have permission to {action_label} {resource_label}."
+                    }), 403
 
             return f(user_id, *args, **kwargs)
 
