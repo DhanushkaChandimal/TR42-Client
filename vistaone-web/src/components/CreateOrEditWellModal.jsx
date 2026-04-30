@@ -107,8 +107,7 @@ export default function CreateOrEditWellModal({
     try {
       await onSubmit(form);
     } catch (err) {
-      console.error(err);
-      setError(`Failed to ${mode === "edit" ? "update" : "create"} well.`);
+      setError(err.message || `Failed to ${mode === "edit" ? "update" : "create"} well.`);
     }
     setLoading(false);
   };

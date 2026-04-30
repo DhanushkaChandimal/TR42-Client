@@ -49,7 +49,7 @@ export default function VendorDetail() {
         const data = await vendorService.getById(vendorId);
         setVendor(data);
       } catch (err) {
-        setError("Failed to load vendor details");
+        setError(err.message || "Failed to load vendor details");
       } finally {
         setLoading(false);
       }

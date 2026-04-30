@@ -240,7 +240,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
       setLoading(false);
       handleCloseModal();
     } catch (err) {
-      setError("Failed to create work order. " + (err?.message || ""));
+      setError(err?.message || "Failed to create work order.");
       setLoading(false);
     }
   };

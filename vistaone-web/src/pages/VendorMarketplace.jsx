@@ -68,7 +68,7 @@ export default function VendorMarketplace() {
             }
             setError("");
         } catch (err) {
-            setError("Failed to load vendors");
+            setError(err.message || "Failed to load vendors");
         } finally {
             setLoading(false);
         }
@@ -80,7 +80,7 @@ export default function VendorMarketplace() {
             await vendorService.addFavorite(clientId, vendorId);
             setFavoriteIds((prev) => new Set(prev).add(vendorId));
         } catch (err) {
-            setError("Failed to add to favorites");
+            setError(err.message || "Failed to add to favorites");
         }
     };
 

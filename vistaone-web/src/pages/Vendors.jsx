@@ -47,7 +47,7 @@ export default function Vendors() {
             setVendors(data);
             setError("");
         } catch (err) {
-            setError("Failed to load vendors");
+            setError(err.message || "Failed to load vendors");
         } finally {
             setLoading(false);
         }
@@ -93,7 +93,7 @@ export default function Vendors() {
             setShowCreateForm(false);
             fetchVendors();
         } catch (err) {
-            setError("Failed to create vendor");
+            setError(err.message || "Failed to create vendor");
         } finally {
             setCreating(false);
         }
