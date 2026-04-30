@@ -1,20 +1,20 @@
 from flask import Blueprint, request, jsonify
 from app.blueprints.services.well_service import WellService
 from app.blueprints.schema.well_schema import well_schema, wells_schema
-from app.utils.util import token_required
+from app.utils.util import permission_required
 
 well_bp = Blueprint("well_bp", __name__)
 
 
 @well_bp.route("/", methods=["GET"])
-@token_required
+@permission_required("wells", "read")
 def get_wells(current_user_id):
     wells = WellService.get_all_wells()
     return wells_schema.jsonify(wells), 200
 
 
 @well_bp.route("/<well_id>", methods=["GET"])
-@token_required
+@permission_required("wells", "read")
 def get_well(current_user_id, well_id):
     try:
         well = WellService.get_well(well_id)
@@ -24,7 +24,7 @@ def get_well(current_user_id, well_id):
 
 
 @well_bp.route("/", methods=["POST"])
-@token_required
+@permission_required("wells", "write")
 def create_well(current_user_id):
     data = request.get_json()
     try:
@@ -44,7 +44,7 @@ def create_well(current_user_id):
 
 
 @well_bp.route("/<well_id>", methods=["PUT"])
-@token_required
+@permission_required("wells", "write")
 def update_well(current_user_id, well_id):
     data = request.get_json()
     try:
@@ -68,7 +68,7 @@ def update_well(current_user_id, well_id):
 
 
 @well_bp.route("/<well_id>", methods=["DELETE"])
-@token_required
+@permission_required("wells", "delete")
 def delete_well(current_user_id, well_id):
     try:
         WellService.delete_well(well_id)

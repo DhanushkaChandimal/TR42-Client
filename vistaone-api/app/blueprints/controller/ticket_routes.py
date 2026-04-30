@@ -2,7 +2,7 @@ from flask import request, jsonify, Blueprint
 from app.blueprints.schema.ticket_schema import ticket_schema, tickets_schema
 from app.blueprints.services.ticket_service import TicketService
 from marshmallow import ValidationError
-from app.utils.util import token_required
+from app.utils.util import permission_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ ticket_bp = Blueprint("ticket_bp", __name__)
 
 
 @ticket_bp.route("/", methods=["GET"])
-@token_required
+@permission_required("workorders", "read")
 def get_all_tickets(current_user_id):
     work_order_id = request.args.get("work_order_id")
     vendor_id = request.args.get("vendor_id")
@@ -23,7 +23,7 @@ def get_all_tickets(current_user_id):
 
 
 @ticket_bp.route("/<string:ticket_id>", methods=["GET"])
-@token_required
+@permission_required("workorders", "read")
 def get_ticket(current_user_id, ticket_id):
     try:
         ticket = TicketService.get_ticket(ticket_id)
@@ -33,7 +33,7 @@ def get_ticket(current_user_id, ticket_id):
 
 
 @ticket_bp.route("/", methods=["POST"])
-@token_required
+@permission_required("workorders", "write")
 def create_ticket(current_user_id):
     json_data = request.get_json()
     if not json_data:
@@ -50,7 +50,7 @@ def create_ticket(current_user_id):
 
 
 @ticket_bp.route("/<string:ticket_id>", methods=["PUT"])
-@token_required
+@permission_required("workorders", "write")
 def update_ticket(current_user_id, ticket_id):
     json_data = request.get_json()
     if not json_data:
@@ -70,7 +70,7 @@ def update_ticket(current_user_id, ticket_id):
 
 
 @ticket_bp.route("/<string:ticket_id>/approve", methods=["PUT"])
-@token_required
+@permission_required("workorders", "write")
 def approve_ticket(current_user_id, ticket_id):
     try:
         ticket = TicketService.approve_ticket(ticket_id, current_user_id)
@@ -83,7 +83,7 @@ def approve_ticket(current_user_id, ticket_id):
 
 
 @ticket_bp.route("/<string:ticket_id>/reject", methods=["PUT"])
-@token_required
+@permission_required("workorders", "write")
 def reject_ticket(current_user_id, ticket_id):
     try:
         ticket = TicketService.reject_ticket(ticket_id, current_user_id)
@@ -96,7 +96,7 @@ def reject_ticket(current_user_id, ticket_id):
 
 
 @ticket_bp.route("/<string:ticket_id>/set-pending", methods=["PUT"])
-@token_required
+@permission_required("workorders", "write")
 def set_pending_ticket(current_user_id, ticket_id):
     try:
         ticket = TicketService.set_pending_ticket(ticket_id, current_user_id)
