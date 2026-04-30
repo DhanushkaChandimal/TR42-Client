@@ -2,6 +2,11 @@ import { authFetch } from "./apiClient";
 
 const TICKET_ENDPOINT = "/tickets";
 
+async function parseError(res, fallback) {
+  const data = await res.json().catch(() => ({}));
+  throw new Error(data?.message || fallback);
+}
+
 export const ticketService = {
   getAll: async (params = {}) => {
     const query = new URLSearchParams();
@@ -11,42 +16,31 @@ export const ticketService = {
     const qs = query.toString();
     const url = qs ? `${TICKET_ENDPOINT}?${qs}` : TICKET_ENDPOINT;
     const response = await authFetch(url, { method: "GET" });
-    if (!response.ok) throw new Error("Failed to fetch tickets");
+    if (!response.ok) await parseError(response, "Failed to fetch tickets");
     return await response.json();
   },
 
   getById: async (ticketId) => {
-    const response = await authFetch(`${TICKET_ENDPOINT}/${ticketId}`, {
-      method: "GET",
-    });
-    if (!response.ok) throw new Error("Failed to fetch ticket");
+    const response = await authFetch(`${TICKET_ENDPOINT}/${ticketId}`, { method: "GET" });
+    if (!response.ok) await parseError(response, "Failed to fetch ticket");
     return await response.json();
   },
 
   approve: async (ticketId) => {
-    const response = await authFetch(
-      `${TICKET_ENDPOINT}/${ticketId}/approve`,
-      { method: "PUT" },
-    );
-    if (!response.ok) throw new Error("Failed to approve ticket");
+    const response = await authFetch(`${TICKET_ENDPOINT}/${ticketId}/approve`, { method: "PUT" });
+    if (!response.ok) await parseError(response, "Failed to approve ticket");
     return await response.json();
   },
 
   reject: async (ticketId) => {
-    const response = await authFetch(
-      `${TICKET_ENDPOINT}/${ticketId}/reject`,
-      { method: "PUT" },
-    );
-    if (!response.ok) throw new Error("Failed to reject ticket");
+    const response = await authFetch(`${TICKET_ENDPOINT}/${ticketId}/reject`, { method: "PUT" });
+    if (!response.ok) await parseError(response, "Failed to reject ticket");
     return await response.json();
   },
 
   setPending: async (ticketId) => {
-    const response = await authFetch(
-      `${TICKET_ENDPOINT}/${ticketId}/set-pending`,
-      { method: "PUT" },
-    );
-    if (!response.ok) throw new Error("Failed to set ticket to pending approval");
+    const response = await authFetch(`${TICKET_ENDPOINT}/${ticketId}/set-pending`, { method: "PUT" });
+    if (!response.ok) await parseError(response, "Failed to set ticket to pending approval");
     return await response.json();
   },
 };
