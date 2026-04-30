@@ -91,7 +91,10 @@ def create_app(config_name="DevelopmentConfig"):
 
     CORS(
         app,
-        origins=app.config.get("CORS_ORIGINS", ["http://localhost:5173"]),
+        origins=[
+            "http://localhost:5173",
+            "https://client-web-dashboard-q67uq3u77-dhanushkas-projects-bab7974e.vercel.app",
+        ],
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     )

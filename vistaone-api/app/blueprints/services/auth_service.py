@@ -1,4 +1,5 @@
 from app.blueprints.repository.user_repository import UserRepository
+from app.extensions import db
 from app.blueprints.repository.address_repository import AddressRepository
 from app.models.user import User
 from app.blueprints.enum.enums import UserStatus, UserType
@@ -118,31 +119,37 @@ class LoginService:
         if password:
             user.set_password(password)
 
-        # Assign the default role (USER) for the user's company
-        if client_id:
-            from app.models.role import Role
-            default_role = Role.query.filter_by(client_id=client_id, is_default=True).first()
-            if default_role:
-                user.roles.append(default_role)
+        try:
+            # Assign the default role (USER) for the user's company
+            if client_id:
+                from app.models.role import Role
+                default_role = Role.query.filter_by(client_id=client_id, is_default=True).first()
+                if default_role:
+                    user.roles.append(default_role)
 
-        created_user = UserRepository.create_user(user)
+            db.session.add(user)
+            db.session.flush()
 
-        # Create ClientUser record linking user to their client
-        if client_id:
-            from app.models.client_user import ClientUser
-            from app.extensions import db as _db
-            client_user_rec = ClientUser(
-                user_id=created_user.id,
-                client_id=client_id,
-                status=UserStatus.PENDING_EMAIL_VERIFICATION,
-            )
-            _db.session.add(client_user_rec)
-            _db.session.commit()
-        # Generate a token for email verification
-        s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-        token = s.dumps(created_user.email, salt="email-verify")
-        send_verification_email(created_user, token)
-        return created_user, 201
+            if client_id:
+                from app.models.client_user import ClientUser
+                client_user_rec = ClientUser(
+                    user_id=user.id,
+                    client_id=client_id,
+                    status=UserStatus.PENDING_EMAIL_VERIFICATION,
+                )
+                db.session.add(client_user_rec)
+                db.session.flush()
+
+            s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+            token = s.dumps(user.email, salt="email-verify")
+            send_verification_email(user, token)
+
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+
+        return user, 201
 
     @staticmethod
     def register_client(client_data):
@@ -203,15 +210,18 @@ class LoginService:
             db.session.add(admin_client_user)
             db.session.commit()
 
-            s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-            token = s.dumps(admin_user.email, salt="email-verify")
-            send_verification_email(admin_user, token)
-
-            return client, 201
-
         except Exception:
             db.session.rollback()
             raise
+
+        s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+        token = s.dumps(admin_user.email, salt="email-verify")
+        try:
+            send_verification_email(admin_user, token)
+        except Exception:
+            logger.error(f"Verification email failed for {admin_user.email}")
+
+        return client, 201
 
     @staticmethod
     def verify_email(token):
