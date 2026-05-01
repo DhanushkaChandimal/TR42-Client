@@ -95,7 +95,7 @@ def create_app(config_name="DevelopmentConfig"):
         app,
         origins=[
             "http://localhost:5173",
-            "https://client-web-dashboard-q67uq3u77-dhanushkas-projects-bab7974e.vercel.app",
+            "https://client-web-dashboard.vercel.app",
         ],
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
