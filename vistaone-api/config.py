@@ -17,6 +17,12 @@ class DevelopmentConfig:
     MAIL_USERNAME = os.getenv("MAIL_USERNAME")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+    OLLAMA_TIMEOUT_S = int(os.getenv("OLLAMA_TIMEOUT_S", "180"))
+    AI_PROMPT_VERSION = os.getenv("AI_PROMPT_VERSION", "v3")
+    AI_MAX_INPUT_CHARS = int(os.getenv("AI_MAX_INPUT_CHARS", "200000"))
 
 
 class TestingConfig:
@@ -26,6 +32,12 @@ class TestingConfig:
     CACHE_TYPE = "SimpleCache"
     FRONTEND_URL = "http://localhost:5173"
     SECRET_KEY = "test-secret-key"
+    LLM_PROVIDER = "ollama"
+    OLLAMA_BASE_URL = "http://localhost:11434"
+    OLLAMA_MODEL = "llama3.1:8b"
+    OLLAMA_TIMEOUT_S = 30
+    AI_PROMPT_VERSION = "test"
+    AI_MAX_INPUT_CHARS = 50000
 
 
 class ProductionConfig:
@@ -44,3 +56,9 @@ class ProductionConfig:
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
+    LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama")
+    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+    OLLAMA_TIMEOUT_S = int(os.environ.get("OLLAMA_TIMEOUT_S", "180"))
+    AI_PROMPT_VERSION = os.environ.get("AI_PROMPT_VERSION", "v3")
+    AI_MAX_INPUT_CHARS = int(os.environ.get("AI_MAX_INPUT_CHARS", "200000"))

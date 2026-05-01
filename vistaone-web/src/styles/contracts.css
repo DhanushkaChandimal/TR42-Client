@@ -195,3 +195,20 @@
   color: #9ca3af;
   font-size: 13px;
 }
+.contracts-analyze-btn {
+  background: #1a5276;
+  color: #fff;
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.contracts-analyze-btn:hover:not(:disabled) {
+  background: #154463;
+}
+.contracts-analyze-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}

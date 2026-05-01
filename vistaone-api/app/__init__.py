@@ -12,6 +12,7 @@ from app.blueprints.controller import (
     role_bp,
     profile_bp,
     ticket_bp,
+    ai_bp,
 )
 from app.utils.logging_util import logging_setup
 from flask_swagger_ui import get_swaggerui_blueprint
@@ -87,13 +88,14 @@ def create_app(config_name="DevelopmentConfig"):
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(role_bp, url_prefix="/api/admin/roles")
     app.register_blueprint(ticket_bp, url_prefix="/api/tickets")
+    app.register_blueprint(ai_bp, url_prefix="/api/ai")
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     CORS(
         app,
         origins=[
             "http://localhost:5173",
-            "https://client-web-dashboard-q67uq3u77-dhanushkas-projects-bab7974e.vercel.app",
+            "https://client-web-dashboard.vercel.app",
         ],
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
