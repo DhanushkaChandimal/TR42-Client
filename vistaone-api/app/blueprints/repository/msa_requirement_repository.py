@@ -12,28 +12,29 @@ class MsaRequirementRepository:
     def get_by_msa(msa_id, category=None, active_only=True):
         """Return rows for an MSA, optionally filtered by category.
 
-        active_only filters by metadata->>is_active = 'true' so callers see
-        only the latest analysis run unless they explicitly opt in to history.
+        active_only keeps only rows whose metadata.is_active is True so callers
+        see only the latest analysis run unless they opt in to history. The
+        is_active filter runs in Python because the metadata column is plain
+        JSON (not JSONB), which doesn't support the ->>  text-extract operator
+        used by SQLAlchemy's .astext.
         """
         query = select(MsaRequirement).where(MsaRequirement.msa_id == msa_id)
         if category:
             query = query.where(MsaRequirement.category == category)
+        rows = db.session.execute(query).scalars().all()
         if active_only:
-            query = query.where(
-                MsaRequirement.extra_metadata["is_active"].astext == "true"
-            )
-        return db.session.execute(query).scalars().all()
+            rows = [r for r in rows if (r.extra_metadata or {}).get("is_active") is True]
+        return rows
 
     @staticmethod
     def get_active_run_id(msa_id):
         """Return the run_id of the current active analysis for this MSA, or None."""
-        query = (
-            select(MsaRequirement.extra_metadata["run_id"].astext)
-            .where(MsaRequirement.msa_id == msa_id)
-            .where(MsaRequirement.extra_metadata["is_active"].astext == "true")
-            .limit(1)
-        )
-        return db.session.execute(query).scalar()
+        rows = MsaRequirementRepository.get_by_msa(msa_id, active_only=True)
+        for r in rows:
+            run_id = (r.extra_metadata or {}).get("run_id")
+            if run_id:
+                return run_id
+        return None
 
     @staticmethod
     def deactivate_runs(msa_id):

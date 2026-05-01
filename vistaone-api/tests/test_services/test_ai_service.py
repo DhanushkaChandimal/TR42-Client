@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app.blueprints.services.ai_service import (
+    AiService,
     OllamaClient,
     OllamaError,
     pages_to_prompt_text,
@@ -16,7 +17,16 @@ from app.blueprints.services.ai_service import (
 
 def _valid_payload():
     return {
-        "executive_summary": "An MSA between Client Co and Vendor Inc covering field services.",
+        "executive_summary": {
+            "summary": "An MSA between Client Co and Vendor Inc covering field services.",
+            "parties": [
+                {"role": "Company", "name": "Client Co"},
+                {"role": "Contractor", "name": "Vendor Inc"},
+            ],
+            "effective_date": "2024-01-15",
+            "term_length": "1 year",
+            "term_end_or_renewal": "Auto-renews annually unless 30 days notice",
+        },
         "key_terms": [
             {"rule_type": "term_length", "description": "1 year initial term", "value": "1y"}
         ],
@@ -34,6 +44,7 @@ def _valid_payload():
                 "service_label": "Hot Shot Trucking",
                 "value": "150.00",
                 "unit": "per_hour",
+                "extracted_text": "Hot Shot Trucking shall be billed at $150.00 per hour.",
             }
         ],
         "disclaimer": "This summary is for informational purposes only and does not constitute legal advice.",
@@ -76,6 +87,85 @@ class TestValidateAnalysis(unittest.TestCase):
         bad["executive_summary"] = 123
         with self.assertRaises(ValueError):
             validate_analysis(bad)
+
+
+class TestFilterHallucinatedRates(unittest.TestCase):
+    def test_keeps_rate_quoted_from_source(self):
+        source = (
+            "Section 5. Rates. Hot Shot Trucking shall be billed at $150.00 "
+            "per hour for all dispatched runs."
+        )
+        payload = {
+            "service_rates": [
+                {
+                    "service_label": "Hot Shot Trucking",
+                    "value": "150.00",
+                    "extracted_text": "Hot Shot Trucking shall be billed at $150.00 per hour",
+                }
+            ]
+        }
+        out = AiService._filter_hallucinated_rates(payload, source)
+        self.assertEqual(len(out["service_rates"]), 1)
+
+    def test_drops_rate_not_in_source(self):
+        source = "This agreement contains no service rates whatsoever."
+        payload = {
+            "service_rates": [
+                {
+                    "service_label": "Wireline survey",
+                    "value": "5",
+                    "extracted_text": "Wireline survey at $5 per foot",
+                }
+            ]
+        }
+        out = AiService._filter_hallucinated_rates(payload, source)
+        self.assertEqual(out["service_rates"], [])
+
+    def test_drops_rate_with_empty_extracted_text(self):
+        source = "Some contract text."
+        payload = {
+            "service_rates": [
+                {"service_label": "X", "value": "1", "extracted_text": ""}
+            ]
+        }
+        out = AiService._filter_hallucinated_rates(payload, source)
+        self.assertEqual(out["service_rates"], [])
+
+    def test_normalizes_whitespace_and_case(self):
+        source = "We will provide MUD LOGGING at $1,250 per day on site."
+        payload = {
+            "service_rates": [
+                {
+                    "service_label": "Mud logging",
+                    "value": "1250",
+                    "extracted_text": "we will provide   mud logging at $1,250 per day",
+                }
+            ]
+        }
+        out = AiService._filter_hallucinated_rates(payload, source)
+        self.assertEqual(len(out["service_rates"]), 1)
+
+    def test_drops_when_value_not_in_source(self):
+        # The extracted_text is genuinely in the source (section 1 prose), but
+        # the rate amount is fabricated. This is the real-world failure where
+        # the model paraphrased a real services list and made up a price.
+        source = (
+            "Contractor shall provide industrial pump maintenance, "
+            "flow measurement, and control system integration."
+        )
+        payload = {
+            "service_rates": [
+                {
+                    "service_label": "industrial pump maintenance",
+                    "value": "15000",
+                    "extracted_text": (
+                        "Contractor shall provide industrial pump maintenance"
+                    ),
+                }
+            ]
+        }
+        out = AiService._filter_hallucinated_rates(payload, source)
+        self.assertEqual(out["service_rates"], [])
 
 
 class TestOllamaClient(unittest.TestCase):

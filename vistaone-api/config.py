@@ -21,7 +21,7 @@ class DevelopmentConfig:
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
     OLLAMA_TIMEOUT_S = int(os.getenv("OLLAMA_TIMEOUT_S", "180"))
-    AI_PROMPT_VERSION = os.getenv("AI_PROMPT_VERSION", "v1")
+    AI_PROMPT_VERSION = os.getenv("AI_PROMPT_VERSION", "v3")
     AI_MAX_INPUT_CHARS = int(os.getenv("AI_MAX_INPUT_CHARS", "200000"))
 
 
@@ -60,5 +60,5 @@ class ProductionConfig:
     OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
     OLLAMA_TIMEOUT_S = int(os.environ.get("OLLAMA_TIMEOUT_S", "180"))
-    AI_PROMPT_VERSION = os.environ.get("AI_PROMPT_VERSION", "v1")
+    AI_PROMPT_VERSION = os.environ.get("AI_PROMPT_VERSION", "v3")
     AI_MAX_INPUT_CHARS = int(os.environ.get("AI_MAX_INPUT_CHARS", "200000"))
