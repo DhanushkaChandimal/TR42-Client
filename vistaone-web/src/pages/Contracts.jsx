@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import MsaAnalysisModal from "../components/MsaAnalysisModal";
 import { msaService } from "../services/msaService";
 import { vendorService } from "../services/vendorService";
 import "../styles/contracts.css";
@@ -22,6 +23,9 @@ export default function Contracts() {
     const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    // AI analysis modal state
+    const [analysisMsa, setAnalysisMsa] = useState(null);
 
     // Search and filter state
     const [searchTerm, setSearchTerm] = useState("");
@@ -336,6 +340,7 @@ export default function Contracts() {
                                 <th>Expiration</th>
                                 <th>Document</th>
                                 <th>Uploaded By</th>
+                                <th>AI Analysis</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -367,7 +372,7 @@ export default function Contracts() {
                                         {msa.file_name ? (
                                             <button
                                                 type="button"
-                                                className="contracts-file-link"
+                                                className="contracts-analyze-btn"
                                                 onClick={async () => {
                                                     try {
                                                         await msaService.download(
@@ -391,12 +396,34 @@ export default function Contracts() {
                                         )}
                                     </td>
                                     <td>{msa.uploaded_by_name || "-"}</td>
+                                    <td>
+                                        <button
+                                            type="button"
+                                            className="contracts-analyze-btn"
+                                            onClick={() => setAnalysisMsa(msa)}
+                                            disabled={!msa.file_name}
+                                            title={
+                                                msa.file_name
+                                                    ? "Analyze this contract with AI"
+                                                    : "Upload a document first"
+                                            }
+                                        >
+                                            Analyze
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 )}
             </section>
+
+            {analysisMsa && (
+                <MsaAnalysisModal
+                    msa={analysisMsa}
+                    onClose={() => setAnalysisMsa(null)}
+                />
+            )}
         </AppShell>
     );
 }
