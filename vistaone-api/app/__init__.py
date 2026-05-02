@@ -13,6 +13,7 @@ from app.blueprints.controller import (
     profile_bp,
     ticket_bp,
     ai_bp,
+    chat_bp,
 )
 from app.utils.logging_util import logging_setup
 from flask_swagger_ui import get_swaggerui_blueprint
@@ -89,6 +90,7 @@ def create_app(config_name="DevelopmentConfig"):
     app.register_blueprint(role_bp, url_prefix="/api/admin/roles")
     app.register_blueprint(ticket_bp, url_prefix="/api/tickets")
     app.register_blueprint(ai_bp, url_prefix="/api/ai")
+    app.register_blueprint(chat_bp, url_prefix="/api")
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     CORS(

@@ -1,0 +1,72 @@
+.wo-recipients {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.wo-recipients-group {
+  border: 1px solid #e2e6ea;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #fafbfc;
+}
+
+.wo-recipients-group-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5f6b80;
+  margin: 0 0 8px 0;
+}
+
+.wo-recipients-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wo-recipients-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border: 1px solid #d4d8df;
+  border-radius: 4px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.wo-recipients-link:hover {
+  background: #e3ecff;
+  border-color: #2f6cf2;
+}
+
+.wo-recipients-name {
+  font-weight: 600;
+  color: #1a2640;
+}
+
+.wo-recipients-role {
+  font-size: 11px;
+  color: #5f6b80;
+  text-transform: lowercase;
+}
+
+.wo-recipients-state {
+  font-size: 13px;
+  color: #5f6b80;
+  font-style: italic;
+}
+
+.wo-recipients-error {
+  color: #b32424;
+  font-style: normal;
+}

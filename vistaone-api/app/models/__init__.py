@@ -14,6 +14,10 @@ from .client_user import ClientUser
 from .line_item import LineItem
 from .client_vendor import ClientVendor
 from .ticket import Ticket
+from .vendor_user import VendorUser
+from .chat import Chat
+from .message import Message
+from .file_attachment import FileAttachment
 from app.blueprints.enum.enums import (
     StatusEnum,
     PriorityEnum,

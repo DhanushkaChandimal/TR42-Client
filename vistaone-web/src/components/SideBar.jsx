@@ -13,6 +13,7 @@ import {
     FiShield,
     FiMenu,
     FiX,
+    FiMessageCircle,
 } from "react-icons/fi";
 import { useAuth } from "../hooks/useAuth";
 
@@ -158,6 +159,7 @@ function getIcon(iconName) {
         folder: <FiFolder />,
         settings: <FiSettings />,
         shield: <FiShield />,
+        message: <FiMessageCircle />,
     };
     return icons[iconName] || null;
 }
