@@ -28,7 +28,7 @@ export default function WorkOrderRecipients({ workOrderId }) {
   }, [workOrderId]);
 
   const goToChat = (userId) => {
-    navigate(`/messages?wo=${workOrderId}&user=${userId}`);
+    navigate(`/messages?user=${userId}`);
   };
 
   if (loading) return <div className="wo-recipients-state">Loading…</div>;

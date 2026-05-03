@@ -268,6 +268,204 @@ class ChatService:
         return tree
 
     @staticmethod
+    def list_contacts(current_user_id):
+        """Return chat partners who are associated with at least one
+        WO / ticket / invoice. Sorted by most recent message first.
+
+        A user counts as "associated" if they:
+          - appear in vendor_user (so they belong to a vendor that has WOs), or
+          - have a name that matches a ticket.assigned_contractor (so they
+            are working on a WO via tickets).
+        """
+        chats = ChatRepository.list_for_user(current_user_id)
+        if not chats:
+            return []
+
+        other_to_chat = {}
+        for c in chats:
+            other = (
+                c.user_two_id if c.user_one_id == current_user_id else c.user_one_id
+            )
+            other_to_chat[other] = c.id
+
+        other_ids = list(other_to_chat.keys())
+        users = (
+            db.session.execute(select(User).where(User.id.in_(other_ids)))
+            .scalars()
+            .all()
+        )
+        users_by_id = {u.id: u for u in users}
+
+        associated = set()
+        vendor_user_role_by_user = {}
+
+        vu_rows = db.session.execute(
+            select(VendorUser).where(
+                and_(
+                    VendorUser.user_id.in_(other_ids),
+                    VendorUser.vendor_id.isnot(None),
+                )
+            )
+        ).scalars().all()
+        for vu in vu_rows:
+            associated.add(vu.user_id)
+            vendor_user_role_by_user[vu.user_id] = vu.vendor_user_role
+
+        full_names = {}
+        for u in users:
+            n = _full_name(u).strip().lower()
+            if n:
+                full_names[u.id] = n
+        if full_names:
+            ticket_names = db.session.execute(
+                select(Ticket.assigned_contractor).where(
+                    Ticket.assigned_contractor.isnot(None)
+                )
+            ).scalars().all()
+            normalized = {
+                (n or "").strip().lower() for n in ticket_names if n and n.strip()
+            }
+            for uid, name in full_names.items():
+                if name in normalized:
+                    associated.add(uid)
+
+        out = []
+        for uid in other_ids:
+            if uid not in associated:
+                continue
+            u = users_by_id.get(uid)
+            last_msg = (
+                db.session.execute(
+                    select(Message)
+                    .where(Message.chat_id == other_to_chat[uid])
+                    .order_by(Message.created_at.desc())
+                    .limit(1)
+                )
+                .scalars()
+                .first()
+            )
+            role = vendor_user_role_by_user.get(uid)
+            if role:
+                role_label = f"vendor:{role}"
+            elif u and getattr(u, "user_type", None):
+                role_label = _enum_value(u.user_type) or "user"
+            else:
+                role_label = "user"
+            out.append(
+                {
+                    "id": uid,
+                    "name": _full_name(u) if u else uid,
+                    "role": role_label,
+                    "email": u.email if u else None,
+                    "phone": getattr(u, "contact_number", None) if u else None,
+                    "chat_id": other_to_chat[uid],
+                    "last_message": (
+                        {
+                            "body": last_msg.body,
+                            "created_at": (
+                                last_msg.created_at.isoformat()
+                                if last_msg.created_at
+                                else None
+                            ),
+                            "sender_id": last_msg.sender_id,
+                        }
+                        if last_msg
+                        else None
+                    ),
+                }
+            )
+
+        out.sort(
+            key=lambda x: (
+                x["last_message"]["created_at"] if x["last_message"] else ""
+            ),
+            reverse=True,
+        )
+        return out
+
+    @staticmethod
+    def get_user_messaging_context(current_user_id, contact_id):
+        """Right-rail data for the contact-centric Messages page: every WO,
+        ticket, and invoice connected to the selected contact.
+
+        Returns (data, error, code).
+        """
+        contact = db.session.get(User, contact_id)
+        if not contact:
+            return None, "Contact not found", 404
+
+        wo_ids = set()
+        vendor_ids = []
+        vu = db.session.execute(
+            select(VendorUser).where(VendorUser.user_id == contact_id)
+        ).scalars().all()
+        for v in vu:
+            if v.vendor_id:
+                vendor_ids.append(v.vendor_id)
+
+        if vendor_ids:
+            wos_via_vendor = db.session.execute(
+                select(WorkOrder.id).where(WorkOrder.vendor_id.in_(vendor_ids))
+            ).scalars().all()
+            wo_ids.update(wos_via_vendor)
+
+        full = _full_name(contact).strip().lower()
+        if full:
+            wos_via_tickets = db.session.execute(
+                select(Ticket.work_order_id).where(
+                    func.lower(Ticket.assigned_contractor) == full
+                )
+            ).scalars().all()
+            wo_ids.update(w for w in wos_via_tickets if w)
+
+        wos = []
+        tickets = []
+        invoices = []
+        if wo_ids:
+            wo_rows = db.session.execute(
+                select(WorkOrder).where(WorkOrder.id.in_(wo_ids))
+            ).scalars().all()
+            wos = [_wo_payload(w) for w in wo_rows]
+
+            ticket_rows = []
+            if full:
+                ticket_rows = db.session.execute(
+                    select(Ticket).where(
+                        func.lower(Ticket.assigned_contractor) == full
+                    )
+                ).scalars().all()
+            elif vendor_ids:
+                ticket_rows = db.session.execute(
+                    select(Ticket).where(Ticket.vendor_id.in_(vendor_ids))
+                ).scalars().all()
+            tickets = [_ticket_payload(t) for t in ticket_rows]
+
+            invoice_rows = db.session.execute(
+                select(Invoice)
+                .where(Invoice.work_order_id.in_(wo_ids))
+                .order_by(Invoice.invoice_date.desc())
+            ).scalars().all()
+            invoices = [_invoice_payload(inv) for inv in invoice_rows]
+
+        return (
+            {
+                "contact": {
+                    "id": contact.id,
+                    "name": _full_name(contact),
+                    "email": contact.email,
+                    "phone": getattr(contact, "contact_number", None),
+                    "alternate_phone": getattr(contact, "alternate_number", None),
+                    "user_type": _enum_value(getattr(contact, "user_type", None)),
+                },
+                "work_orders": wos,
+                "tickets": tickets,
+                "invoices": invoices,
+            },
+            None,
+            200,
+        )
+
+    @staticmethod
     def get_workorder_summary(wo_id):
         """Return everything the right-rail panel needs for a single WO,
         independent of any chat: WO + vendor + tickets + invoices + MSAs.

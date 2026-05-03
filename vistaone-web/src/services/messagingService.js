@@ -33,6 +33,25 @@ export const messagingService = {
     return await res.json();
   },
 
+  listContacts: async () => {
+    const res = await fetch(`${API_BASE}/messages/contacts`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+    if (!res.ok) await fail(res, "Failed to load contacts");
+    const data = await res.json();
+    return data.contacts || [];
+  },
+
+  getUserContext: async (contactId) => {
+    const res = await fetch(
+      `${API_BASE}/users/${contactId}/messaging-context`,
+      { method: "GET", headers: authHeaders() }
+    );
+    if (!res.ok) await fail(res, "Failed to load contact details");
+    return await res.json();
+  },
+
   listTree: async () => {
     const res = await fetch(`${API_BASE}/messages/tree`, {
       method: "GET",

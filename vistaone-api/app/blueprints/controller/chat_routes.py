@@ -34,6 +34,21 @@ def list_tree(user_id):
     return jsonify({"workorders": ChatService.list_workorder_tree(user_id)}), 200
 
 
+@chat_bp.route("/messages/contacts", methods=["GET"])
+@permission_required("workorders", "read")
+def list_contacts(user_id):
+    return jsonify({"contacts": ChatService.list_contacts(user_id)}), 200
+
+
+@chat_bp.route("/users/<contact_id>/messaging-context", methods=["GET"])
+@permission_required("workorders", "read")
+def user_messaging_context(user_id, contact_id):
+    data, err, code = ChatService.get_user_messaging_context(user_id, contact_id)
+    if err:
+        return jsonify({"message": err}), code
+    return jsonify(data), 200
+
+
 @chat_bp.route("/workorders/<wo_id>/messaging-context", methods=["GET"])
 @permission_required("workorders", "read")
 def workorder_messaging_context(user_id, wo_id):

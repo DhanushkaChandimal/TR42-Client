@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
 import { messagingService } from "../services/messagingService";
 import { getUserIdFromToken } from "../services/currentUser";
@@ -17,24 +17,27 @@ const formatTime = (s) =>
       })
     : "";
 
+const formatDay = (s) =>
+  s
+    ? new Date(s).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+
 export default function Messages() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const deepWO = searchParams.get("wo");
   const deepUser = searchParams.get("user");
 
-  const [tree, setTree] = useState([]);
-  const [loadingTree, setLoadingTree] = useState(true);
-  const [openWO, setOpenWO] = useState(new Set());
-  const [openGroup, setOpenGroup] = useState(new Set());
-  const [activeChatKey, setActiveChatKey] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(true);
+  const [activeContact, setActiveContact] = useState(null);
   const [activeChatId, setActiveChatId] = useState(null);
-  const [activePerson, setActivePerson] = useState(null);
-  const [activeWO, setActiveWO] = useState(null);
-  const [activeWOContext, setActiveWOContext] = useState(null);
-  const [loadingWOContext, setLoadingWOContext] = useState(false);
   const [messages, setMessages] = useState([]);
-  const [context, setContext] = useState(null);
+  const [contactContext, setContactContext] = useState(null);
   const [loadingThread, setLoadingThread] = useState(false);
+  const [loadingContext, setLoadingContext] = useState(false);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [file, setFile] = useState(null);
@@ -42,125 +45,67 @@ export default function Messages() {
   const lastSeenRef = useRef(null);
   const threadRef = useRef(null);
   const currentUserId = getUserIdFromToken();
+  const navigate = useNavigate();
 
-  const loadTree = useCallback(async () => {
+  const loadContacts = useCallback(async () => {
     try {
-      const data = await messagingService.listTree();
-      setTree(data);
+      const data = await messagingService.listContacts();
+      setContacts(data);
     } catch (err) {
-      setError(err.message || "Failed to load work orders");
+      setError(err.message || "Failed to load contacts");
     } finally {
-      setLoadingTree(false);
+      setLoadingContacts(false);
     }
   }, []);
 
   useEffect(() => {
-    loadTree();
-  }, [loadTree]);
+    loadContacts();
+  }, [loadContacts]);
 
   useEffect(() => {
     const id = setInterval(() => {
-      if (document.visibilityState === "visible") loadTree();
+      if (document.visibilityState === "visible") loadContacts();
     }, POLL_MS * 4);
     return () => clearInterval(id);
-  }, [loadTree]);
+  }, [loadContacts]);
 
-  const selectWO = useCallback(async (wo) => {
-    setActiveWO(wo);
-    setLoadingWOContext(true);
-    setActiveWOContext(null);
-    try {
-      const ctx = await messagingService.getWorkOrderContext(wo.id);
-      setActiveWOContext(ctx);
-    } catch (err) {
-      setError(err.message || "Failed to load work order details");
-    } finally {
-      setLoadingWOContext(false);
-    }
-  }, []);
-
-  const toggleWO = (wo) => {
-    const woId = wo.id;
-    setOpenWO((prev) => {
-      const next = new Set(prev);
-      if (next.has(woId)) {
-        next.delete(woId);
-      } else {
-        next.add(woId);
-        selectWO(wo);
+  const selectContact = useCallback(
+    async (contact) => {
+      setActiveContact(contact);
+      setActiveChatId(contact.chat_id);
+      setMessages([]);
+      setContactContext(null);
+      lastSeenRef.current = null;
+      setLoadingThread(true);
+      setLoadingContext(true);
+      setError("");
+      try {
+        const [msgs, ctx] = await Promise.all([
+          messagingService.listMessages(contact.chat_id),
+          messagingService.getUserContext(contact.id).catch(() => null),
+        ]);
+        setMessages(msgs);
+        setContactContext(ctx);
+        if (msgs.length) lastSeenRef.current = msgs[msgs.length - 1].created_at;
+      } catch (err) {
+        setError(err.message || "Failed to open conversation");
+      } finally {
+        setLoadingThread(false);
+        setLoadingContext(false);
       }
-      return next;
-    });
-  };
+    },
+    []
+  );
 
-  const toggleGroup = (key) => {
-    setOpenGroup((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
-
-  const openConversation = useCallback(async (wo, person) => {
-    const key = `${wo.id}:${person.id}`;
-    setActiveChatKey(key);
-    setActivePerson(person);
-    setMessages([]);
-    setContext(null);
-    setActiveChatId(null);
-    lastSeenRef.current = null;
-    setLoadingThread(true);
-    setError("");
-    selectWO(wo);
-    try {
-      const chat = person.chat_id
-        ? { id: person.chat_id }
-        : await messagingService.openChat(wo.id, person.id);
-      setActiveChatId(chat.id);
-      const [msgs, ctx] = await Promise.all([
-        messagingService.listMessages(chat.id),
-        messagingService.getContext(chat.id, wo.id).catch(() => null),
-      ]);
-      setMessages(msgs);
-      setContext(ctx);
-      if (msgs.length) lastSeenRef.current = msgs[msgs.length - 1].created_at;
-      await loadTree();
-    } catch (err) {
-      setError(err.message || "Failed to open conversation");
-    } finally {
-      setLoadingThread(false);
-    }
-  }, [loadTree, selectWO]);
-
-  // Deep link: ?wo=<id>&user=<id>
+  // Deep link via ?user=<id>
   useEffect(() => {
-    if (!deepWO || loadingTree || !tree.length) return;
-    const wo = tree.find((w) => w.id === deepWO);
-    if (!wo) return;
-    setOpenWO((prev) => {
-      const next = new Set(prev);
-      next.add(wo.id);
-      return next;
-    });
-    if (deepUser) {
-      const inVendor = wo.vendor?.users?.find((u) => u.id === deepUser);
-      const inContractors = wo.contractors?.find((u) => u.id === deepUser);
-      const person = inVendor || inContractors;
-      if (person) {
-        if (inVendor) {
-          setOpenGroup((prev) => new Set(prev).add(`${wo.id}:vendor`));
-        } else {
-          setOpenGroup((prev) => new Set(prev).add(`${wo.id}:contractors`));
-        }
-        openConversation(wo, person);
-      } else {
-        selectWO(wo);
-      }
-    } else {
-      selectWO(wo);
+    if (!deepUser || loadingContacts) return;
+    const found = contacts.find((c) => c.id === deepUser);
+    if (found) {
+      selectContact(found);
     }
     setSearchParams({}, { replace: true });
-  }, [deepWO, deepUser, tree, loadingTree, openConversation, selectWO, setSearchParams]);
+  }, [deepUser, contacts, loadingContacts, selectContact, setSearchParams]);
 
   useEffect(() => {
     if (!activeChatId) return;
@@ -204,7 +149,7 @@ export default function Messages() {
       lastSeenRef.current = msg.created_at;
       setDraft("");
       setFile(null);
-      await loadTree();
+      await loadContacts();
     } catch (err) {
       setError(err.message || "Failed to send");
     } finally {
@@ -215,426 +160,283 @@ export default function Messages() {
   return (
     <AppShell
       title="Messages"
-      subtitle="Conversations grouped by work order. Expand a work order to message its vendor or contractor."
+      subtitle="Pick a contact to view their thread, work orders, tickets, and invoices."
     >
       <div className="messages-page">
         <div className="messages-page-grid">
-          <aside className="messages-tree">
-            {loadingTree ? (
-              <div className="messages-state">Loading…</div>
-            ) : tree.length === 0 ? (
-              <div className="messages-state">No work orders.</div>
-            ) : (
-              tree.map((wo) => {
-                const woOpen = openWO.has(wo.id);
-                const vendorKey = `${wo.id}:vendor`;
-                const contractorKey = `${wo.id}:contractors`;
-                const vendorOpen = openGroup.has(vendorKey);
-                const contractorOpen = openGroup.has(contractorKey);
-                return (
-                  <div key={wo.id} className="messages-tree-wo">
-                    <button
-                      className={`messages-tree-row messages-tree-wo-row ${
-                        woOpen ? "open" : ""
-                      } ${activeWO?.id === wo.id ? "selected" : ""}`}
-                      onClick={() => toggleWO(wo)}
-                    >
-                      <span className="messages-tree-caret">
-                        {woOpen ? "▾" : "▸"}
-                      </span>
-                      <span className="messages-tree-label">{wo.label}</span>
-                      {wo.status && (
-                        <span className="messages-tree-status">{wo.status}</span>
-                      )}
-                    </button>
-                    {woOpen && (
-                      <div className="messages-tree-children">
-                        {wo.vendor ? (
-                          <>
-                            <button
-                              className={`messages-tree-row messages-tree-group-row ${
-                                vendorOpen ? "open" : ""
-                              }`}
-                              onClick={() => toggleGroup(vendorKey)}
-                            >
-                              <span className="messages-tree-caret">
-                                {vendorOpen ? "▾" : "▸"}
-                              </span>
-                              <span className="messages-tree-label">
-                                Vendor: {wo.vendor.company_name}
-                              </span>
-                            </button>
-                            {vendorOpen && (
-                              <div className="messages-tree-grandchildren">
-                                {wo.vendor.users.length === 0 ? (
-                                  <div className="messages-tree-empty">
-                                    No vendor users linked.
-                                  </div>
-                                ) : (
-                                  wo.vendor.users.map((u) => (
-                                    <PersonRow
-                                      key={u.id}
-                                      person={u}
-                                      activeKey={activeChatKey}
-                                      woId={wo.id}
-                                      onClick={() => openConversation(wo, u)}
-                                    />
-                                  ))
-                                )}
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="messages-tree-empty">
-                            No vendor on this work order.
-                          </div>
-                        )}
-
-                        <button
-                          className={`messages-tree-row messages-tree-group-row ${
-                            contractorOpen ? "open" : ""
-                          }`}
-                          onClick={() => toggleGroup(contractorKey)}
-                        >
-                          <span className="messages-tree-caret">
-                            {contractorOpen ? "▾" : "▸"}
-                          </span>
-                          <span className="messages-tree-label">
-                            Contractors ({wo.contractors.length})
-                          </span>
-                        </button>
-                        {contractorOpen && (
-                          <div className="messages-tree-grandchildren">
-                            {wo.contractors.length === 0 ? (
-                              <div className="messages-tree-empty">
-                                No contractor matched on tickets.
-                              </div>
-                            ) : (
-                              wo.contractors.map((u) => (
-                                <PersonRow
-                                  key={u.id}
-                                  person={u}
-                                  activeKey={activeChatKey}
-                                  woId={wo.id}
-                                  onClick={() => openConversation(wo, u)}
-                                />
-                              ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </aside>
-
-          <section className="messages-page-thread-wrap">
-            {!activeChatKey ? (
-              <div className="messages-state">
-                Pick a work order, then a recipient.
-              </div>
-            ) : (
-              <>
-                <div className="messages-thread-header">
-                  <strong>{activePerson?.name}</strong>
-                  <span className="messages-thread-wo">
-                    {activeWO?.label || ""}
-                  </span>
-                </div>
-                {loadingThread ? (
-                  <div className="messages-state">Loading…</div>
-                ) : (
-                  <>
-                    <div className="messages-thread" ref={threadRef}>
-                      {messages.length === 0 ? (
-                        <div className="messages-state">No messages yet.</div>
-                      ) : (
-                        messages.map((m) => {
-                          const mine = m.sender_id === currentUserId;
-                          return (
-                            <div
-                              key={m.id}
-                              className={`messages-bubble ${
-                                mine
-                                  ? "messages-bubble-mine"
-                                  : "messages-bubble-theirs"
-                              }`}
-                            >
-                              {m.body && (
-                                <div className="messages-body">{m.body}</div>
-                              )}
-                              {m.attachments?.length > 0 && (
-                                <ul className="messages-attachments">
-                                  {m.attachments.map((a) => (
-                                    <li key={a.id}>
-                                      <a
-                                        href={messagingService.attachmentUrl(
-                                          m.id,
-                                          a.id
-                                        )}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                      >
-                                        {a.filename}
-                                      </a>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                              <div className="messages-meta">
-                                {formatTime(m.created_at)}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                    <form className="messages-composer" onSubmit={send}>
-                      <textarea
-                        className="messages-input"
-                        placeholder="Type a message…"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        disabled={sending}
-                        rows={2}
-                      />
-                      <div className="messages-composer-row">
-                        <input
-                          type="file"
-                          onChange={(e) =>
-                            setFile(e.target.files?.[0] || null)
-                          }
-                          disabled={sending}
-                        />
-                        <button
-                          type="submit"
-                          className="messages-send-btn"
-                          disabled={sending || (!draft.trim() && !file)}
-                        >
-                          {sending ? "Sending…" : "Send"}
-                        </button>
-                      </div>
-                      {error && (
-                        <div className="messages-error">{error}</div>
-                      )}
-                    </form>
-                  </>
-                )}
-              </>
-            )}
-          </section>
-
-          {activeWO && (
-            <ContextPanel
-              chatContext={context}
-              woContext={activeWOContext}
-              loading={loadingThread || loadingWOContext}
-            />
-          )}
+          <ContactsList
+            contacts={contacts}
+            loading={loadingContacts}
+            activeId={activeContact?.id}
+            onSelect={selectContact}
+          />
+          <ThreadPane
+            activeContact={activeContact}
+            messages={messages}
+            loadingThread={loadingThread}
+            currentUserId={currentUserId}
+            threadRef={threadRef}
+            draft={draft}
+            setDraft={setDraft}
+            file={file}
+            setFile={setFile}
+            sending={sending}
+            error={error}
+            onSend={send}
+          />
+          <ContactContextPanel
+            context={contactContext}
+            loading={loadingContext}
+            visible={!!activeContact}
+            onOpenWorkOrder={(woId) => navigate(`/workorders?id=${woId}`)}
+          />
         </div>
       </div>
     </AppShell>
   );
 }
 
-function PersonRow({ person, activeKey, woId, onClick }) {
-  const key = `${woId}:${person.id}`;
-  const isActive = activeKey === key;
+function ContactsList({ contacts, loading, activeId, onSelect }) {
   return (
-    <button
-      className={`messages-tree-person ${isActive ? "active" : ""}`}
-      onClick={onClick}
-    >
-      <span className="messages-tree-person-name">{person.name}</span>
-      {person.role && (
-        <span className="messages-tree-person-role">{person.role}</span>
+    <aside className="messages-contacts">
+      <header className="messages-contacts-header">Contacts</header>
+      {loading ? (
+        <div className="messages-state">Loading…</div>
+      ) : contacts.length === 0 ? (
+        <div className="messages-state">
+          No contacts yet. Open a work order and pick someone to start a conversation.
+        </div>
+      ) : (
+        contacts.map((c) => (
+          <button
+            key={c.id}
+            className={`messages-contact ${
+              activeId === c.id ? "messages-contact-active" : ""
+            }`}
+            onClick={() => onSelect(c)}
+          >
+            <div className="messages-contact-row">
+              <span className="messages-contact-name">{c.name}</span>
+            </div>
+            <div className="messages-contact-role">{c.role}</div>
+            {c.last_message && (
+              <div className="messages-contact-preview">
+                {c.last_message.body
+                  ? c.last_message.body.slice(0, 60)
+                  : "(attachment)"}
+              </div>
+            )}
+            {c.last_message?.created_at && (
+              <div className="messages-contact-time">
+                {formatDay(c.last_message.created_at)}
+              </div>
+            )}
+          </button>
+        ))
       )}
-    </button>
+    </aside>
   );
 }
 
-function ContextPanel({ chatContext, woContext, loading }) {
-  const data = chatContext || woContext;
-  if (loading && !data) {
+function ThreadPane({
+  activeContact,
+  messages,
+  loadingThread,
+  currentUserId,
+  threadRef,
+  draft,
+  setDraft,
+  file,
+  setFile,
+  sending,
+  error,
+  onSend,
+}) {
+  if (!activeContact) {
+    return (
+      <section className="messages-thread-pane">
+        <div className="messages-state">Pick a contact to start reading.</div>
+      </section>
+    );
+  }
+  return (
+    <section className="messages-thread-pane">
+      <div className="messages-thread-header">
+        <strong>{activeContact.name}</strong>
+        <span className="messages-thread-role">{activeContact.role}</span>
+      </div>
+      {loadingThread ? (
+        <div className="messages-state">Loading…</div>
+      ) : (
+        <>
+          <div className="messages-thread" ref={threadRef}>
+            {messages.length === 0 ? (
+              <div className="messages-state">No messages yet. Say hi.</div>
+            ) : (
+              messages.map((m) => {
+                const mine = m.sender_id === currentUserId;
+                return (
+                  <div
+                    key={m.id}
+                    className={`messages-bubble ${
+                      mine ? "messages-bubble-mine" : "messages-bubble-theirs"
+                    }`}
+                  >
+                    {m.body && <div className="messages-body">{m.body}</div>}
+                    {m.attachments?.length > 0 && (
+                      <ul className="messages-attachments">
+                        {m.attachments.map((a) => (
+                          <li key={a.id}>
+                            <a
+                              href={messagingService.attachmentUrl(m.id, a.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {a.filename}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="messages-meta">
+                      {formatTime(m.created_at)}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <form className="messages-composer" onSubmit={onSend}>
+            <textarea
+              className="messages-input"
+              placeholder="Type a message…"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={sending}
+              rows={2}
+            />
+            <div className="messages-composer-row">
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                disabled={sending}
+              />
+              <button
+                type="submit"
+                className="messages-send-btn"
+                disabled={sending || (!draft.trim() && !file)}
+              >
+                {sending ? "Sending…" : "Send"}
+              </button>
+            </div>
+            {error && <div className="messages-error">{error}</div>}
+          </form>
+        </>
+      )}
+    </section>
+  );
+}
+
+function ContactContextPanel({ context, loading, visible, onOpenWorkOrder }) {
+  if (!visible) return null;
+  if (loading || !context) {
     return (
       <aside className="messages-context">
         <div className="messages-state">Loading details…</div>
       </aside>
     );
   }
-  if (!data) {
-    return (
-      <aside className="messages-context">
-        <div className="messages-state">No details available.</div>
-      </aside>
-    );
-  }
-  const fmtDate = (s) =>
-    s
-      ? new Date(s).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : "—";
-  const other_user = chatContext?.other_user || null;
-  const { work_order, vendor, msas, tickets, ticket_counts, invoices } = data;
+  const { contact, work_orders = [], tickets = [], invoices = [] } = context;
   return (
     <aside className="messages-context">
-      {other_user && (
-        <section className="messages-context-section">
-          <h3>Contact</h3>
-          <dl>
-            <dt>Name</dt><dd>{other_user.name}</dd>
-            <dt>Role</dt><dd>{other_user.role}</dd>
-            <dt>Email</dt>
-            <dd>
-              {other_user.email ? (
-                <a href={`mailto:${other_user.email}`}>{other_user.email}</a>
-              ) : (
-                "—"
-              )}
-            </dd>
-            <dt>Phone</dt>
-            <dd>
-              {other_user.phone ? (
-                <a href={`tel:${other_user.phone}`}>{other_user.phone}</a>
-              ) : (
-                "—"
-              )}
-            </dd>
-          </dl>
-        </section>
-      )}
-      {work_order && (
-        <section className="messages-context-section">
-          <h3>Work Order</h3>
-          <dl>
-            <dt>Ref</dt><dd>{work_order.label}</dd>
-            <dt>Status</dt>
-            <dd>
-              <span className={`messages-status-pill status-${(work_order.status || "").toLowerCase()}`}>
-                {work_order.status || "—"}
-              </span>
-            </dd>
-            <dt>Priority</dt><dd>{work_order.priority || "—"}</dd>
-            {work_order.description && (
-              <>
-                <dt>Description</dt>
-                <dd>{work_order.description}</dd>
-              </>
+      <section className="messages-context-section">
+        <h3>Contact</h3>
+        <dl>
+          <dt>Name</dt><dd>{contact.name}</dd>
+          <dt>Type</dt><dd>{contact.user_type || "—"}</dd>
+          <dt>Email</dt>
+          <dd>
+            {contact.email ? (
+              <a href={`mailto:${contact.email}`}>{contact.email}</a>
+            ) : (
+              "—"
             )}
-          </dl>
-        </section>
-      )}
-
-      {work_order && (
-        <section className="messages-context-section">
-          <h3>Tickets {ticket_counts ? `(${ticket_counts.open}/${ticket_counts.total} open)` : ""}</h3>
-          {tickets && tickets.length > 0 ? (
-            <ul className="messages-context-list">
-              {tickets.map((t) => (
-                <li key={t.id}>
-                  <span className="messages-context-msa-name">
-                    {t.description || `Ticket ${t.id.slice(0, 8)}`}
-                  </span>
-                  <span className="messages-context-msa-meta">
-                    {t.status || ""}
-                    {t.priority ? ` · ${t.priority}` : ""}
-                    {t.assigned_contractor ? ` · ${t.assigned_contractor}` : ""}
-                    {t.due_date ? ` · due ${fmtDate(t.due_date)}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="messages-context-empty">No tickets on this WO.</div>
-          )}
-        </section>
-      )}
-
-      {work_order && (
-        <section className="messages-context-section">
-          <h3>Invoices</h3>
-          {invoices && invoices.length > 0 ? (
-            <ul className="messages-context-list">
-              {invoices.map((inv) => (
-                <li key={inv.id}>
-                  <span className="messages-context-msa-name">
-                    {inv.total_amount != null
-                      ? `$${inv.total_amount.toFixed(2)}`
-                      : `Invoice ${inv.id.slice(0, 8)}`}
-                  </span>
-                  <span className="messages-context-msa-meta">
-                    {inv.status || ""}
-                    {inv.due_date ? ` · due ${fmtDate(inv.due_date)}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="messages-context-empty">No invoices yet.</div>
-          )}
-        </section>
-      )}
-
-      {vendor && (
-        <section className="messages-context-section">
-          <h3>Vendor</h3>
-          <dl>
-            <dt>Company</dt><dd>{vendor.company_name || "—"}</dd>
-            {vendor.vendor_code && (
-              <>
-                <dt>Code</dt>
-                <dd>{vendor.vendor_code}</dd>
-              </>
+          </dd>
+          <dt>Phone</dt>
+          <dd>
+            {contact.phone ? (
+              <a href={`tel:${contact.phone}`}>{contact.phone}</a>
+            ) : (
+              "—"
             )}
-            <dt>Primary contact</dt>
-            <dd>{vendor.primary_contact_name || "—"}</dd>
-            <dt>Email</dt>
-            <dd>
-              {vendor.company_email ? (
-                <a href={`mailto:${vendor.company_email}`}>
-                  {vendor.company_email}
-                </a>
-              ) : (
-                "—"
-              )}
-            </dd>
-            <dt>Phone</dt>
-            <dd>
-              {vendor.company_phone ? (
-                <a href={`tel:${vendor.company_phone}`}>{vendor.company_phone}</a>
-              ) : (
-                "—"
-              )}
-            </dd>
-          </dl>
-        </section>
-      )}
+          </dd>
+        </dl>
+      </section>
 
       <section className="messages-context-section">
-        <h3>Contracts</h3>
-        {msas && msas.length > 0 ? (
+        <h3>Work Orders ({work_orders.length})</h3>
+        {work_orders.length === 0 ? (
+          <div className="messages-context-empty">None on file.</div>
+        ) : (
           <ul className="messages-context-list">
-            {msas.map((m) => (
-              <li key={m.id}>
-                <span className="messages-context-msa-name">
-                  {m.file_name || `MSA ${m.id.slice(0, 8)}`}
-                </span>
+            {work_orders.map((w) => (
+              <li
+                key={w.id}
+                className="messages-context-clickable"
+                onClick={() => onOpenWorkOrder(w.id)}
+              >
+                <span className="messages-context-msa-name">{w.label}</span>
                 <span className="messages-context-msa-meta">
-                  {m.version ? `v${m.version}` : ""}{" "}
-                  {m.status ? `· ${m.status}` : ""}
+                  {w.status || ""}{w.priority ? ` · ${w.priority}` : ""}
                 </span>
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="messages-context-section">
+        <h3>Tickets ({tickets.length})</h3>
+        {tickets.length === 0 ? (
+          <div className="messages-context-empty">None.</div>
         ) : (
-          <div className="messages-context-empty">
-            No contracts on file for this vendor.
-          </div>
+          <ul className="messages-context-list">
+            {tickets.map((t) => (
+              <li key={t.id}>
+                <span className="messages-context-msa-name">
+                  {t.description || `Ticket ${t.id.slice(0, 8)}`}
+                </span>
+                <span className="messages-context-msa-meta">
+                  {t.status || ""}
+                  {t.priority ? ` · ${t.priority}` : ""}
+                  {t.due_date ? ` · due ${formatDay(t.due_date)}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="messages-context-section">
+        <h3>Invoices ({invoices.length})</h3>
+        {invoices.length === 0 ? (
+          <div className="messages-context-empty">None.</div>
+        ) : (
+          <ul className="messages-context-list">
+            {invoices.map((inv) => (
+              <li key={inv.id}>
+                <span className="messages-context-msa-name">
+                  {inv.total_amount != null
+                    ? `$${inv.total_amount.toFixed(2)}`
+                    : `Invoice ${inv.id.slice(0, 8)}`}
+                </span>
+                <span className="messages-context-msa-meta">
+                  {inv.status || ""}
+                  {inv.due_date ? ` · due ${formatDay(inv.due_date)}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </aside>
