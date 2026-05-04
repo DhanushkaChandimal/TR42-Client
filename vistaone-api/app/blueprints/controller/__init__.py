@@ -10,6 +10,7 @@ from .admin_routes import admin_bp
 from .role_routes import role_bp
 from .ticket_routes import ticket_bp
 from .ai_routes import ai_bp
+from .export_routes import export_bp
 
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "role_bp",
     "ticket_bp",
     "ai_bp",
+    "export_bp",
 ]

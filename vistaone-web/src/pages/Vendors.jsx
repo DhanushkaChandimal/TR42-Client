@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import ExportButton from "../components/ExportButton";
+import { exportService } from "../services/exportService";
 import { vendorService } from "../services/vendorService";
 import "../styles/vendors.css";
 
@@ -105,6 +107,7 @@ export default function Vendors() {
             subtitle="Browse and manage vendors"
             loading={loading}
             loadingText="Loading vendors..."
+            controls={<ExportButton onExport={exportService.vendors} />}
         >
             {error && <div className="vendors-error">{error}</div>}
 

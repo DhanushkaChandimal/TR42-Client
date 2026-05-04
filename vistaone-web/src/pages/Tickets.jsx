@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
+import ExportButton from "../components/ExportButton";
 import TicketDetailModal from "../components/TicketDetailModal";
+import { exportService } from "../services/exportService";
 import { ticketService } from "../services/ticketService";
 import { workOrderService } from "../services/workOrderService";
 import "../styles/tickets.css";
@@ -322,6 +324,7 @@ export default function Tickets() {
       subtitle="Track ticket execution across work orders"
       loading={loading}
       loadingText="Loading tickets..."
+      controls={<ExportButton withDateRange onExport={exportService.tickets} />}
     >
       {error && <div className="tickets-error">{error}</div>}
 
