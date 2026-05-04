@@ -36,24 +36,24 @@ async function downloadBinary(url, fallbackName) {
 export const exportService = {
   analytics: (range) =>
     downloadBinary(
-      `${API_BASE}/exports/analytics.xlsx${buildQuery(range)}`,
+      `${API_BASE}/export/analytics.xlsx${buildQuery(range)}`,
       "analytics.xlsx"
     ),
   invoices: (range) =>
     downloadBinary(
-      `${API_BASE}/exports/invoices.xlsx${buildQuery(range)}`,
+      `${API_BASE}/export/invoices.xlsx${buildQuery(range)}`,
       "invoices.xlsx"
     ),
   tickets: (range) =>
     downloadBinary(
-      `${API_BASE}/exports/tickets.xlsx${buildQuery(range)}`,
+      `${API_BASE}/export/tickets.xlsx${buildQuery(range)}`,
       "tickets.xlsx"
     ),
   workorders: (range) =>
     downloadBinary(
-      `${API_BASE}/exports/workorders.xlsx${buildQuery(range)}`,
+      `${API_BASE}/export/workorders.xlsx${buildQuery(range)}`,
       "workorders.xlsx"
     ),
   vendors: () =>
-    downloadBinary(`${API_BASE}/exports/vendors.xlsx`, "vendors.xlsx"),
+    downloadBinary(`${API_BASE}/export/vendors.xlsx`, "vendors.xlsx"),
 };

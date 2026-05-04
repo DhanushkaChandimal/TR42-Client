@@ -28,7 +28,7 @@ def _range():
     return parse_date_range(request.args.get("from"), request.args.get("to"))
 
 
-@export_bp.route("/exports/analytics.xlsx", methods=["GET"])
+@export_bp.route("/analytics.xlsx", methods=["GET"])
 @token_required
 def analytics_xlsx(user_id):
     start, end = _range()
@@ -41,7 +41,7 @@ def analytics_xlsx(user_id):
     )
 
 
-@export_bp.route("/exports/invoices.xlsx", methods=["GET"])
+@export_bp.route("/invoices.xlsx", methods=["GET"])
 @permission_required("invoices", "read")
 def invoices_xlsx(user_id):
     start, end = _range()
@@ -54,7 +54,7 @@ def invoices_xlsx(user_id):
     )
 
 
-@export_bp.route("/exports/tickets.xlsx", methods=["GET"])
+@export_bp.route("/tickets.xlsx", methods=["GET"])
 @permission_required("workorders", "read")
 def tickets_xlsx(user_id):
     start, end = _range()
@@ -67,7 +67,7 @@ def tickets_xlsx(user_id):
     )
 
 
-@export_bp.route("/exports/workorders.xlsx", methods=["GET"])
+@export_bp.route("/workorders.xlsx", methods=["GET"])
 @permission_required("workorders", "read")
 def workorders_xlsx(user_id):
     start, end = _range()
@@ -80,7 +80,7 @@ def workorders_xlsx(user_id):
     )
 
 
-@export_bp.route("/exports/vendors.xlsx", methods=["GET"])
+@export_bp.route("/vendors.xlsx", methods=["GET"])
 @permission_required("vendors", "read")
 def vendors_xlsx(user_id):
     buf = build_vendors_workbook()
