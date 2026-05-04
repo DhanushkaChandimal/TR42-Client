@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { initialNotifications } from '../data/dashboardData';
 import '../styles/topBar.css';
 
-function TopBar({ title, subtitle }) {
+function TopBar({ title, subtitle, controls }) {
     const navigate = useNavigate();
     const { logout } = useAuth();
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -38,6 +38,7 @@ function TopBar({ title, subtitle }) {
                     {subtitle && <div className="text-muted small">{subtitle}</div>}
                 </div>
                 <div className="d-flex align-items-center gap-3">
+                    {controls && <div className="topbar-controls">{controls}</div>}
                     <div className="position-relative" ref={notificationRef}>
                         <button
                             type="button"

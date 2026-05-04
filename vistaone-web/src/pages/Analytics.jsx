@@ -13,6 +13,8 @@ import {
   YAxis,
 } from "recharts";
 import AppShell from "../components/AppShell";
+import ExportButton from "../components/ExportButton";
+import { exportService } from "../services/exportService";
 import { ticketService } from "../services/ticketService";
 import { vendorService } from "../services/vendorService";
 import { invoiceService } from "../services/invoiceService";
@@ -155,6 +157,7 @@ export default function Analytics() {
       subtitle="Performance insights from tickets, vendors, and invoices"
       loading={loading}
       loadingText="Crunching numbers..."
+      controls={<ExportButton withDateRange onExport={exportService.analytics} />}
     >
       {error && <div className="analytics-error">{error}</div>}
 

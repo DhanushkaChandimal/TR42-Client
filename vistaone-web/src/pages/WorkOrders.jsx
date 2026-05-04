@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
+import ExportButton from "../components/ExportButton";
 import { useWorkOrder } from "../hooks/useWorkOrder";
 import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
 import WorkOrderDetailModal from "../components/WorkOrderDetailModal";
+import { exportService } from "../services/exportService";
 import "../styles/workorder.css";
 
 const statusOptions = [
@@ -221,6 +223,7 @@ export default function WorkOrders() {
       subtitle="Manage field work orders"
       loading={loading}
       loadingText="Loading work orders..."
+      controls={<ExportButton withDateRange onExport={exportService.workorders} />}
     >
       <section className="workorders-controls">
         <input

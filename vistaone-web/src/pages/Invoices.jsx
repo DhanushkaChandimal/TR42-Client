@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
+import ExportButton from "../components/ExportButton";
 import InvoiceDetailModal from "../components/InvoiceDetailModal";
+import { exportService } from "../services/exportService";
 import { useInvoice } from "../hooks/useInvoice";
 import "../styles/invoices.css";
 
@@ -210,6 +212,7 @@ export default function Invoices() {
       subtitle="Review, approve, and manage invoices"
       loading={loading}
       loadingText="Loading invoices..."
+      controls={<ExportButton withDateRange onExport={exportService.invoices} />}
     >
       {/* Status summary cards */}
       <section className="inv-summary">
