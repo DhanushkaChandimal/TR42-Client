@@ -10,6 +10,12 @@ logger = logging.getLogger(__name__)
 
 SECRET_KEY = os.environ.get("SECRET_KEY") or "custom key"
 
+# Tokens are signed with JWT_SECRET so they validate against Supabase Realtime
+# / RLS (set JWT_SECRET to the project's Supabase JWT secret in any env that
+# talks to Supabase). Falls back to SECRET_KEY for environments not pointed at
+# Supabase, so local dev without Realtime keeps working.
+JWT_SECRET = os.environ.get("JWT_SECRET") or SECRET_KEY
+
 ALL_RESOURCES = [
     "dashboard",
     "wells",
@@ -23,47 +29,78 @@ ALL_RESOURCES = [
 ]
 
 
-def encode_token(user_id):
+def encode_token(user_id, client_id=None):
+    """Issue a JWT for the given user. The client_id ('cid') claim is included
+    so tenant scoping can travel with the token — every authenticated request
+    knows which client the caller belongs to without an extra DB lookup.
+    """
     payload = {
         "exp": datetime.now(timezone.utc) + timedelta(days=0, hours=5),
         "iat": datetime.now(timezone.utc),
         "sub": str(user_id),
         "jti": str(user_id) + "-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
+        # Supabase Realtime / RLS reads role + aud to pick the Postgres role
+        # that evaluates row-level policies. authenticated is the Supabase
+        # default for logged-in users.
+        "role": "authenticated",
+        "aud": "authenticated",
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    if client_id:
+        payload["cid"] = str(client_id)
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
 def _decode_request_token():
     auth = request.headers.get("Authorization")
     if not auth:
-        return None, (jsonify({"message": "Missing token"}), 401)
+        return None, None, (jsonify({"message": "Missing token"}), 401)
     try:
         scheme, token = auth.split()
         if scheme.lower() != "bearer":
-            return None, (jsonify({"message": "Invalid auth format"}), 401)
-        data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            return None, None, (jsonify({"message": "Invalid auth format"}), 401)
+        # We don't pass an audience here so tokens issued before the aud claim
+        # was added (and bare tokens used in dev) keep validating. The aud
+        # claim is solely for Supabase Realtime / RLS, which validates it
+        # itself when the JS client connects.
+        data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
         jti = data.get("jti")
         logger.info(f"Token jti: {jti}")
         if jti in blacklist:
             logger.warning(f"Attempted access with revoked token: {jti}")
-            return None, (jsonify({"message": "Token has been revoked!"}), 401)
-        return data["sub"], None
+            return None, None, (jsonify({"message": "Token has been revoked!"}), 401)
+        return data["sub"], data.get("cid"), None
     except jwt.ExpiredSignatureError:
-        return None, (jsonify({"message": "Token has expired!"}), 401)
+        return None, None, (jsonify({"message": "Token has expired!"}), 401)
     except jwt.InvalidTokenError:
-        return None, (jsonify({"message": "Invalid token!"}), 401)
+        return None, None, (jsonify({"message": "Invalid token!"}), 401)
     except Exception as e:
         logger.error(f"Token validation error: {e}")
-        return None, (jsonify({"message": "Token validation error!"}), 401)
+        return None, None, (jsonify({"message": "Token validation error!"}), 401)
+
+
+def _ensure_current_client_id(user_id):
+    """Guarantee g.current_client_id is populated. New tokens carry it as a
+    'cid' claim; legacy tokens fall back to a one-time DB lookup. Idempotent.
+    """
+    if getattr(g, "current_client_id", None):
+        return
+
+    from app.models.user import User
+
+    user = User.query.get(user_id)
+    if user and user.client_id:
+        g.current_client_id = user.client_id
 
 
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        user_id, err = _decode_request_token()
+        user_id, client_id, err = _decode_request_token()
         if err:
             return err
         g.current_user_id = user_id
+        g.current_client_id = client_id
+        _ensure_current_client_id(user_id)
         logger.info(f"Authenticated user: {user_id}")
         return f(user_id, *args, **kwargs)
 
@@ -76,10 +113,12 @@ def role_required(*allowed_roles):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            user_id, err = _decode_request_token()
+            user_id, client_id, err = _decode_request_token()
             if err:
                 return err
             g.current_user_id = user_id
+            g.current_client_id = client_id
+            _ensure_current_client_id(user_id)
 
             from app.models.user import User
 
@@ -96,6 +135,14 @@ def role_required(*allowed_roles):
         return decorated
 
     return decorator
+
+
+def get_current_user_client_id():
+    """Return the caller's client_id, populated on flask.g by the auth
+    decorators. Returns None outside a request context or for users with no
+    associated client.
+    """
+    return getattr(g, "current_client_id", None)
 
 
 def get_user_permissions(user):
@@ -142,10 +189,12 @@ def permission_required(resource, action="read"):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            user_id, err = _decode_request_token()
+            user_id, client_id, err = _decode_request_token()
             if err:
                 return err
             g.current_user_id = user_id
+            g.current_client_id = client_id
+            _ensure_current_client_id(user_id)
 
             from app.models.user import User
 

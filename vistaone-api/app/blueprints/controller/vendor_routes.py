@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from app.blueprints.services.vendor_service import VendorService
 from app.blueprints.repository.client_vendor_repository import ClientVendorRepository
 from app.models.client_vendor import ClientVendor
-from app.utils.util import permission_required
+from app.utils.util import permission_required, get_current_user_client_id
 import logging
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,10 @@ def update_vendor(user_id, vendor_id):
 @vendor_bp.route("/favorites/<client_id>", methods=["GET"])
 @permission_required("vendors", "read")
 def get_favorites(user_id, client_id):
+    # Caller may only list favorites for their own client.
+    caller_client_id = get_current_user_client_id()
+    if not caller_client_id or caller_client_id != client_id:
+        return jsonify({"error": "Forbidden"}), 403
     try:
         links = ClientVendorRepository.get_by_client(client_id)
         result, code = VendorService.get_all_vendors()
@@ -66,6 +70,9 @@ def add_favorite(user_id):
     vendor_id = body.get("vendor_id")
     if not client_id or not vendor_id:
         return jsonify({"error": "client_id and vendor_id are required"}), 400
+    caller_client_id = get_current_user_client_id()
+    if not caller_client_id or caller_client_id != client_id:
+        return jsonify({"error": "Forbidden"}), 403
     existing = ClientVendorRepository.get_by_client_and_vendor(client_id, vendor_id)
     if existing:
         return jsonify({"message": "Vendor already in favorites"}), 200
@@ -84,6 +91,9 @@ def add_favorite(user_id):
 @vendor_bp.route("/favorites/<client_id>/<vendor_id>", methods=["DELETE"])
 @permission_required("vendors", "delete")
 def remove_favorite(user_id, client_id, vendor_id):
+    caller_client_id = get_current_user_client_id()
+    if not caller_client_id or caller_client_id != client_id:
+        return jsonify({"error": "Forbidden"}), 403
     link = ClientVendorRepository.get_by_client_and_vendor(client_id, vendor_id)
     if not link:
         return jsonify({"error": "Vendor not in favorites"}), 404

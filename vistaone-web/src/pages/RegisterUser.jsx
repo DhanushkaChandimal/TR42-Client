@@ -237,7 +237,7 @@ function RegisterUser() {
     const [companiesLoading, setCompaniesLoading] = useState(true);
     const [companiesError, setCompaniesError] = useState("");
 
-    const { submitRegistration, loading, error, success } = useRegisterUser();
+    const { submitRegistration, loading, error } = useRegisterUser();
 
     useEffect(() => {
         authService.getClients()
@@ -395,15 +395,12 @@ function RegisterUser() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validateStep2()) return;
-        await submitRegistration(formData);
-    };
-
-    useEffect(() => {
-        if (success) {
+        const ok = await submitRegistration(formData);
+        if (ok) {
             setRegistrationComplete(true);
             setFormData(initialState);
         }
-    }, [success]);
+    };
 
     return (
         <div className="login-page position-relative overflow-hidden">

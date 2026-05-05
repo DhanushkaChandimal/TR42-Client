@@ -106,7 +106,7 @@ export function costByService(invoices, workOrders) {
     slot.invoiceCount += 1;
     slot.total += amount;
     if (inv.invoice_status === "APPROVED") slot.approved += amount;
-    else if (inv.invoice_status === "PENDING") slot.pending += amount;
+    else if (inv.invoice_status === "SUBMITTED") slot.pending += amount;
     else if (inv.invoice_status === "REJECTED") slot.rejected += amount;
     else if (inv.invoice_status === "PAID") slot.paid += amount;
   });
@@ -147,7 +147,7 @@ export function invoiceApprovalByVendor(invoices, vendors) {
     const slot = m.get(vId);
     if (inv.invoice_status === "APPROVED") slot.approved += 1;
     else if (inv.invoice_status === "REJECTED") slot.rejected += 1;
-    else if (inv.invoice_status === "PENDING") slot.pending += 1;
+    else if (inv.invoice_status === "SUBMITTED") slot.pending += 1;
   });
   const rows = [];
   m.forEach((counts, vendorId) => {
@@ -195,7 +195,7 @@ export function invoicesOutstandingByVendor(invoices, vendors) {
 export function workOrdersByStatus(workOrders) {
   const m = new Map();
   workOrders.forEach((wo) => {
-    const status = wo.status || "UNKNOWN";
+    const status = wo.current_status || "UNKNOWN";
     m.set(status, (m.get(status) || 0) + 1);
   });
   return Array.from(m.entries()).map(([status, count]) => ({ status, count }));
@@ -245,12 +245,12 @@ export function fraudSignals({ tickets, vendors, invoices, workOrders, msas }) {
     const allApproved = wt.every((t) => t.status === "APPROVED");
     const hasInvoice = invoices.some((inv) => inv.work_order_id === wo.id);
     if (allApproved && !hasInvoice) {
-      const v = lookup.get(wo.vendor_id);
+      const v = lookup.get(wo.assigned_vendor);
       signals.push({
         severity: "LOW",
         category: "Missing invoice",
         target: v?.company_name || v?.name || "Unknown vendor",
-        description: `Work order #${wo.work_order_id ?? wo.id.slice(0, 8)}: all tickets approved but no invoice has been generated.`,
+        description: `Work order #${wo.work_order_code ?? wo.id.slice(0, 8)}: all tickets approved but no invoice has been generated.`,
       });
     }
   });
@@ -273,9 +273,9 @@ export function fraudSignals({ tickets, vendors, invoices, workOrders, msas }) {
   const today = Date.now();
   const activeWOByVendor = new Map();
   workOrders.forEach((wo) => {
-    if (wo.status === "CANCELLED" || wo.status === "CLOSED") return;
-    if (!activeWOByVendor.has(wo.vendor_id)) activeWOByVendor.set(wo.vendor_id, 0);
-    activeWOByVendor.set(wo.vendor_id, activeWOByVendor.get(wo.vendor_id) + 1);
+    if (wo.current_status === "CANCELLED" || wo.current_status === "CLOSED") return;
+    if (!activeWOByVendor.has(wo.assigned_vendor)) activeWOByVendor.set(wo.assigned_vendor, 0);
+    activeWOByVendor.set(wo.assigned_vendor, activeWOByVendor.get(wo.assigned_vendor) + 1);
   });
   msas.forEach((m) => {
     if (!m.expiration_date) return;

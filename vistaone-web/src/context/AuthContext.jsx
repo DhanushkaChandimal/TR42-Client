@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { API_BASE } from "../config/api";
+import { setRealtimeAuth } from "../services/supabase";
 
 const AuthContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuthContext() {
   return useContext(AuthContext);
 }
@@ -16,8 +18,11 @@ export function AuthProvider({ children }) {
       return null;
     }
   });
-  // true once we have fresh permissions from the server (or confirmed no token)
+  // true once we have fresh permissions from the server (or confirmed no token).
+  // Initialized to true when there is no auth token so the app does not stall
+  // on a logged-out user — the refresh effect below only runs when a token exists.
   const [profileReady, setProfileReady] = useState(() => {
+    if (!localStorage.getItem("authToken")) return true;
     try {
       const stored = JSON.parse(localStorage.getItem("userProfile"));
       return !!(stored?.permissions);
@@ -31,6 +36,7 @@ export function AuthProvider({ children }) {
     setUser(userProfile);
     localStorage.setItem("authToken", newToken);
     localStorage.setItem("userProfile", JSON.stringify(userProfile));
+    setRealtimeAuth(newToken);
   }, []);
 
   const clearAuth = useCallback(() => {
@@ -40,6 +46,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("userProfile");
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    setRealtimeAuth(null);
   }, []);
 
   const hasRole = useCallback(
@@ -69,10 +76,10 @@ export function AuthProvider({ children }) {
   // on the next page load without requiring the user to log out and back in.
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken");
-    if (!storedToken) {
-      setProfileReady(true);
-      return;
-    }
+    if (!storedToken) return;
+
+    // Hand the JWT to Supabase Realtime so RLS policies see our claims.
+    setRealtimeAuth(storedToken);
 
     fetch(`${API_BASE}/users/me`, {
       headers: { Authorization: `Bearer ${storedToken}` },

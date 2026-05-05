@@ -97,8 +97,8 @@ export default function Wells() {
                 >
                   <td>{well.api_number}</td>
                   <td>{well.well_name}</td>
-                  <td>{well.latitude}</td>
-                  <td>{well.longitude}</td>
+                  <td>{well.location?.surface_latitude}</td>
+                  <td>{well.location?.surface_longitude}</td>
                   <td>{well.status}</td>
                 </tr>
               ))}

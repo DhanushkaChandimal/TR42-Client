@@ -36,7 +36,6 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
     vendor: prefilledVendorId || "",
   });
   const { wells, fetchWells } = useWell();
-  const [wellOptions, setWellOptions] = useState([]);
   const [markerPos, setMarkerPos] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -94,23 +93,28 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
     fetchWells();
   }, [fetchWells]);
 
-  useEffect(() => {
-    setWellOptions(
+  const wellOptions = useMemo(
+    () =>
       wells.map((w) => ({
         id: w.id,
-        label: w.well_name
-          ? `${w.well_name} - ${w.api_number}`
-          : w.api_number,
-        gps: w.latitude && w.longitude ? `${w.latitude}, ${w.longitude}` : "",
+        label: w.well_name ? `${w.well_name} - ${w.api_number}` : w.api_number,
+        gps:
+          w.location?.surface_latitude && w.location?.surface_longitude
+            ? `${w.location.surface_latitude}, ${w.location.surface_longitude}`
+            : "",
       })),
-    );
+    [wells],
+  );
+
+  useEffect(() => {
+    // Default to the first well once async data arrives. This is a legitimate
+    // setState in an effect: we cannot derive it from props/state alone and
+    // we only want it to run once after wells load.
     if (wells.length && !formData.well) {
-      setFormData((prev) => ({
-        ...prev,
-        well: wells[0].id,
-      }));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData((prev) => ({ ...prev, well: wells[0].id }));
     }
-  }, [wells]);
+  }, [wells, formData.well]);
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -170,13 +174,6 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
       const [lat, lng] = value.split(",").map(Number);
       if (!isNaN(lat) && !isNaN(lng)) setMarkerPos([lat, lng]);
     }
-  };
-
-  // When user clicks map, update gpsCoordinates and marker
-  const handleMapClick = (coords) => {
-    setFormData((prev) => ({ ...prev, gpsCoordinates: coords }));
-    const [lat, lng] = coords.split(",").map(Number);
-    setMarkerPos([lat, lng]);
   };
 
   const handleCreateWorkOrder = async (e) => {

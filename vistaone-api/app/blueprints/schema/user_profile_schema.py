@@ -26,5 +26,10 @@ class UserProfileSchema(ma.SQLAlchemySchema):
 
     address = fields.Nested(AddressSchema)
 
+    client_name = fields.Method("get_client_name", dump_only=True)
+
+    def get_client_name(self, obj):
+        return obj.client.client_name if getattr(obj, "client", None) else None
+
 
 user_profile_schema = UserProfileSchema()

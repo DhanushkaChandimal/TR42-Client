@@ -3,6 +3,7 @@ from app.extensions import db
 from app.models.msa import Msa
 from app.models.vendor import Vendor
 from app.models.user import User
+from app.models.client_user import ClientUser
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,17 +12,30 @@ logger = logging.getLogger(__name__)
 class MsaRepository:
 
     @staticmethod
-    def get_all(vendor_id=None, status=None):
+    def get_all(vendor_id=None, status=None, client_id=None):
         query = select(Msa)
         if vendor_id:
             query = query.where(Msa.vendor_id == vendor_id)
         if status:
             query = query.where(Msa.status == status)
+        if client_id:
+            # An MSA is owned by the client whose user uploaded it. Scope
+            # through the client_user join table so a brand-new client (with
+            # no users yet, or no uploads) sees zero MSAs.
+            client_user_ids = select(ClientUser.user_id).where(
+                ClientUser.client_id == client_id
+            )
+            query = query.where(Msa.uploaded_by.in_(client_user_ids))
         return db.session.execute(query).scalars().all()
 
     @staticmethod
-    def get_by_id(msa_id):
+    def get_by_id(msa_id, client_id=None):
         query = select(Msa).where(Msa.id == msa_id)
+        if client_id:
+            client_user_ids = select(ClientUser.user_id).where(
+                ClientUser.client_id == client_id
+            )
+            query = query.where(Msa.uploaded_by.in_(client_user_ids))
         return db.session.execute(query).scalars().first()
 
     @staticmethod

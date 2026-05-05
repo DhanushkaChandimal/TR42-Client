@@ -9,14 +9,14 @@ logger = logging.getLogger(__name__)
 class TicketService:
 
     @staticmethod
-    def get_all_tickets(work_order_id=None, vendor_id=None, status=None):
+    def get_all_tickets(work_order_id=None, vendor_id=None, status=None, client_id=None):
         return TicketRepository.get_all(
-            work_order_id=work_order_id, vendor_id=vendor_id, status=status
+            work_order_id=work_order_id, vendor_id=vendor_id, status=status, client_id=client_id
         )
 
     @staticmethod
-    def get_ticket(ticket_id):
-        ticket = TicketRepository.get_by_id(ticket_id)
+    def get_ticket(ticket_id, client_id=None):
+        ticket = TicketRepository.get_by_id(ticket_id, client_id=client_id)
         if not ticket:
             raise ValueError("Ticket not found")
         return ticket
@@ -36,8 +36,8 @@ class TicketService:
         return saved
 
     @staticmethod
-    def update_ticket(ticket_id, validated_data, current_user_id):
-        ticket = TicketRepository.get_by_id(ticket_id)
+    def update_ticket(ticket_id, validated_data, current_user_id, client_id=None):
+        ticket = TicketRepository.get_by_id(ticket_id, client_id=client_id)
         if not ticket:
             raise ValueError("Ticket not found")
         for key, value in validated_data.items():
@@ -49,8 +49,8 @@ class TicketService:
         return saved
 
     @staticmethod
-    def _set_status(ticket_id, new_status, current_user_id):
-        ticket = TicketRepository.get_by_id(ticket_id)
+    def _set_status(ticket_id, new_status, current_user_id, client_id=None):
+        ticket = TicketRepository.get_by_id(ticket_id, client_id=client_id)
         if not ticket:
             raise ValueError("Ticket not found")
         ticket.status = new_status
@@ -59,25 +59,25 @@ class TicketService:
         return saved
 
     @staticmethod
-    def approve_ticket(ticket_id, current_user_id):
+    def approve_ticket(ticket_id, current_user_id, client_id=None):
         saved = TicketService._set_status(
-            ticket_id, TicketStatusEnum.APPROVED, current_user_id
+            ticket_id, TicketStatusEnum.APPROVED, current_user_id, client_id=client_id
         )
         logger.info(f"Ticket approved: {saved.id}")
         return saved
 
     @staticmethod
-    def reject_ticket(ticket_id, current_user_id):
+    def reject_ticket(ticket_id, current_user_id, client_id=None):
         saved = TicketService._set_status(
-            ticket_id, TicketStatusEnum.REJECTED, current_user_id
+            ticket_id, TicketStatusEnum.REJECTED, current_user_id, client_id=client_id
         )
         logger.info(f"Ticket rejected: {saved.id}")
         return saved
 
     @staticmethod
-    def set_pending_ticket(ticket_id, current_user_id):
+    def set_pending_ticket(ticket_id, current_user_id, client_id=None):
         saved = TicketService._set_status(
-            ticket_id, TicketStatusEnum.PENDING_APPROVAL, current_user_id
+            ticket_id, TicketStatusEnum.PENDING_APPROVAL, current_user_id, client_id=client_id
         )
         logger.info(f"Ticket set to pending approval: {saved.id}")
         return saved

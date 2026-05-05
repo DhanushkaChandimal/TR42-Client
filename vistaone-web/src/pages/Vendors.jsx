@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import ExportButton from "../components/ExportButton";
+import { exportService } from "../services/exportService";
 import { vendorService } from "../services/vendorService";
 import "../styles/vendors.css";
 
 const statusOptions = [
     { value: "ALL", label: "All Statuses" },
-    { value: "active", label: "Active" },
-    { value: "inactive", label: "Inactive" },
+    { value: "ACTIVE", label: "Active" },
+    { value: "INACTIVE", label: "Inactive" },
 ];
 
 const complianceOptions = [
     { value: "ALL", label: "All Compliance" },
-    { value: "complete", label: "Complete" },
-    { value: "incomplete", label: "Incomplete" },
-    { value: "expired", label: "Expired" },
+    { value: "COMPLETE", label: "Complete" },
+    { value: "INCOMPLETE", label: "Incomplete" },
+    { value: "EXPIRED", label: "Expired" },
 ];
 
 export default function Vendors() {
@@ -105,6 +107,7 @@ export default function Vendors() {
             subtitle="Browse and manage vendors"
             loading={loading}
             loadingText="Loading vendors..."
+            controls={<ExportButton onExport={exportService.vendors} />}
         >
             {error && <div className="vendors-error">{error}</div>}
 

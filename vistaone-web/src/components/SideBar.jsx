@@ -61,7 +61,9 @@ function SideBar({ navData }) {
         <aside className={`sidebar${isOpen ? " open" : ""}`}>
             <div className="sidebar-brand">
                 <h2 className="sidebar-title">FieldPortal</h2>
-                <p className="sidebar-subtitle">Permian Basin Operations</p>
+                <p className="sidebar-subtitle">
+                    {navData.clientName ? `${navData.clientName} Operations` : "Operations"}
+                </p>
                 <button className="sidebar-close" onClick={() => setIsOpen(false)} aria-label="Close menu">
                     <FiX size={20} />
                 </button>

@@ -88,7 +88,7 @@ export const authService = {
                 client_code: company.client_code,
                 primary_contact_name: company.primary_contact_name,
                 company_email: company.company_email,
-                company_contact_number: company.company_contact_number,
+                company_phone: company.company_phone,
                 address,
                 admin_user: {
                     username: adminUser.username,

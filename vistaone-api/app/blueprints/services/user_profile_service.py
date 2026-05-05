@@ -36,7 +36,7 @@ class UserProfileService:
 
         #  Update Address
         if "address" in body:
-            address = AddressRepository.get_or_create_address(body["address"])
+            address = AddressRepository.get_or_create_address(body["address"], user_id=user_id)
             update_user.address_id = address.id
 
         # AUDIT FIX (IMPORTANT)

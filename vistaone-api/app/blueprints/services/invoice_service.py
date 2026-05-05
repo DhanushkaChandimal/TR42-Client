@@ -21,8 +21,8 @@ class InvoiceService:
         return invoices
 
     @staticmethod
-    def get_invoice(invoice_id):
-        invoice = InvoiceRepository.get_by_id(invoice_id)
+    def get_invoice(invoice_id, client_id=None):
+        invoice = InvoiceRepository.get_by_id(invoice_id, client_id=client_id)
         if not invoice:
             raise ValueError("Invoice not found")
         return invoice
@@ -50,7 +50,7 @@ class InvoiceService:
 
             invoice = Invoice(**validated_data)
             invoice.created_by = current_user_id
-            invoice.invoice_status = InvoiceStatusEnum.PENDING
+            invoice.invoice_status = InvoiceStatusEnum.SUBMITTED
 
             saved = InvoiceRepository.create(invoice)
 
@@ -72,8 +72,8 @@ class InvoiceService:
             raise e
 
     @staticmethod
-    def update_invoice(invoice_id, validated_data, current_user_id):
-        invoice = InvoiceRepository.get_by_id(invoice_id)
+    def update_invoice(invoice_id, validated_data, current_user_id, client_id=None):
+        invoice = InvoiceRepository.get_by_id(invoice_id, client_id=client_id)
         if not invoice:
             raise ValueError("Invoice not found")
 
@@ -87,8 +87,8 @@ class InvoiceService:
         return saved
 
     @staticmethod
-    def approve_invoice(invoice_id, current_user_id):
-        invoice = InvoiceRepository.get_by_id(invoice_id)
+    def approve_invoice(invoice_id, current_user_id, client_id=None):
+        invoice = InvoiceRepository.get_by_id(invoice_id, client_id=client_id)
         if not invoice:
             raise ValueError("Invoice not found")
 
@@ -100,8 +100,8 @@ class InvoiceService:
         return saved
 
     @staticmethod
-    def reject_invoice(invoice_id, current_user_id):
-        invoice = InvoiceRepository.get_by_id(invoice_id)
+    def reject_invoice(invoice_id, current_user_id, client_id=None):
+        invoice = InvoiceRepository.get_by_id(invoice_id, client_id=client_id)
         if not invoice:
             raise ValueError("Invoice not found")
 
@@ -113,13 +113,13 @@ class InvoiceService:
         return saved
 
     @staticmethod
-    def set_pending_invoice(invoice_id, current_user_id):
-        invoice = InvoiceRepository.get_by_id(invoice_id)
+    def set_pending_invoice(invoice_id, current_user_id, client_id=None):
+        invoice = InvoiceRepository.get_by_id(invoice_id, client_id=client_id)
         if not invoice:
             raise ValueError("Invoice not found")
 
-        invoice.invoice_status = InvoiceStatusEnum.PENDING
+        invoice.invoice_status = InvoiceStatusEnum.SUBMITTED
         invoice.last_modified_by = current_user_id
         saved = InvoiceRepository.update(invoice)
-        logger.info(f"Invoice reset to pending: {saved.id}")
+        logger.info(f"Invoice reset to submitted: {saved.id}")
         return saved

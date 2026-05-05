@@ -41,6 +41,7 @@ function AppShell({
         admin: adminSection,
         userName: user ? `${user.first_name} ${user.last_name}` : "User",
         userRole: user?.roles?.[0] ?? "",
+        clientName: user?.client_name ?? "",
     };
 
     return (

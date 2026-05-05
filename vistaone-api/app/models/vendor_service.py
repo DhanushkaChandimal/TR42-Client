@@ -11,7 +11,7 @@ class VendorService(db.Model, AuditMixin):
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     vendor_id = mapped_column(db.String(36), db.ForeignKey("vendor.id"), nullable=False)
-    service_type_id = mapped_column(
+    service_id = mapped_column(
         db.String(36), db.ForeignKey("service.id"), nullable=False
     )
 
@@ -20,5 +20,5 @@ class VendorService(db.Model, AuditMixin):
     service = relationship("Service", back_populates="vendor_services")
 
     __table_args__ = (
-        db.UniqueConstraint("vendor_id", "service_type_id", name="uq_vendor_service"),
+        db.UniqueConstraint("vendor_id", "service_id", name="uq_vendor_service"),
     )

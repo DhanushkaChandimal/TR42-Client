@@ -34,7 +34,7 @@ export default function WorkOrdersByStatusWidget() {
     const buckets = useMemo(() => {
         const counts = {};
         state.rows.forEach((wo) => {
-            const key = (wo.status || "unknown").toLowerCase();
+            const key = (wo.current_status || "unknown").toLowerCase();
             counts[key] = (counts[key] || 0) + 1;
         });
         const total = state.rows.length || 1;

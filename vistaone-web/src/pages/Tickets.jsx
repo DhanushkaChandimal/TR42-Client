@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
+import ExportButton from "../components/ExportButton";
 import TicketDetailModal from "../components/TicketDetailModal";
+import { exportService } from "../services/exportService";
 import { ticketService } from "../services/ticketService";
 import { workOrderService } from "../services/workOrderService";
 import "../styles/tickets.css";
@@ -85,7 +87,7 @@ function contractorLabel(t) {
 
 function woNumberValue(t, lookup) {
   const wo = lookup.get(t.work_order_id);
-  const n = Number(wo?.work_order_id);
+  const n = Number(wo?.work_order_code);
   return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
 }
 
@@ -267,7 +269,7 @@ export default function Tickets() {
       if (!matchesPriority) return false;
       if (!term) return true;
       const wo = workOrderLookup.get(t.work_order_id);
-      const woNumber = wo?.work_order_id != null ? `#${wo.work_order_id}` : "";
+      const woNumber = wo?.work_order_code != null ? `#${wo.work_order_code}` : "";
       const haystack = [
         t.description,
         t.assigned_contractor,
@@ -322,6 +324,7 @@ export default function Tickets() {
       subtitle="Track ticket execution across work orders"
       loading={loading}
       loadingText="Loading tickets..."
+      controls={<ExportButton withDateRange onExport={exportService.tickets} />}
     >
       {error && <div className="tickets-error">{error}</div>}
 
@@ -407,7 +410,7 @@ export default function Tickets() {
               {filtered.map((t) => {
                 const wo = workOrderLookup.get(t.work_order_id);
                 const woLabel = wo
-                  ? `#${wo.work_order_id ?? wo.id?.slice(0, 8)}`
+                  ? `#${wo.work_order_code ?? wo.id?.slice(0, 8)}`
                   : `#${t.work_order_id?.slice(0, 8) || "—"}`;
                 const cost = ticketCost(t);
                 return (

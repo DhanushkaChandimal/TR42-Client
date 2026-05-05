@@ -49,7 +49,7 @@ class LoginService:
                 return {"message": "Your account has been deleted."}, 403
             case UserStatus.ACTIVE:
                 logger.info(f"User logged in: {user.id}")
-                token = encode_token(user.id)
+                token = encode_token(user.id, client_id=user.client_id)
                 return {
                     "status": "success",
                     "message": "Successfully Logged In",
@@ -103,18 +103,12 @@ class LoginService:
         if "address" in user_data and isinstance(user_data["address"], dict):
             for k in address_fields:
                 address_data[k] = user_data["address"].get(k, "")
-        else:
-            for k in address_fields:
-                address_data[k] = ""
-        # Get or create address
-        address = AddressRepository.get_or_create_address(address_data)
-        user_data["address_id"] = address.id
         password = user_data.pop("password", None)
         client_id = user_data.pop("client_id", None)
         user_data.pop("status", None)
+        user_data.pop("address", None)
 
         user_data["user_type"] = UserType.CLIENT
-        user_data.pop("address", None)
         user = User(**user_data)
         if password:
             user.set_password(password)
@@ -128,7 +122,19 @@ class LoginService:
                     user.roles.append(default_role)
 
             db.session.add(user)
-            db.session.flush()
+            db.session.flush()  # populate user.id
+
+            # Address creation requires a real auth_user FK; do it after user exists.
+            if any(address_data.get(k) for k in address_fields):
+                from app.models.address import Address
+                address = Address(
+                    **address_data,
+                    created_by=user.id,
+                    updated_by=user.id,
+                )
+                db.session.add(address)
+                db.session.flush()
+                user.address_id = address.id
 
             if client_id:
                 from app.models.client_user import ClientUser
@@ -136,17 +142,23 @@ class LoginService:
                     user_id=user.id,
                     client_id=client_id,
                     status=UserStatus.PENDING_EMAIL_VERIFICATION,
+                    created_by=user.id,
+                    updated_by=user.id,
                 )
                 db.session.add(client_user_rec)
                 db.session.flush()
 
             s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
             token = s.dumps(user.email, salt="email-verify")
-            send_verification_email(user, token)
+            try:
+                send_verification_email(user, token)
+            except Exception as mail_err:
+                logger.warning(f"Verification email failed (non-fatal): {mail_err}")
 
             db.session.commit()
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
+            logger.error(f"register_user failed, session rolled back: {exc}", exc_info=True)
             raise
 
         return user, 201
@@ -177,41 +189,52 @@ class LoginService:
             from seed import init_company_roles
 
             address_data = client_data.pop("address", {})
-            address = AddressRepository.get_or_create_address(address_data)
+            password = admin_data.pop("password")
+
+            # Create the admin user first so audit FKs (created_by/updated_by)
+            # on address, client, and client_user have a valid auth_user to point at.
+            # No JWT exists during self-registration, so we cannot rely on the
+            # before_flush hook to populate these for non-User rows.
+            admin_user = User(
+                **admin_data,
+                user_type=UserType.CLIENT,
+            )
+            admin_user.set_password(password)
+            db.session.add(admin_user)
+            db.session.flush()
+
+            address = AddressRepository.get_or_create_address(
+                address_data, user_id=admin_user.id
+            )
+            admin_user.address_id = address.id
 
             client_data["address_id"] = address.id
+            client_data["created_by"] = admin_user.id
+            client_data["updated_by"] = admin_user.id
             client = Client(**client_data)
             db.session.add(client)
             db.session.flush()
 
-            # Create MASTER, ADMIN, USER roles for this company
+            # Create MASTER, ADMIN, USER roles for this company, then promote admin.
             init_company_roles(client.id)
-
             master_role = Role.query.filter_by(name="MASTER", client_id=client.id).first()
-
-            password = admin_data.pop("password")
-            admin_user = User(
-                **admin_data,
-                address_id=address.id,
-                user_type=UserType.CLIENT,
-            )
-            admin_user.set_password(password)
             if master_role:
                 admin_user.roles.append(master_role)
-            db.session.add(admin_user)
-            db.session.flush()
 
             from app.models.client_user import ClientUser
             admin_client_user = ClientUser(
                 user_id=admin_user.id,
                 client_id=client.id,
                 status=UserStatus.PENDING_EMAIL_VERIFICATION,
+                created_by=admin_user.id,
+                updated_by=admin_user.id,
             )
             db.session.add(admin_client_user)
             db.session.commit()
 
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
+            logger.error(f"register_client failed, session rolled back: {exc}", exc_info=True)
             raise
 
         s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])

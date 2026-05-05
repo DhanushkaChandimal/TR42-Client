@@ -13,8 +13,12 @@ export default function CreateOrEditWellModal({
       ? {
           api_number: initialData.api_number || "",
           well_name: initialData.well_name || "",
-          latitude: initialData.latitude ? String(initialData.latitude) : "",
-          longitude: initialData.longitude ? String(initialData.longitude) : "",
+          latitude: initialData.location?.surface_latitude
+            ? String(initialData.location.surface_latitude)
+            : "",
+          longitude: initialData.location?.surface_longitude
+            ? String(initialData.location.surface_longitude)
+            : "",
           status: initialData.status || "ACTIVE",
         }
       : {
@@ -73,7 +77,7 @@ export default function CreateOrEditWellModal({
       state && state.counties.find((c) => c.county_code === countyCode);
     const countyName = county ? county.county_name : "";
     return { state: stateName, county: countyName };
-  }, [form.api_number, stateData]);
+  }, [form.api_number]);
 
   const validateForm = () => {
     if (!form.api_number.trim()) {
@@ -105,7 +109,16 @@ export default function CreateOrEditWellModal({
     }
     setLoading(true);
     try {
-      await onSubmit(form);
+      const payload = {
+        api_number: form.api_number,
+        well_name: form.well_name,
+        status: form.status,
+        location: {
+          surface_latitude: parseFloat(form.latitude),
+          surface_longitude: parseFloat(form.longitude),
+        },
+      };
+      await onSubmit(payload);
     } catch (err) {
       setError(err.message || `Failed to ${mode === "edit" ? "update" : "create"} well.`);
     }
@@ -219,7 +232,12 @@ export default function CreateOrEditWellModal({
             Status
             <select name="status" value={form.status} onChange={handleChange}>
               <option value="ACTIVE">Active</option>
+              <option value="DRILLING">Drilling</option>
+              <option value="COMPLETED">Completed</option>
               <option value="INACTIVE">Inactive</option>
+              <option value="SUSPENDED">Suspended</option>
+              <option value="ABANDONED">Abandoned</option>
+              <option value="PLUGGED">Plugged</option>
             </select>
           </label>
           <button type="submit" className="workorder-submit-btn">
