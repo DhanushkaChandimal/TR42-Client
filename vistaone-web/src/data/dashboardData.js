@@ -124,6 +124,7 @@ export const sidebarNav = {
     { to: "/tickets", label: "Tickets", icon: "clipboard", permission: "workorders" },
     { to: "/invoices", label: "Invoices", icon: "file", permission: "invoices" },
     { to: "/vendor-favorites", label: "Vendors", icon: "users", permission: "vendors" },
+    { to: "/messages", label: "Messages", icon: "message", permission: "workorders" },
   ],
   account: [
     { to: "/vendor-marketplace", label: "Vendor Marketplace", icon: "users", permission: "vendor_marketplace" },

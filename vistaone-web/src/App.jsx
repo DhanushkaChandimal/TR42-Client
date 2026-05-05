@@ -23,6 +23,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import UserManagement from "./pages/UserManagement";
 import RoleManagement from "./pages/RoleManagement";
 import Profile from "./pages/UserProfile";
+import Messages from "./pages/Messages";
 
 function App() {
     return (
@@ -152,6 +153,15 @@ function App() {
                   <ProtectedRoute>
                     <Fraud />
                   </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/messages"
+                element={
+                  <PermissionRoute resource="workorders">
+                    <Messages />
+                  </PermissionRoute>
                 }
               />
                   

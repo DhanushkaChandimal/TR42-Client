@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ticketService } from "../services/ticketService";
 import { invoiceService } from "../services/invoiceService";
+import WorkOrderRecipients from "./WorkOrderRecipients";
+import "../styles/workOrderRecipients.css";
 
 const formatDate = (s) =>
   s
@@ -177,6 +179,11 @@ export default function WorkOrderDetailModal({ workOrder, onClose }) {
                 </tbody>
               </table>
             )}
+          </section>
+
+          <section className="workorder-detail-section">
+            <h3>Message a recipient</h3>
+            <WorkOrderRecipients workOrderId={workOrder.id} />
           </section>
         </div>
       </div>
