@@ -52,7 +52,8 @@ export function AuthProvider({ children }) {
   const hasRole = useCallback(
     (...roles) => {
       if (!user?.roles) return false;
-      return roles.some((r) => user.roles.includes(r));
+      const userRolesUpper = user.roles.map((r) => r.toUpperCase());
+      return roles.some((r) => userRolesUpper.includes(r.toUpperCase()));
     },
     [user]
   );
@@ -65,7 +66,7 @@ export function AuthProvider({ children }) {
     (resource, action = "read") => {
       if (!user) return false;
       // MASTER has all permissions
-      if (user.roles?.includes("MASTER")) return true;
+      if (user.roles?.some((r) => r.toUpperCase() === "MASTER")) return true;
       return user.permissions?.[resource]?.[action] === true;
     },
     [user]

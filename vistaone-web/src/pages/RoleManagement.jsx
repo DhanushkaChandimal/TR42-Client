@@ -59,7 +59,7 @@ function PermissionMatrix({ roleId, roleName, initialPermissions, onSaved }) {
         }
     };
 
-    const isMasterRole = roleName === 'MASTER';
+    const isMasterRole = roleName?.toUpperCase() === 'MASTER';
 
     return (
         <div className="mt-3">
@@ -322,7 +322,7 @@ export default function RoleManagement() {
                                 </div>
 
                                 <div className="d-flex gap-1">
-                                    {!BUILT_IN_ROLES.has(role.name) && editId !== role.id && deleteTarget?.id !== role.id && (
+                                    {!BUILT_IN_ROLES.has(role.name?.toUpperCase()) && editId !== role.id && deleteTarget?.id !== role.id && (
                                         <>
                                             <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" onClick={() => startEdit(role)}>
                                                 <Edit2 size={13} /> Edit
@@ -356,7 +356,7 @@ export default function RoleManagement() {
                                             disabled={deleting}
                                         >
                                             <option value="">— Remove role only (no migration) —</option>
-                                            {roles.filter((r) => r.id !== role.id && r.name !== 'MASTER').map((r) => (
+                                            {roles.filter((r) => r.id !== role.id && r.name?.toUpperCase() !== 'MASTER').map((r) => (
                                                 <option key={r.id} value={r.id}>{r.name}</option>
                                             ))}
                                         </select>
