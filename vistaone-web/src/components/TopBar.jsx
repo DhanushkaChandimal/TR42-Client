@@ -2,18 +2,34 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, UserCircle2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { initialNotifications } from '../data/dashboardData';
+import { useNotifications } from '../context/NotificationsContext';
 import '../styles/topBar.css';
+
+function formatTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now - d;
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return d.toLocaleDateString();
+}
 
 function TopBar({ title, subtitle, controls }) {
     const navigate = useNavigate();
     const { logout } = useAuth();
+    const notificationsCtx = useNotifications();
+    const notifications = notificationsCtx?.items ?? [];
+    const unreadCount = notificationsCtx?.unreadCount ?? 0;
+    const markAllRead = notificationsCtx?.markAllRead ?? (() => {});
+    const markRead = notificationsCtx?.markRead ?? (() => {});
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
-    const [notifications, setNotifications] = useState(initialNotifications);
     const notificationRef = useRef(null);
     const profileRef = useRef(null);
-    const unreadCount = notifications.filter((item) => !item.isRead).length;
 
     useEffect(() => {
         function handleOutsideClick(event) {
@@ -59,7 +75,7 @@ function TopBar({ title, subtitle, controls }) {
                             <div className="dropdown-menu show p-3 shadow topbar-dropdown">
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <span className="fw-semibold">Notifications</span>
-                                    <button className="btn btn-link btn-sm p-0 text-decoration-none" onClick={() => setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })))}>
+                                    <button className="btn btn-link btn-sm p-0 text-decoration-none" onClick={markAllRead}>
                                         Mark all as read
                                     </button>
                                 </div>
@@ -69,13 +85,12 @@ function TopBar({ title, subtitle, controls }) {
                                     ) : notifications.map((item) => (
                                         <button
                                             key={item.id}
-                                            className={`dropdown-item d-flex flex-column align-items-start border rounded mb-1 topbar-notification-item${item.isRead ? ' read' : ''}`}
-                                            onClick={() => setNotifications((prev) => prev.map((entry) => (entry.id === item.id ? { ...entry, isRead: true } : entry)))}
+                                            className="dropdown-item d-flex flex-column align-items-start border rounded mb-1 topbar-notification-item"
+                                            onClick={() => markRead(item.id)}
                                         >
-                                            <span className="fw-medium text-dark">{item.title}</span>
+                                            <span className="fw-medium text-dark">{item.message}</span>
                                             <div className="d-flex w-100 justify-content-between align-items-center mt-1">
-                                                <span className="text-muted topbar-time">{item.time}</span>
-                                                {!item.isRead && <span className="badge bg-primary rounded-pill topbar-dot"></span>}
+                                                <span className="text-muted topbar-time">{formatTime(item.created_at)}</span>
                                             </div>
                                         </button>
                                     ))}

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { API_BASE } from "../config/api";
+import { setRealtimeAuth } from "../services/supabase";
 
 const AuthContext = createContext();
 
@@ -35,6 +36,7 @@ export function AuthProvider({ children }) {
     setUser(userProfile);
     localStorage.setItem("authToken", newToken);
     localStorage.setItem("userProfile", JSON.stringify(userProfile));
+    setRealtimeAuth(newToken);
   }, []);
 
   const clearAuth = useCallback(() => {
@@ -44,6 +46,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("userProfile");
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    setRealtimeAuth(null);
   }, []);
 
   const hasRole = useCallback(
@@ -74,6 +77,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken");
     if (!storedToken) return;
+
+    // Hand the JWT to Supabase Realtime so RLS policies see our claims.
+    setRealtimeAuth(storedToken);
 
     fetch(`${API_BASE}/users/me`, {
       headers: { Authorization: `Bearer ${storedToken}` },
