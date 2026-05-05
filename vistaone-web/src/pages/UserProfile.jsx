@@ -15,6 +15,10 @@ export default function UserProfile() {
     const [addressError, setAddressError] = useState("");
 
     useEffect(() => {
+        // Sync the controlled form with newly-fetched profile data. This is the
+        // canonical "respond to async data" effect and the controlled inputs
+        // require local state, so the setState call here is intentional.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFormData(data || {});
     }, [data]);
 

@@ -73,7 +73,7 @@ export default function MsaAnalysisModal({ msa, onClose }) {
                 try {
                     const data = await aiService.getText(msa.id);
                     if (!cancelled) setTextPages(data.pages || []);
-                } catch (err) {
+                } catch {
                     if (!cancelled) setTextPages([]);
                 }
             })();

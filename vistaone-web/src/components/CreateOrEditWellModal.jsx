@@ -77,7 +77,7 @@ export default function CreateOrEditWellModal({
       state && state.counties.find((c) => c.county_code === countyCode);
     const countyName = county ? county.county_name : "";
     return { state: stateName, county: countyName };
-  }, [form.api_number, stateData]);
+  }, [form.api_number]);
 
   const validateForm = () => {
     if (!form.api_number.trim()) {

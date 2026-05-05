@@ -70,7 +70,7 @@ const STATUS_BADGE = {
 };
 
 export default function UserManagement() {
-    const { isMaster, user: currentUser } = useAuthContext();
+    const { isMaster } = useAuthContext();
     const [users, setUsers] = useState([]);
     const [availableRoles, setAvailableRoles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -210,7 +210,7 @@ export default function UserManagement() {
     };
 
     // Roles a given user is allowed to see/assign in the role picker
-    const assignableRoles = (targetUser) => {
+    const assignableRoles = () => {
         return availableRoles.filter((r) => {
             if (r.name === 'MASTER') return false; // never assignable via this UI
             return true;
@@ -399,7 +399,7 @@ export default function UserManagement() {
                                         <td className="px-3 py-3 align-middle">
                                             {roleEditId === user.id ? (
                                                 <MultiRoleSelect
-                                                    roles={assignableRoles(user)}
+                                                    roles={assignableRoles()}
                                                     selected={selectedRoles}
                                                     onChange={setSelectedRoles}
                                                 />
