@@ -179,7 +179,7 @@ export default function UserManagement() {
 
     const startRoleEdit = (user) => {
         setRoleEditId(user.id);
-        setSelectedRoles(user.roles.filter((r) => r !== 'MASTER'));
+        setSelectedRoles(user.roles.filter((r) => r.toUpperCase() !== 'MASTER'));
     };
 
 
@@ -212,12 +212,12 @@ export default function UserManagement() {
     // Roles a given user is allowed to see/assign in the role picker
     const assignableRoles = () => {
         return availableRoles.filter((r) => {
-            if (r.name === 'MASTER') return false; // never assignable via this UI
+            if (r.name.toUpperCase() === 'MASTER') return false; // never assignable via this UI
             return true;
         });
     };
 
-    const nonMasterUsers = users.filter((u) => !u.roles.includes('MASTER'));
+    const nonMasterUsers = users.filter((u) => !u.roles.some((r) => r.toUpperCase() === 'MASTER'));
 
     return (
         <AppShell title="User Management" subtitle="Approve, reject, and manage company users." loading={loading}>
@@ -407,7 +407,7 @@ export default function UserManagement() {
                                                 <div className="d-flex flex-wrap gap-1">
                                                     {user.roles.length === 0 && <span className="text-muted small">No roles</span>}
                                                     {user.roles.map((r) => (
-                                                        <span key={r} className={`badge px-2 py-1 ${r === 'MASTER' ? 'bg-danger-subtle text-danger' : 'bg-primary-subtle text-primary'}`}>
+                                                        <span key={r} className={`badge px-2 py-1 ${r.toUpperCase() === 'MASTER' ? 'bg-danger-subtle text-danger' : 'bg-primary-subtle text-primary'}`}>
                                                             {r}
                                                         </span>
                                                     ))}
@@ -440,7 +440,7 @@ export default function UserManagement() {
                                                         <Edit2 size={13} /> Edit
                                                     </button>
                                                 )}
-                                                {!user.roles.includes('MASTER') && (
+                                                {!user.roles.some((r) => r.toUpperCase() === 'MASTER') && (
                                                     roleEditId === user.id ? (
                                                         <>
                                                             <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" onClick={() => saveRoles(user.id)}>
