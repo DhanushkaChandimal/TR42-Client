@@ -103,18 +103,12 @@ class LoginService:
         if "address" in user_data and isinstance(user_data["address"], dict):
             for k in address_fields:
                 address_data[k] = user_data["address"].get(k, "")
-        else:
-            for k in address_fields:
-                address_data[k] = ""
-        # Get or create address
-        address = AddressRepository.get_or_create_address(address_data)
-        user_data["address_id"] = address.id
         password = user_data.pop("password", None)
         client_id = user_data.pop("client_id", None)
         user_data.pop("status", None)
+        user_data.pop("address", None)
 
         user_data["user_type"] = UserType.CLIENT
-        user_data.pop("address", None)
         user = User(**user_data)
         if password:
             user.set_password(password)
@@ -128,7 +122,19 @@ class LoginService:
                     user.roles.append(default_role)
 
             db.session.add(user)
-            db.session.flush()
+            db.session.flush()  # populate user.id
+
+            # Address creation requires a real auth_user FK; do it after user exists.
+            if any(address_data.get(k) for k in address_fields):
+                from app.models.address import Address
+                address = Address(
+                    **address_data,
+                    created_by=user.id,
+                    updated_by=user.id,
+                )
+                db.session.add(address)
+                db.session.flush()
+                user.address_id = address.id
 
             if client_id:
                 from app.models.client_user import ClientUser
@@ -136,13 +142,18 @@ class LoginService:
                     user_id=user.id,
                     client_id=client_id,
                     status=UserStatus.PENDING_EMAIL_VERIFICATION,
+                    created_by=user.id,
+                    updated_by=user.id,
                 )
                 db.session.add(client_user_rec)
                 db.session.flush()
 
             s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
             token = s.dumps(user.email, salt="email-verify")
-            send_verification_email(user, token)
+            try:
+                send_verification_email(user, token)
+            except Exception as mail_err:
+                logger.warning(f"Verification email failed (non-fatal): {mail_err}")
 
             db.session.commit()
         except Exception:
