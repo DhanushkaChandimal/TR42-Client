@@ -263,7 +263,7 @@ class LoginService:
 
         # Master accounts are always activated immediately after email confirmation
         new_status = UserStatus.PENDING_APPROVAL
-        if any(role.name == "MASTER" for role in user.roles):
+        if any(role.name.upper() == "MASTER" for role in user.roles):
             new_status = UserStatus.ACTIVE
         elif user.client_id:
             from app.models.client import Client

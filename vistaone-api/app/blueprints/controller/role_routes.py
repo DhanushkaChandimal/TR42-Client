@@ -49,7 +49,7 @@ def update_role(user_id, role_id):
 
     if not role or role.client_id != user.client_id:
         return jsonify({"message": "Role not found"}), 404
-    if role.name in BUILT_IN_ROLE_NAMES:
+    if role.name.upper() in BUILT_IN_ROLE_NAMES:
         return jsonify({"message": "Built-in roles cannot be edited"}), 403
 
     data = request.get_json() or {}
@@ -75,7 +75,7 @@ def delete_role(user_id, role_id):
 
     if not role or role.client_id != user.client_id:
         return jsonify({"message": "Role not found"}), 404
-    if role.name in BUILT_IN_ROLE_NAMES:
+    if role.name.upper() in BUILT_IN_ROLE_NAMES:
         return jsonify({"message": "Built-in roles cannot be deleted"}), 403
 
     data = request.get_json() or {}
@@ -113,7 +113,7 @@ def set_permissions(user_id, role_id):
     role = RoleRepository.get_role_by_id(role_id)
     if not role or role.client_id != user.client_id:
         return jsonify({"message": "Role not found"}), 404
-    if role.name == "MASTER":
+    if role.name.upper() == "MASTER":
         return jsonify({"message": "MASTER role permissions cannot be changed"}), 403
 
     data = request.get_json() or {}

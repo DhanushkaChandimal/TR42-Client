@@ -511,7 +511,7 @@ class AiService:
         if not msa:
             return None, False
 
-        role_names = {r.name for r in user.roles}
+        role_names = {r.name.upper() for r in user.roles}
         if "MASTER" in role_names:
             return msa, True
 

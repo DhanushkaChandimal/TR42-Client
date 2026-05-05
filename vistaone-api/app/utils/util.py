@@ -126,8 +126,8 @@ def role_required(*allowed_roles):
             if not user:
                 return jsonify({"message": "User not found"}), 404
 
-            user_role_names = {r.name for r in user.roles}
-            if not user_role_names.intersection(set(allowed_roles)):
+            user_role_names = {r.name.upper() for r in user.roles}
+            if not user_role_names.intersection({r.upper() for r in allowed_roles}):
                 return jsonify({"message": "Insufficient permissions"}), 403
 
             return f(user_id, *args, **kwargs)
@@ -150,7 +150,7 @@ def get_user_permissions(user):
     MASTER gets full access on all resources.
     Others get their actual DB permissions.
     """
-    role_names = {r.name for r in user.roles}
+    role_names = {r.name.upper() for r in user.roles}
     if "MASTER" in role_names:
         return {
             res: {"read": True, "write": True, "delete": True} for res in ALL_RESOURCES
@@ -202,7 +202,7 @@ def permission_required(resource, action="read"):
             if not user:
                 return jsonify({"message": "User not found"}), 404
 
-            role_names = {r.name for r in user.roles}
+            role_names = {r.name.upper() for r in user.roles}
             if "MASTER" not in role_names:
                 perms = get_user_permissions(user)
                 resource_perms = perms.get(resource, {})

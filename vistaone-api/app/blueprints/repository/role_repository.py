@@ -1,6 +1,7 @@
 from app.models.role import Role
 from app.models.permission import Permission
 from app.extensions import db
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
 
@@ -15,7 +16,10 @@ class RoleRepository:
 
     @staticmethod
     def get_custom_role_by_name(client_id, name):
-        return Role.query.filter_by(name=name, client_id=client_id).first()
+        return Role.query.filter(
+            func.lower(Role.name) == name.lower(),
+            Role.client_id == client_id,
+        ).first()
 
     @staticmethod
     def create_role(name, description, client_id):
