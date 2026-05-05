@@ -12,7 +12,7 @@ class VendorSchema(ma.SQLAlchemyAutoSchema):
         include_fk = True
         exclude = ('workorders',)
 
-    # Serialize enum fields as their string values (e.g. "active" not "VendorStatus.ACTIVE")
+    # Serialize enum fields as their string values (e.g. "ACTIVE" not "VendorStatus.ACTIVE")
     status = fields.String()
     compliance_status = fields.String()
 

@@ -7,7 +7,6 @@ from app.blueprints.enum.enums import (
 )
 import uuid
 from app.extensions import db
-from sqlalchemy import Sequence
 from app.models.audit_mixin import AuditMixin
 
 
@@ -17,24 +16,25 @@ class WorkOrder(db.Model, AuditMixin):
     id: Mapped[str] = mapped_column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    work_order_id = mapped_column(db.Integer, Sequence("work_order_id_seq"))
+    work_order_code = mapped_column(db.Integer, unique=True, nullable=True)
 
     client_id = mapped_column(db.String(36), db.ForeignKey("client.id"), nullable=False)
-    vendor_id = mapped_column(db.String(36), db.ForeignKey("vendor.id"), nullable=False)
-    service_type_id = mapped_column(
+    assigned_vendor = mapped_column(
+        db.String(36), db.ForeignKey("vendor.id"), nullable=True
+    )
+    service_type = mapped_column(
         db.String(36), db.ForeignKey("service.id"), nullable=False
     )
 
-    description = mapped_column(db.String(500))
+    description = mapped_column(db.Text)
+    comments = mapped_column(db.String(500), nullable=True)
+    location = mapped_column(db.String(100), nullable=True)
+    location_type = mapped_column(db.Enum(LocationTypeEnum), nullable=True)
 
-    location_type = mapped_column(db.Enum(LocationTypeEnum), nullable=False)
+    well_id = mapped_column(db.String(36), db.ForeignKey("well.id"))
 
-    well_id = mapped_column(
-        db.String(36), db.ForeignKey("well.id")
-    )  ## well table reference if location_type is WELL
-
-    latitude = mapped_column(db.Float, nullable=True)
-    longitude = mapped_column(db.Float, nullable=True)
+    latitude = mapped_column(db.Numeric, nullable=True)
+    longitude = mapped_column(db.Numeric, nullable=True)
 
     units = mapped_column(db.String(15))
     estimated_quantity = mapped_column(db.Float, nullable=True)
@@ -43,31 +43,30 @@ class WorkOrder(db.Model, AuditMixin):
 
     priority = mapped_column(db.Enum(PriorityEnum), nullable=False)
 
-    status = mapped_column(db.Enum(StatusEnum), default=StatusEnum.UNASSIGNED)
+    current_status = mapped_column(
+        db.Enum(StatusEnum), nullable=False, default=StatusEnum.UNASSIGNED
+    )
 
     is_recurring = mapped_column(db.Boolean, default=False)
     recurrence_type = mapped_column(
         db.Enum(FrequencyEnum), default=FrequencyEnum.ONE_TIME
     )
 
-    estimated_start_date = mapped_column(db.DateTime, nullable=True)
-    estimated_end_date = mapped_column(db.DateTime, nullable=True)
+    estimated_start_date = mapped_column(db.DateTime(timezone=True), nullable=True)
+    estimated_end_date = mapped_column(db.DateTime(timezone=True), nullable=True)
     assigned_at = mapped_column(db.DateTime(timezone=True), nullable=True)
     completed_at = mapped_column(db.DateTime(timezone=True), nullable=True)
-    cancelled_by = mapped_column(db.String(36))
-    cancelled_at = mapped_column(db.DateTime(timezone=True))
-    cancellation_reason = mapped_column(db.String(255), nullable=True)
+    closed_at = mapped_column(db.DateTime(timezone=True), nullable=True)
+    halted_at = mapped_column(db.DateTime(timezone=True), nullable=True)
+    rejected_at = mapped_column(db.DateTime(timezone=True), nullable=True)
+    cancelled_at = mapped_column(db.DateTime(timezone=True), nullable=True)
+    cancelled_by = mapped_column(db.String(36), nullable=True)
+    cancellation_reason = mapped_column(db.Text, nullable=True)
 
-    address_id = mapped_column(
-        db.String(36), db.ForeignKey("address.id")
-    )  ## address reference if location_type is ADDRESS
-
-    ## Relationships
     client = relationship("Client", back_populates="workorders")
-    vendor = relationship("Vendor", back_populates="workorders")
-    service_type = relationship("Service")
+    vendor = relationship("Vendor", back_populates="workorders", foreign_keys=[assigned_vendor])
+    service = relationship("Service", foreign_keys=[service_type])
     well = relationship("Well")
-    address = relationship("Address")
     tickets = relationship(
         "Ticket", back_populates="work_order", cascade="all, delete-orphan"
     )

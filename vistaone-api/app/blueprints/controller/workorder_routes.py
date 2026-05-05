@@ -108,7 +108,7 @@ def search_workorders(current_user_id):
         page = int(request.args.get("page", 1))
         per_page = int(request.args.get("per_page", 10))
 
-        sort_by = request.args.get("sort_by", "created_date")
+        sort_by = request.args.get("sort_by", "created_at")
         order = request.args.get("order", "desc")
 
         result = WorkOrderService.search_workorders(

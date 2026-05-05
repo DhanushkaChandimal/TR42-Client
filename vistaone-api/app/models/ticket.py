@@ -33,6 +33,8 @@ class Ticket(db.Model, AuditMixin):
     due_date = mapped_column(db.DateTime(timezone=True), nullable=False)
     assigned_at = mapped_column(db.DateTime(timezone=True), nullable=True)
     end_time = mapped_column(db.DateTime(timezone=True), nullable=True)
+    approved_at = mapped_column(db.DateTime(timezone=True), nullable=True)
+    rejected_at = mapped_column(db.DateTime(timezone=True), nullable=True)
     estimated_duration = mapped_column(db.Interval, nullable=True)
 
     service_type = mapped_column(
@@ -40,8 +42,10 @@ class Ticket(db.Model, AuditMixin):
     )
 
     notes = mapped_column(db.Text, nullable=True)
-    contractor_start_location = mapped_column(db.Text, nullable=True)
-    contractor_end_location = mapped_column(db.Text, nullable=True)
+    contractor_start_latitude = mapped_column(db.Numeric, nullable=True)
+    contractor_start_longitude = mapped_column(db.Numeric, nullable=True)
+    contractor_end_latitude = mapped_column(db.Numeric, nullable=True)
+    contractor_end_longitude = mapped_column(db.Numeric, nullable=True)
     estimated_quantity = mapped_column(db.Float, nullable=True)
     unit = mapped_column(db.String(100), nullable=True)
     special_requirements = mapped_column(db.Text, nullable=True)

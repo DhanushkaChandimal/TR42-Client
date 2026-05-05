@@ -1,7 +1,6 @@
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.extensions import db
-from app.models.audit_mixin import AuditMixin
 
 
 user_role = db.Table(
@@ -11,7 +10,7 @@ user_role = db.Table(
 )
 
 
-class Role(db.Model, AuditMixin):
+class Role(db.Model):
     __tablename__ = "roles"
 
     id: Mapped[str] = mapped_column(

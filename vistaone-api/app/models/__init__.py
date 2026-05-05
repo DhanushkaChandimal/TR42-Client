@@ -4,6 +4,7 @@ from .user import User
 from .workorder import WorkOrder
 from .address import Address
 from .well import Well
+from .well_location import WellLocation
 from .vendor import Vendor
 from .client import Client
 from .service import Service
