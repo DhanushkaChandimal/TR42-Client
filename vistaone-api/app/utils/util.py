@@ -26,6 +26,9 @@ ALL_RESOURCES = [
     "invoices",
     "users",
     "promote_admin",
+    "analytics",
+    "fraud",
+    "messages",
 ]
 
 
@@ -178,6 +181,9 @@ _RESOURCE_LABELS = {
     "users": "users",
     "dashboard": "dashboard",
     "promote_admin": "admin promotions",
+    "analytics": "analytics",
+    "fraud": "fraud detection",
+    "messages": "messages",
 }
 
 
