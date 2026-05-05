@@ -30,7 +30,7 @@ function buildPermMap(permissions) {
     return map;
 }
 
-function PermissionMatrix({ roleId, roleName, isDefault, initialPermissions, onSaved }) {
+function PermissionMatrix({ roleId, roleName, initialPermissions, onSaved }) {
     const [map, setMap] = useState(() => buildPermMap(initialPermissions));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -379,7 +379,6 @@ export default function RoleManagement() {
                                 <PermissionMatrix
                                     roleId={role.id}
                                     roleName={role.name}
-                                    isDefault={role.is_default}
                                     initialPermissions={role.permissions || []}
                                     onSaved={(updated) =>
                                         setRoles((prev) =>
