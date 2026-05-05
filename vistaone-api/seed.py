@@ -115,7 +115,9 @@ def init_company_roles(client_id):
                 can_delete=pdata.get("can_delete", False),
             ))
 
-    db.session.commit()
+    # Flush only — let the caller own the transaction so a failure later in
+    # registration can roll roles/permissions back along with everything else.
+    db.session.flush()
 
 
 if __name__ == "__main__":

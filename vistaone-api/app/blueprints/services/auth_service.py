@@ -156,8 +156,9 @@ class LoginService:
                 logger.warning(f"Verification email failed (non-fatal): {mail_err}")
 
             db.session.commit()
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
+            logger.error(f"register_user failed, session rolled back: {exc}", exc_info=True)
             raise
 
         return user, 201
@@ -231,8 +232,9 @@ class LoginService:
             db.session.add(admin_client_user)
             db.session.commit()
 
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
+            logger.error(f"register_client failed, session rolled back: {exc}", exc_info=True)
             raise
 
         s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
