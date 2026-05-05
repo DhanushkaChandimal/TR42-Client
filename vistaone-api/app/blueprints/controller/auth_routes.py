@@ -56,6 +56,7 @@ def get_current_user(user_id):
                 "email": user.email,
                 "client_id": user.client_id,
                 "company_id": user.client_id,
+                "client_name": user.client.client_name if user.client else None,
                 "status": user.status.value if user.status else None,
                 "roles": [r.name for r in user.roles],
                 "permissions": get_user_permissions(user),
