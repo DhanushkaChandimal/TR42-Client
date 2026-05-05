@@ -68,7 +68,7 @@ export default function WorkOrderDetailModal({ workOrder, onClose }) {
       >
         <div className="workorders-modal-header workorder-modal-header">
           <h2 className="workorder-modal-title">
-            Work Order #{workOrder.work_order_id}
+            Work Order #{workOrder.work_order_code}
           </h2>
           <button
             className="workorders-close-btn workorder-close-btn"
@@ -84,13 +84,13 @@ export default function WorkOrderDetailModal({ workOrder, onClose }) {
             <h3>Information</h3>
             <dl className="workorder-detail-grid">
               <dt>Vendor</dt><dd>{workOrder.vendor?.name || "—"}</dd>
-              <dt>Job Type</dt><dd>{workOrder.service_type?.service || "—"}</dd>
+              <dt>Job Type</dt><dd>{workOrder.service?.service || "—"}</dd>
               <dt>Description</dt><dd>{workOrder.description || "—"}</dd>
               <dt>Location Type</dt><dd>{workOrder.location_type || "—"}</dd>
               <dt>Location</dt>
               <dd>
-                {workOrder.location_type === "ADDRESS" && workOrder.address
-                  ? `${workOrder.address.street || ""}, ${workOrder.address.city || ""}`.trim()
+                {workOrder.location_type === "ADDRESS" && workOrder.location
+                  ? workOrder.location
                   : workOrder.latitude != null && workOrder.longitude != null
                   ? `${workOrder.latitude}, ${workOrder.longitude}`
                   : "—"}
@@ -99,7 +99,7 @@ export default function WorkOrderDetailModal({ workOrder, onClose }) {
               <dt>Status</dt>
               <dd>
                 {(() => {
-                  const effective = workOrder.display_status || workOrder.status;
+                  const effective = workOrder.display_status || workOrder.current_status;
                   return (
                     <span className={`status-badge status-${effective?.toLowerCase()}`}>
                       {formatStatusLabel(effective)}

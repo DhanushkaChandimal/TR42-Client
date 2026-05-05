@@ -50,7 +50,7 @@ class InvoiceService:
 
             invoice = Invoice(**validated_data)
             invoice.created_by = current_user_id
-            invoice.invoice_status = InvoiceStatusEnum.PENDING
+            invoice.invoice_status = InvoiceStatusEnum.SUBMITTED
 
             saved = InvoiceRepository.create(invoice)
 
@@ -118,8 +118,8 @@ class InvoiceService:
         if not invoice:
             raise ValueError("Invoice not found")
 
-        invoice.invoice_status = InvoiceStatusEnum.PENDING
+        invoice.invoice_status = InvoiceStatusEnum.SUBMITTED
         invoice.last_modified_by = current_user_id
         saved = InvoiceRepository.update(invoice)
-        logger.info(f"Invoice reset to pending: {saved.id}")
+        logger.info(f"Invoice reset to submitted: {saved.id}")
         return saved

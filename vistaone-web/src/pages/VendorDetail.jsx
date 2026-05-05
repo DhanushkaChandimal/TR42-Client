@@ -130,8 +130,8 @@ export default function VendorDetail() {
             >
               Back
             </button>
-            {vendor.status === "active" &&
-              vendor.compliance_status === "complete" && (
+            {vendor.status === "ACTIVE" &&
+              vendor.compliance_status === "COMPLETE" && (
                 <button
                   className="vendor-detail-create-wo"
                   onClick={() => setShowCreateWO(true)}
@@ -207,19 +207,17 @@ export default function VendorDetail() {
                         }}
                         tabIndex={0}
                         role="button"
-                        aria-label={`Open work order ${wo.work_order_id ?? wo.id?.slice(0, 8)}`}
+                        aria-label={`Open work order ${wo.work_order_code ?? wo.id?.slice(0, 8)}`}
                       >
-                        <td>{wo.work_order_id ?? wo.id?.slice(0, 8)}</td>
+                        <td>{wo.work_order_code ?? wo.id?.slice(0, 8)}</td>
                         <td>
-                          {wo.service_type?.service ||
-                            wo.service_type ||
-                            "-"}
+                          {wo.service?.service || "-"}
                         </td>
                         <td>
                           <span
-                            className={`status-badge status-${(wo.status || "").toLowerCase()}`}
+                            className={`status-badge status-${(wo.current_status || "").toLowerCase()}`}
                           >
-                            {wo.status || "-"}
+                            {wo.current_status || "-"}
                           </span>
                         </td>
                         <td>{formatDate(wo.created_at)}</td>

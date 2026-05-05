@@ -8,15 +8,15 @@ import "../styles/vendors.css";
 
 const statusOptions = [
     { value: "ALL", label: "All Statuses" },
-    { value: "active", label: "Active" },
-    { value: "inactive", label: "Inactive" },
+    { value: "ACTIVE", label: "Active" },
+    { value: "INACTIVE", label: "Inactive" },
 ];
 
 const complianceOptions = [
     { value: "ALL", label: "All Compliance" },
-    { value: "complete", label: "Complete" },
-    { value: "incomplete", label: "Incomplete" },
-    { value: "expired", label: "Expired" },
+    { value: "COMPLETE", label: "Complete" },
+    { value: "INCOMPLETE", label: "Incomplete" },
+    { value: "EXPIRED", label: "Expired" },
 ];
 
 export default function Vendors() {

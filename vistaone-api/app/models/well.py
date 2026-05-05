@@ -11,16 +11,25 @@ class Well(db.Model, AuditMixin):
     id: Mapped[str] = mapped_column(
         db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    client_id = mapped_column(db.String(36), db.ForeignKey("client.id"), nullable=False)
+    client_id = mapped_column(db.String(36), db.ForeignKey("client.id"), nullable=True)
 
     api_number = mapped_column(db.String(50), unique=True, nullable=False)
-    well_name = mapped_column(db.String(255), nullable=True)
-    latitude = mapped_column(db.String(50), nullable=True)
-    longitude = mapped_column(db.String(50), nullable=True)
-    well_type = mapped_column(db.Enum(WellTypeEnum), nullable=True)
-    access_instructions = mapped_column(db.Text, nullable=True)
-    safety_notes = mapped_column(db.Text, nullable=True)
+    well_name = mapped_column(db.String(255), nullable=False)
+    type = mapped_column(db.Enum(WellTypeEnum), nullable=True)
     status = mapped_column(db.Enum(WellStatusEnum), default=WellStatusEnum.ACTIVE)
 
-    # relationships
+    range = mapped_column(db.String(2), nullable=True)
+    quarter = mapped_column(db.String(2), nullable=True)
+    ground_elevation = mapped_column(db.Integer, nullable=True)
+    total_depth = mapped_column(db.Integer, nullable=True)
+    geofence_radius = mapped_column(db.Integer, nullable=True)
+    spud_date = mapped_column(db.DateTime(timezone=True), nullable=True)
+    completion_date = mapped_column(db.DateTime(timezone=True), nullable=True)
+
+    access_instructions = mapped_column(db.Text, nullable=True)
+    safety_notes = mapped_column(db.Text, nullable=True)
+
     client = relationship("Client", back_populates="wells")
+    location = relationship(
+        "WellLocation", back_populates="well", uselist=False, cascade="all, delete-orphan"
+    )

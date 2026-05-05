@@ -102,6 +102,7 @@ export default function Invoices() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("invoice_date_desc");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [actionMessage, setActionMessage] = useState("");
   const {
     invoices,
     loading,

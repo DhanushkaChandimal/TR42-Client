@@ -9,11 +9,13 @@ class PriorityEnum(Enum):
 
 class StatusEnum(Enum):
     UNASSIGNED = "UNASSIGNED"
+    PENDING = "PENDING"
     ASSIGNED = "ASSIGNED"
-    APPROVED = "APPROVED"
-    CANCELLED = "CANCELLED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
+    HALTED = "HALTED"
+    CANCELLED = "CANCELLED"
+    REJECTED = "REJECTED"
     CLOSED = "CLOSED"
 
 
@@ -32,7 +34,12 @@ class LocationTypeEnum(Enum):
 
 class WellStatusEnum(Enum):
     ACTIVE = "ACTIVE"
+    DRILLING = "DRILLING"
+    COMPLETED = "COMPLETED"
     INACTIVE = "INACTIVE"
+    SUSPENDED = "SUSPENDED"
+    ABANDONED = "ABANDONED"
+    PLUGGED = "PLUGGED"
 
 
 class WellTypeEnum(Enum):
@@ -45,17 +52,17 @@ class WellTypeEnum(Enum):
 
 
 class VendorStatus(str, Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
 
     def __str__(self):
         return self.value
 
 
 class ComplianceStatus(str, Enum):
-    EXPIRED = "expired"
-    INCOMPLETE = "incomplete"
-    COMPLETE = "complete"
+    EXPIRED = "EXPIRED"
+    INCOMPLETE = "INCOMPLETE"
+    COMPLETE = "COMPLETE"
 
     def __str__(self):
         return self.value
@@ -68,18 +75,20 @@ class UserType(str, Enum):
 
 
 class UserStatus(str, Enum):
-    PENDING_EMAIL_VERIFICATION = "pending_email_verification"
-    PENDING_APPROVAL = "pending_approval"
-    ACTIVE = "active"
-    REJECTED = "rejected"
-    INACTIVE = "inactive"
-    DELETED = "deleted"
+    PENDING_EMAIL_VERIFICATION = "PENDING_EMAIL_VERIFICATION"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    ACTIVE = "ACTIVE"
+    REJECTED = "REJECTED"
+    INACTIVE = "INACTIVE"
+    DELETED = "DELETED"
 
 
 class InvoiceStatusEnum(Enum):
-    PENDING = "PENDING"
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    PAID = "PAID"
 
 
 class TicketStatusEnum(Enum):

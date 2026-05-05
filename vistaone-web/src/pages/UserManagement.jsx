@@ -145,7 +145,7 @@ export default function UserManagement() {
         setError('');
         try {
             await authService.approveUser(userId);
-            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: 'active' } : u));
+            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: 'ACTIVE' } : u));
         } catch (e) {
             setError(e.message);
         }
@@ -155,7 +155,7 @@ export default function UserManagement() {
         setError('');
         try {
             await authService.rejectUser(userId);
-            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: 'rejected' } : u));
+            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: 'REJECTED' } : u));
         } catch (e) {
             setError(e.message);
         }
@@ -250,7 +250,7 @@ export default function UserManagement() {
                                 onChange={(e) => setTransferTarget(e.target.value)}
                             >
                                 <option value="">— Select user —</option>
-                                {nonMasterUsers.filter((u) => u.status === 'active').map((u) => (
+                                {nonMasterUsers.filter((u) => u.status === 'ACTIVE').map((u) => (
                                     <option key={u.id} value={u.id}>
                                         {u.first_name} {u.last_name} ({u.email})
                                     </option>
@@ -416,7 +416,7 @@ export default function UserManagement() {
                                         </td>
                                         <td className="px-3 py-3 align-middle">
                                             <div className="d-flex gap-1 flex-wrap">
-                                                {user.status === 'pending_approval' && (
+                                                {user.status === 'PENDING_APPROVAL' && (
                                                     <>
                                                         <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1" onClick={() => handleApprove(user.id)}>
                                                             <CheckCircle size={13} /> Approve

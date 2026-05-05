@@ -56,12 +56,12 @@ function locationTypeLabel(o) {
 }
 
 function orderIdValue(o) {
-  const n = Number(o.work_order_id);
+  const n = Number(o.work_order_code);
   return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
 }
 
 function effectiveStatus(o) {
-  return o.display_status || o.status || "";
+  return o.display_status || o.current_status || "";
 }
 
 function parseSort(sortBy) {
@@ -158,12 +158,11 @@ export default function WorkOrders() {
     const matched = workOrders.filter((order) => {
       const matchesStatus =
         statusFilter === "ALL" ||
-        (order.status && order.status === statusFilter);
-      // Search by description, location, or work_order_id
+        (order.current_status && order.current_status === statusFilter);
       const matchesSearch =
         order.description?.toLowerCase().includes(normalizedSearch) ||
         order.location_type?.toLowerCase().includes(normalizedSearch) ||
-        String(order.work_order_id ?? "").toLowerCase().includes(normalizedSearch);
+        String(order.work_order_code ?? "").toLowerCase().includes(normalizedSearch);
       return matchesStatus && matchesSearch;
     });
     return sortOrders(matched, sortBy);
@@ -298,12 +297,12 @@ export default function WorkOrders() {
             <tbody>
               {filteredOrders.map((order) => (
                 <tr
-                  key={order.work_order_id}
+                  key={order.work_order_code}
                   className="workorders-row-clickable"
                   onClick={() => setDetailOrder(order)}
                   tabIndex={0}
                   role="button"
-                  aria-label={`View details for work order ${order.work_order_id}`}
+                  aria-label={`View details for work order ${order.work_order_code}`}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
@@ -311,15 +310,15 @@ export default function WorkOrders() {
                     }
                   }}
                 >
-                  <td>{order.work_order_id}</td>
+                  <td>{order.work_order_code}</td>
                   <td>{order.vendor.name}</td>
-                  <td>{order.service_type.service}</td>
+                  <td>{order.service.service}</td>
                   <td>{order.location_type}</td>
                   <td>{`${order.latitude}, ${order.longitude}`}</td>
                   <td>{formatDate(order.created_at)}</td>
                   <td>
                     {(() => {
-                      const effective = order.display_status || order.status;
+                      const effective = order.display_status || order.current_status;
                       return (
                         <span
                           className={`status-badge status-${effective?.toLowerCase()}`}

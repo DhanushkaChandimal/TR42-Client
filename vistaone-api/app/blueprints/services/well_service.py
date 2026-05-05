@@ -2,9 +2,7 @@ from uuid import UUID
 from app.models.well import Well
 from app.models.user import User
 from app.blueprints.repository.well_repository import WellRepository
-from app.extensions import db
 import logging
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +16,7 @@ class WellService:
                 raise ValueError("Authenticated user has no associated client")
             well.client_id = user.client_id
             well.created_by = current_user_id
-            well.created_date = datetime.now()
+            well.updated_by = current_user_id
             return WellRepository.create(well)
         except Exception as e:
             logger.error(f"Error creating well: {str(e)}")
@@ -38,8 +36,7 @@ class WellService:
     @staticmethod
     def update_well(well: Well, current_user_id: str):
         try:
-            well.last_modified_by = current_user_id
-            well.last_modified_date = datetime.now()
+            well.updated_by = current_user_id
             return WellRepository.update(well)
         except Exception as e:
             logger.error(f"Error updating well: {str(e)}")

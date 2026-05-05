@@ -1,10 +1,9 @@
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column
 from app.extensions import db
-from app.models.audit_mixin import AuditMixin
 
 
-class Permission(db.Model, AuditMixin):
+class Permission(db.Model):
     __tablename__ = "permission"
 
     id: Mapped[str] = mapped_column(

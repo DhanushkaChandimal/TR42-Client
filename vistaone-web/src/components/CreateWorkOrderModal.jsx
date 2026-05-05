@@ -101,7 +101,10 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
         label: w.well_name
           ? `${w.well_name} - ${w.api_number}`
           : w.api_number,
-        gps: w.latitude && w.longitude ? `${w.latitude}, ${w.longitude}` : "",
+        gps:
+          w.location?.surface_latitude && w.location?.surface_longitude
+            ? `${w.location.surface_latitude}, ${w.location.surface_longitude}`
+            : "",
       })),
     );
     if (wells.length && !formData.well) {

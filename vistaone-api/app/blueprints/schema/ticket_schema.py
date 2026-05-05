@@ -12,7 +12,7 @@ class WorkOrderSummarySchema(ma.SQLAlchemyAutoSchema):
         model = WorkOrder
         fields = (
             "id",
-            "work_order_id",
+            "work_order_code",
             "description",
             "estimated_cost",
             "estimated_duration",
@@ -44,13 +44,17 @@ class TicketSchema(ma.SQLAlchemyAutoSchema):
     due_date = fields.DateTime(required=True)
     assigned_at = fields.DateTime(allow_none=True)
     end_time = fields.DateTime(allow_none=True)
+    approved_at = fields.DateTime(allow_none=True)
+    rejected_at = fields.DateTime(allow_none=True)
     estimated_duration = fields.TimeDelta(allow_none=True)
 
     service_type = fields.String(required=True)
 
     notes = fields.String(allow_none=True)
-    contractor_start_location = fields.String(allow_none=True)
-    contractor_end_location = fields.String(allow_none=True)
+    contractor_start_latitude = fields.Decimal(allow_none=True, as_string=True)
+    contractor_start_longitude = fields.Decimal(allow_none=True, as_string=True)
+    contractor_end_latitude = fields.Decimal(allow_none=True, as_string=True)
+    contractor_end_longitude = fields.Decimal(allow_none=True, as_string=True)
     estimated_quantity = fields.Float(allow_none=True)
     unit = fields.String(allow_none=True)
     special_requirements = fields.String(allow_none=True)

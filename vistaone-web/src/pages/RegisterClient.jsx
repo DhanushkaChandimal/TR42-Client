@@ -21,7 +21,7 @@ const initialCompanyData = {
     client_name: "",
     client_code: "",
     company_email: "",
-    company_contact_number: "",
+    company_phone: "",
     company_web_address: "",
     primary_contact_name: "",
     street: "",
@@ -72,7 +72,7 @@ function RegisterClient() {
             client_name,
             client_code,
             company_email,
-            company_contact_number,
+            company_phone,
             company_web_address,
         } = companyData;
 
@@ -93,14 +93,14 @@ function RegisterClient() {
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company_email.trim()))
             newErrors.company_email = "Invalid email address";
 
-        if (!company_contact_number.trim())
-            newErrors.company_contact_number = "Contact number is required";
+        if (!company_phone.trim())
+            newErrors.company_phone = "Contact number is required";
         else if (
             !/^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/.test(
-                company_contact_number.trim(),
+                company_phone.trim(),
             )
         )
-            newErrors.company_contact_number = "Invalid phone number";
+            newErrors.company_phone = "Invalid phone number";
 
         if (
             company_web_address.trim() &&
@@ -431,21 +431,21 @@ function RegisterClient() {
                                                     </span>
                                                     <input
                                                         type="tel"
-                                                        name="company_contact_number"
+                                                        name="company_phone"
                                                         value={
-                                                            companyData.company_contact_number
+                                                            companyData.company_phone
                                                         }
                                                         onChange={
                                                             handleCompanyChange
                                                         }
-                                                        className={`form-control${companyErrors.company_contact_number ? " is-invalid" : ""}`}
+                                                        className={`form-control${companyErrors.company_phone ? " is-invalid" : ""}`}
                                                         placeholder="(555) 123-4567"
                                                     />
                                                 </div>
-                                                {companyErrors.company_contact_number && (
+                                                {companyErrors.company_phone && (
                                                     <div className="invalid-feedback d-block">
                                                         {
-                                                            companyErrors.company_contact_number
+                                                            companyErrors.company_phone
                                                         }
                                                     </div>
                                                 )}
