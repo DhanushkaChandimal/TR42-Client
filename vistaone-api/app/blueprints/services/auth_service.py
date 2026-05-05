@@ -156,8 +156,9 @@ class LoginService:
                 logger.warning(f"Verification email failed (non-fatal): {mail_err}")
 
             db.session.commit()
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
+            logger.error(f"register_user failed, session rolled back: {exc}", exc_info=True)
             raise
 
         return user, 201
@@ -188,41 +189,52 @@ class LoginService:
             from seed import init_company_roles
 
             address_data = client_data.pop("address", {})
-            address = AddressRepository.get_or_create_address(address_data)
+            password = admin_data.pop("password")
+
+            # Create the admin user first so audit FKs (created_by/updated_by)
+            # on address, client, and client_user have a valid auth_user to point at.
+            # No JWT exists during self-registration, so we cannot rely on the
+            # before_flush hook to populate these for non-User rows.
+            admin_user = User(
+                **admin_data,
+                user_type=UserType.CLIENT,
+            )
+            admin_user.set_password(password)
+            db.session.add(admin_user)
+            db.session.flush()
+
+            address = AddressRepository.get_or_create_address(
+                address_data, user_id=admin_user.id
+            )
+            admin_user.address_id = address.id
 
             client_data["address_id"] = address.id
+            client_data["created_by"] = admin_user.id
+            client_data["updated_by"] = admin_user.id
             client = Client(**client_data)
             db.session.add(client)
             db.session.flush()
 
-            # Create MASTER, ADMIN, USER roles for this company
+            # Create MASTER, ADMIN, USER roles for this company, then promote admin.
             init_company_roles(client.id)
-
             master_role = Role.query.filter_by(name="MASTER", client_id=client.id).first()
-
-            password = admin_data.pop("password")
-            admin_user = User(
-                **admin_data,
-                address_id=address.id,
-                user_type=UserType.CLIENT,
-            )
-            admin_user.set_password(password)
             if master_role:
                 admin_user.roles.append(master_role)
-            db.session.add(admin_user)
-            db.session.flush()
 
             from app.models.client_user import ClientUser
             admin_client_user = ClientUser(
                 user_id=admin_user.id,
                 client_id=client.id,
                 status=UserStatus.PENDING_EMAIL_VERIFICATION,
+                created_by=admin_user.id,
+                updated_by=admin_user.id,
             )
             db.session.add(admin_client_user)
             db.session.commit()
 
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
+            logger.error(f"register_client failed, session rolled back: {exc}", exc_info=True)
             raise
 
         s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])

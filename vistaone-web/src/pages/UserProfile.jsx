@@ -170,6 +170,14 @@ export default function UserProfile() {
                             disabled
                         />
                     </label>
+                    <label>
+                        Company
+                        <input
+                            name="client_name"
+                            value={formData.client_name || ""}
+                            disabled
+                        />
+                    </label>
                     <div className="profile-form-row">
                         <label>
                             Primary phone
