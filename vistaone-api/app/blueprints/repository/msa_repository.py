@@ -3,7 +3,7 @@ from app.extensions import db
 from app.models.msa import Msa
 from app.models.vendor import Vendor
 from app.models.user import User
-from app.models.client_vendor import ClientVendor
+from app.models.client_user import ClientUser
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,22 +19,23 @@ class MsaRepository:
         if status:
             query = query.where(Msa.status == status)
         if client_id:
-            # An MSA belongs to a vendor; a client only has visibility into MSAs
-            # of vendors it is linked to via the client_vendor join table.
-            linked_vendor_ids = select(ClientVendor.vendor_id).where(
-                ClientVendor.client_id == client_id
+            # An MSA is owned by the client whose user uploaded it. Scope
+            # through the client_user join table so a brand-new client (with
+            # no users yet, or no uploads) sees zero MSAs.
+            client_user_ids = select(ClientUser.user_id).where(
+                ClientUser.client_id == client_id
             )
-            query = query.where(Msa.vendor_id.in_(linked_vendor_ids))
+            query = query.where(Msa.uploaded_by.in_(client_user_ids))
         return db.session.execute(query).scalars().all()
 
     @staticmethod
     def get_by_id(msa_id, client_id=None):
         query = select(Msa).where(Msa.id == msa_id)
         if client_id:
-            linked_vendor_ids = select(ClientVendor.vendor_id).where(
-                ClientVendor.client_id == client_id
+            client_user_ids = select(ClientUser.user_id).where(
+                ClientUser.client_id == client_id
             )
-            query = query.where(Msa.vendor_id.in_(linked_vendor_ids))
+            query = query.where(Msa.uploaded_by.in_(client_user_ids))
         return db.session.execute(query).scalars().first()
 
     @staticmethod
