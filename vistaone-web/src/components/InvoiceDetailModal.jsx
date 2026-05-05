@@ -160,7 +160,7 @@ export default function InvoiceDetailModal({
             <div className="ticket-detail-action-message">{actionMessage}</div>
           )}
 
-          {invoice.invoice_status === "PENDING" && (
+          {invoice.invoice_status === "SUBMITTED" && (
             <div className="ticket-detail-actions">
               <button
                 className="ticket-btn-approve"

@@ -223,7 +223,7 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
                       <dt>Work Order</dt>
                       <dd>
                         #
-                        {ticket.work_order.work_order_id ??
+                        {ticket.work_order.work_order_code ??
                           ticket.work_order.id?.slice(0, 8)}
                         {ticket.work_order.description
                           ? ` — ${ticket.work_order.description}`
@@ -315,8 +315,8 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
               {(ticket.notes ||
                 ticket.special_requirements ||
                 ticket.route ||
-                ticket.contractor_start_location ||
-                ticket.contractor_end_location) && (
+                ticket.contractor_start_latitude ||
+                ticket.contractor_end_latitude) && (
                 <section className="workorder-detail-section">
                   <h3>Notes & Location</h3>
                   <dl className="workorder-detail-grid">
@@ -332,16 +332,16 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
                         <dd>{ticket.special_requirements}</dd>
                       </>
                     )}
-                    {ticket.contractor_start_location && (
+                    {ticket.contractor_start_latitude != null && (
                       <>
                         <dt>Start Location</dt>
-                        <dd>{ticket.contractor_start_location}</dd>
+                        <dd>{`${ticket.contractor_start_latitude}, ${ticket.contractor_start_longitude}`}</dd>
                       </>
                     )}
-                    {ticket.contractor_end_location && (
+                    {ticket.contractor_end_latitude != null && (
                       <>
                         <dt>End Location</dt>
-                        <dd>{ticket.contractor_end_location}</dd>
+                        <dd>{`${ticket.contractor_end_latitude}, ${ticket.contractor_end_longitude}`}</dd>
                       </>
                     )}
                     {ticket.route && (

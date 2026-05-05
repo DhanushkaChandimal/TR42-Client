@@ -20,8 +20,8 @@ export default function WorkOrdersRecentWidget() {
                     .slice()
                     .sort(
                         (a, b) =>
-                            new Date(b.created_date || 0) -
-                            new Date(a.created_date || 0),
+                            new Date(b.created_at || 0) -
+                            new Date(a.created_at || 0),
                     )
                     .slice(0, 6);
                 setState({ loading: false, error: null, items: recent });
@@ -49,23 +49,23 @@ export default function WorkOrdersRecentWidget() {
             <ul className="widget-list__items">
                 {state.items.map((wo) => (
                     <li
-                        key={wo.work_order_id || wo.id}
+                        key={wo.work_order_code || wo.id}
                         className="widget-list__row"
                     >
                         <div className="widget-list__primary">
                             <span className="widget-list__name">
-                                {wo.description || wo.work_order_id || "Work order"}
+                                {wo.description || wo.work_order_code || "Work order"}
                             </span>
                             <span className="widget-list__meta">
                                 {wo.vendor?.name || "—"} ·{" "}
-                                {formatDate(wo.created_date)}
+                                {formatDate(wo.created_at)}
                             </span>
                         </div>
                         <div className="widget-list__secondary">
                             <span
-                                className={`status-pill ${statusClass(wo.status)}`}
+                                className={`status-pill ${statusClass(wo.current_status)}`}
                             >
-                                {wo.status || "—"}
+                                {wo.current_status || "—"}
                             </span>
                         </div>
                     </li>
