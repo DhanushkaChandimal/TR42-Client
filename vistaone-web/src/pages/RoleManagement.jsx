@@ -181,20 +181,20 @@ export default function RoleManagement() {
 
     const openDeletePanel = (role) => {
         setDeleteTarget(role);
-        setMigrateToRoleId('');
+        setMigrateToRoleId(null);
         setEditId(null);
     };
 
     const cancelDelete = () => {
         setDeleteTarget(null);
-        setMigrateToRoleId('');
+        setMigrateToRoleId(null);
     };
 
     const confirmDelete = async (roleId) => {
         setDeleting(true);
         setError('');
         try {
-            await authService.deleteRole(roleId, migrateToRoleId || null);
+            await authService.deleteRole(roleId, migrateToRoleId);
             setRoles((prev) => prev.filter((r) => r.id !== roleId));
             setDeleteTarget(null);
             setMigrateToRoleId('');
@@ -351,11 +351,11 @@ export default function RoleManagement() {
                                         <select
                                             className="form-select form-select-sm"
                                             style={{ maxWidth: 240 }}
-                                            value={migrateToRoleId}
+                                            value={migrateToRoleId ?? ''}
                                             onChange={(e) => setMigrateToRoleId(e.target.value)}
                                             disabled={deleting}
                                         >
-                                            <option value="">— Remove role only (no migration) —</option>
+                                            <option value="" disabled>— Select a role to migrate users to —</option>
                                             {roles.filter((r) => r.id !== role.id && r.name?.toUpperCase() !== 'MASTER').map((r) => (
                                                 <option key={r.id} value={r.id}>{r.name}</option>
                                             ))}
@@ -363,7 +363,7 @@ export default function RoleManagement() {
                                         <button
                                             className="btn btn-sm btn-danger d-inline-flex align-items-center gap-1"
                                             onClick={() => confirmDelete(role.id)}
-                                            disabled={deleting}
+                                            disabled={deleting || migrateToRoleId === null}
                                         >
                                             <Trash2 size={13} />
                                             {deleting ? 'Deleting…' : 'Confirm Delete'}
