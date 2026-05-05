@@ -32,7 +32,7 @@ def create_invoice(current_user_id):
 def get_all_invoices(current_user_id):
     # Always scope to the caller's client. The client_id query param is ignored
     # so a CLIENT user cannot peek at another tenant's invoices by URL hacking.
-    client_id = get_current_user_client_id(current_user_id)
+    client_id = get_current_user_client_id()
     vendor_id = request.args.get("vendor_id")
     status = request.args.get("status")
     work_order_id = request.args.get("work_order_id")
@@ -46,7 +46,7 @@ def get_all_invoices(current_user_id):
 @permission_required("invoices", "read")
 def get_invoice(current_user_id, invoice_id):
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         invoice = InvoiceService.get_invoice(invoice_id, client_id=client_id)
         return invoice_schema.jsonify(invoice), 200
     except ValueError:
@@ -63,7 +63,7 @@ def update_invoice(current_user_id, invoice_id):
         return jsonify({"error": "No input data provided"}), 400
 
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         validated_data = invoice_schema.load(json_data, partial=True)
         invoice = InvoiceService.update_invoice(
             invoice_id, validated_data, current_user_id, client_id=client_id
@@ -81,7 +81,7 @@ def update_invoice(current_user_id, invoice_id):
 @permission_required("invoices", "write")
 def approve_invoice(current_user_id, invoice_id):
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         invoice = InvoiceService.approve_invoice(invoice_id, current_user_id, client_id=client_id)
         return invoice_schema.jsonify(invoice), 200
     except ValueError as e:
@@ -94,7 +94,7 @@ def approve_invoice(current_user_id, invoice_id):
 @permission_required("invoices", "write")
 def reject_invoice(current_user_id, invoice_id):
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         invoice = InvoiceService.reject_invoice(invoice_id, current_user_id, client_id=client_id)
         return invoice_schema.jsonify(invoice), 200
     except ValueError as e:
@@ -107,7 +107,7 @@ def reject_invoice(current_user_id, invoice_id):
 @permission_required("invoices", "write")
 def set_pending_invoice(current_user_id, invoice_id):
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         invoice = InvoiceService.set_pending_invoice(invoice_id, current_user_id, client_id=client_id)
         return invoice_schema.jsonify(invoice), 200
     except ValueError as e:

@@ -63,6 +63,20 @@ def _decode_request_token():
         return None, None, (jsonify({"message": "Token validation error!"}), 401)
 
 
+def _ensure_current_client_id(user_id):
+    """Guarantee g.current_client_id is populated. New tokens carry it as a
+    'cid' claim; legacy tokens fall back to a one-time DB lookup. Idempotent.
+    """
+    if getattr(g, "current_client_id", None):
+        return
+
+    from app.models.user import User
+
+    user = User.query.get(user_id)
+    if user and user.client_id:
+        g.current_client_id = user.client_id
+
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -71,6 +85,7 @@ def token_required(f):
             return err
         g.current_user_id = user_id
         g.current_client_id = client_id
+        _ensure_current_client_id(user_id)
         logger.info(f"Authenticated user: {user_id}")
         return f(user_id, *args, **kwargs)
 
@@ -88,6 +103,7 @@ def role_required(*allowed_roles):
                 return err
             g.current_user_id = user_id
             g.current_client_id = client_id
+            _ensure_current_client_id(user_id)
 
             from app.models.user import User
 
@@ -106,26 +122,12 @@ def role_required(*allowed_roles):
     return decorator
 
 
-def get_current_user_client_id(user_id):
-    """Return the client_id of the authenticated user, or None if the user has
-    no associated client. Use this to scope list/get queries to the caller's
-    tenant — every CLIENT-side resource (wells, work orders, invoices, ...)
-    must be filtered by this value.
-
-    Reads from the JWT 'cid' claim stashed on flask.g during token decode so
-    the common path is a constant-time lookup. Falls back to a DB lookup for
-    tokens issued before the cid claim existed.
+def get_current_user_client_id():
+    """Return the caller's client_id, populated on flask.g by the auth
+    decorators. Returns None outside a request context or for users with no
+    associated client.
     """
-    cached = getattr(g, "current_client_id", None)
-    if cached:
-        return cached
-
-    from app.models.user import User
-
-    user = User.query.get(user_id)
-    if not user:
-        return None
-    return user.client_id
+    return getattr(g, "current_client_id", None)
 
 
 def get_user_permissions(user):
@@ -177,16 +179,13 @@ def permission_required(resource, action="read"):
                 return err
             g.current_user_id = user_id
             g.current_client_id = client_id
+            _ensure_current_client_id(user_id)
 
             from app.models.user import User
 
             user = User.query.get(user_id)
             if not user:
                 return jsonify({"message": "User not found"}), 404
-
-            # Backfill cid on g for tokens issued before the cid claim existed.
-            if not g.current_client_id:
-                g.current_client_id = user.client_id
 
             role_names = {r.name for r in user.roles}
             if "MASTER" not in role_names:

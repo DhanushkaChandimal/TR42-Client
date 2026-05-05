@@ -13,7 +13,7 @@ ticket_bp = Blueprint("ticket_bp", __name__)
 @ticket_bp.route("/", methods=["GET"])
 @permission_required("workorders", "read")
 def get_all_tickets(current_user_id):
-    client_id = get_current_user_client_id(current_user_id)
+    client_id = get_current_user_client_id()
     work_order_id = request.args.get("work_order_id")
     vendor_id = request.args.get("vendor_id")
     status = request.args.get("status")
@@ -27,7 +27,7 @@ def get_all_tickets(current_user_id):
 @permission_required("workorders", "read")
 def get_ticket(current_user_id, ticket_id):
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         ticket = TicketService.get_ticket(ticket_id, client_id=client_id)
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
@@ -58,7 +58,7 @@ def update_ticket(current_user_id, ticket_id):
     if not json_data:
         return jsonify({"error": "No input data provided"}), 400
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         validated_data = ticket_schema.load(json_data, partial=True)
         ticket = TicketService.update_ticket(
             ticket_id, validated_data, current_user_id, client_id=client_id
@@ -76,7 +76,7 @@ def update_ticket(current_user_id, ticket_id):
 @permission_required("workorders", "write")
 def approve_ticket(current_user_id, ticket_id):
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         ticket = TicketService.approve_ticket(ticket_id, current_user_id, client_id=client_id)
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
@@ -90,7 +90,7 @@ def approve_ticket(current_user_id, ticket_id):
 @permission_required("workorders", "write")
 def reject_ticket(current_user_id, ticket_id):
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         ticket = TicketService.reject_ticket(ticket_id, current_user_id, client_id=client_id)
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
@@ -104,7 +104,7 @@ def reject_ticket(current_user_id, ticket_id):
 @permission_required("workorders", "write")
 def set_pending_ticket(current_user_id, ticket_id):
     try:
-        client_id = get_current_user_client_id(current_user_id)
+        client_id = get_current_user_client_id()
         ticket = TicketService.set_pending_ticket(ticket_id, current_user_id, client_id=client_id)
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
