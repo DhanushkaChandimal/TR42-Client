@@ -141,25 +141,25 @@ function App() {
               <Route
                 path="/analytics"
                 element={
-                  <ProtectedRoute>
+                  <PermissionRoute resource="analytics">
                     <Analytics />
-                  </ProtectedRoute>
+                  </PermissionRoute>
                 }
               />
-                  
+
               <Route
                 path="/fraud"
                 element={
-                  <ProtectedRoute>
+                  <PermissionRoute resource="fraud">
                     <Fraud />
-                  </ProtectedRoute>
+                  </PermissionRoute>
                 }
               />
 
               <Route
                 path="/messages"
                 element={
-                  <PermissionRoute resource="workorders">
+                  <PermissionRoute resource="messages">
                     <Messages />
                   </PermissionRoute>
                 }
