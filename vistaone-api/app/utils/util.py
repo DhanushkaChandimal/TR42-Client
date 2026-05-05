@@ -10,6 +10,12 @@ logger = logging.getLogger(__name__)
 
 SECRET_KEY = os.environ.get("SECRET_KEY") or "custom key"
 
+# Tokens are signed with JWT_SECRET so they validate against Supabase Realtime
+# / RLS (set JWT_SECRET to the project's Supabase JWT secret in any env that
+# talks to Supabase). Falls back to SECRET_KEY for environments not pointed at
+# Supabase, so local dev without Realtime keeps working.
+JWT_SECRET = os.environ.get("JWT_SECRET") or SECRET_KEY
+
 ALL_RESOURCES = [
     "dashboard",
     "wells",
@@ -33,10 +39,15 @@ def encode_token(user_id, client_id=None):
         "iat": datetime.now(timezone.utc),
         "sub": str(user_id),
         "jti": str(user_id) + "-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
+        # Supabase Realtime / RLS reads role + aud to pick the Postgres role
+        # that evaluates row-level policies. authenticated is the Supabase
+        # default for logged-in users.
+        "role": "authenticated",
+        "aud": "authenticated",
     }
     if client_id:
         payload["cid"] = str(client_id)
-    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
 def _decode_request_token():
@@ -47,7 +58,11 @@ def _decode_request_token():
         scheme, token = auth.split()
         if scheme.lower() != "bearer":
             return None, None, (jsonify({"message": "Invalid auth format"}), 401)
-        data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        # We don't pass an audience here so tokens issued before the aud claim
+        # was added (and bare tokens used in dev) keep validating. The aud
+        # claim is solely for Supabase Realtime / RLS, which validates it
+        # itself when the JS client connects.
+        data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
         jti = data.get("jti")
         logger.info(f"Token jti: {jti}")
         if jti in blacklist:
