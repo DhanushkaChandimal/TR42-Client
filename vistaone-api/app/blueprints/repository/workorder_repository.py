@@ -23,12 +23,18 @@ class WorkOrderRepository:
             raise e
 
     @staticmethod
-    def get_by_id(work_order_id: str):
-        return db.session.query(WorkOrder).filter_by(id=work_order_id).first()
+    def get_by_id(work_order_id: str, client_id=None):
+        query = db.session.query(WorkOrder).filter_by(id=work_order_id)
+        if client_id:
+            query = query.filter(WorkOrder.client_id == client_id)
+        return query.first()
 
     @staticmethod
-    def get_all():
-        return db.session.query(WorkOrder).all()
+    def get_all(client_id=None):
+        query = db.session.query(WorkOrder)
+        if client_id:
+            query = query.filter(WorkOrder.client_id == client_id)
+        return query.all()
 
     @staticmethod
     def update(workorder: WorkOrder):
@@ -53,9 +59,12 @@ class WorkOrderRepository:
         per_page=10,
         sort_by="created_at",
         order="desc",
+        client_id=None,
     ):
         try:
             query = WorkOrder.query
+            if client_id:
+                query = query.filter(WorkOrder.client_id == client_id)
 
             if search_text:
                 words = search_text.lower().split()

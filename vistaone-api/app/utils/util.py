@@ -23,47 +23,69 @@ ALL_RESOURCES = [
 ]
 
 
-def encode_token(user_id):
+def encode_token(user_id, client_id=None):
+    """Issue a JWT for the given user. The client_id ('cid') claim is included
+    so tenant scoping can travel with the token — every authenticated request
+    knows which client the caller belongs to without an extra DB lookup.
+    """
     payload = {
         "exp": datetime.now(timezone.utc) + timedelta(days=0, hours=5),
         "iat": datetime.now(timezone.utc),
         "sub": str(user_id),
         "jti": str(user_id) + "-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
     }
+    if client_id:
+        payload["cid"] = str(client_id)
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 
 def _decode_request_token():
     auth = request.headers.get("Authorization")
     if not auth:
-        return None, (jsonify({"message": "Missing token"}), 401)
+        return None, None, (jsonify({"message": "Missing token"}), 401)
     try:
         scheme, token = auth.split()
         if scheme.lower() != "bearer":
-            return None, (jsonify({"message": "Invalid auth format"}), 401)
+            return None, None, (jsonify({"message": "Invalid auth format"}), 401)
         data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         jti = data.get("jti")
         logger.info(f"Token jti: {jti}")
         if jti in blacklist:
             logger.warning(f"Attempted access with revoked token: {jti}")
-            return None, (jsonify({"message": "Token has been revoked!"}), 401)
-        return data["sub"], None
+            return None, None, (jsonify({"message": "Token has been revoked!"}), 401)
+        return data["sub"], data.get("cid"), None
     except jwt.ExpiredSignatureError:
-        return None, (jsonify({"message": "Token has expired!"}), 401)
+        return None, None, (jsonify({"message": "Token has expired!"}), 401)
     except jwt.InvalidTokenError:
-        return None, (jsonify({"message": "Invalid token!"}), 401)
+        return None, None, (jsonify({"message": "Invalid token!"}), 401)
     except Exception as e:
         logger.error(f"Token validation error: {e}")
-        return None, (jsonify({"message": "Token validation error!"}), 401)
+        return None, None, (jsonify({"message": "Token validation error!"}), 401)
+
+
+def _ensure_current_client_id(user_id):
+    """Guarantee g.current_client_id is populated. New tokens carry it as a
+    'cid' claim; legacy tokens fall back to a one-time DB lookup. Idempotent.
+    """
+    if getattr(g, "current_client_id", None):
+        return
+
+    from app.models.user import User
+
+    user = User.query.get(user_id)
+    if user and user.client_id:
+        g.current_client_id = user.client_id
 
 
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        user_id, err = _decode_request_token()
+        user_id, client_id, err = _decode_request_token()
         if err:
             return err
         g.current_user_id = user_id
+        g.current_client_id = client_id
+        _ensure_current_client_id(user_id)
         logger.info(f"Authenticated user: {user_id}")
         return f(user_id, *args, **kwargs)
 
@@ -76,10 +98,12 @@ def role_required(*allowed_roles):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            user_id, err = _decode_request_token()
+            user_id, client_id, err = _decode_request_token()
             if err:
                 return err
             g.current_user_id = user_id
+            g.current_client_id = client_id
+            _ensure_current_client_id(user_id)
 
             from app.models.user import User
 
@@ -96,6 +120,14 @@ def role_required(*allowed_roles):
         return decorated
 
     return decorator
+
+
+def get_current_user_client_id():
+    """Return the caller's client_id, populated on flask.g by the auth
+    decorators. Returns None outside a request context or for users with no
+    associated client.
+    """
+    return getattr(g, "current_client_id", None)
 
 
 def get_user_permissions(user):
@@ -142,10 +174,12 @@ def permission_required(resource, action="read"):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
-            user_id, err = _decode_request_token()
+            user_id, client_id, err = _decode_request_token()
             if err:
                 return err
             g.current_user_id = user_id
+            g.current_client_id = client_id
+            _ensure_current_client_id(user_id)
 
             from app.models.user import User
 

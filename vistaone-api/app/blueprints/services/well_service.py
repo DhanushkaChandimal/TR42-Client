@@ -23,15 +23,15 @@ class WellService:
             raise e
 
     @staticmethod
-    def get_well(well_id: UUID | str):
-        well = WellRepository.get_by_id(well_id)
+    def get_well(well_id: UUID | str, client_id=None):
+        well = WellRepository.get_by_id(well_id, client_id=client_id)
         if not well:
             raise ValueError("Well not found")
         return well
 
     @staticmethod
-    def get_all_wells():
-        return WellRepository.get_all()
+    def get_all_wells(client_id=None):
+        return WellRepository.get_all(client_id=client_id)
 
     @staticmethod
     def update_well(well: Well, current_user_id: str):
@@ -43,9 +43,9 @@ class WellService:
             raise e
 
     @staticmethod
-    def delete_well(well_id: UUID | str):
+    def delete_well(well_id: UUID | str, client_id=None):
         try:
-            result = WellRepository.delete(well_id)
+            result = WellRepository.delete(well_id, client_id=client_id)
             if not result:
                 raise ValueError("Well not found")
             return True

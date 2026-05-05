@@ -55,20 +55,20 @@ class WorkOrderService:
             raise e
 
     @staticmethod
-    def get_workorder(work_order_id: str, current_user_id):
-        workorder = WorkOrderRepository.get_by_id(work_order_id)
+    def get_workorder(work_order_id: str, current_user_id, client_id=None):
+        workorder = WorkOrderRepository.get_by_id(work_order_id, client_id=client_id)
         if not workorder:
             raise ValueError("WorkOrder not found")
         return workorder
 
     @staticmethod
-    def get_all_workorders():
-        return WorkOrderRepository.get_all()
+    def get_all_workorders(client_id=None):
+        return WorkOrderRepository.get_all(client_id=client_id)
 
     @staticmethod
-    def update_workorder(current_user_id, work_order_id: str, data):
+    def update_workorder(current_user_id, work_order_id: str, data, client_id=None):
         try:
-            workorder = WorkOrderRepository.get_by_id(work_order_id)
+            workorder = WorkOrderRepository.get_by_id(work_order_id, client_id=client_id)
             if not workorder:
                 raise Exception("WorkOrder not found")
 
@@ -139,10 +139,10 @@ class WorkOrderService:
             raise e
 
     @staticmethod
-    def cancel_workorder(work_order_id, cancellation_reason, current_user_id):
+    def cancel_workorder(work_order_id, cancellation_reason, current_user_id, client_id=None):
         try:
             logger.info(f"Attempting to cancel workorder with ID: {work_order_id}")
-            workorder = WorkOrderRepository.get_by_id(work_order_id)
+            workorder = WorkOrderRepository.get_by_id(work_order_id, client_id=client_id)
         except Exception as e:
             logger.error(f"Error retrieving workorder: {str(e)}")
             raise e
@@ -172,7 +172,7 @@ class WorkOrderService:
         return True
 
     @staticmethod
-    def search_workorders(search_text, status, page, per_page, sort_by, order):
+    def search_workorders(search_text, status, page, per_page, sort_by, order, client_id=None):
         return WorkOrderRepository.search(
             search_text=search_text,
             status=status,
@@ -180,4 +180,5 @@ class WorkOrderService:
             per_page=per_page,
             sort_by=sort_by,
             order=order,
+            client_id=client_id,
         )
