@@ -49,7 +49,7 @@ class LoginService:
                 return {"message": "Your account has been deleted."}, 403
             case UserStatus.ACTIVE:
                 logger.info(f"User logged in: {user.id}")
-                token = encode_token(user.id)
+                token = encode_token(user.id, client_id=user.client_id)
                 return {
                     "status": "success",
                     "message": "Successfully Logged In",
