@@ -98,6 +98,20 @@ def role_required(*allowed_roles):
     return decorator
 
 
+def get_current_user_client_id(user_id):
+    """Return the client_id of the authenticated user, or None if the user has
+    no associated client. Use this to scope list/get queries to the caller's
+    tenant — every CLIENT-side resource (wells, work orders, invoices, ...)
+    must be filtered by this value.
+    """
+    from app.models.user import User
+
+    user = User.query.get(user_id)
+    if not user:
+        return None
+    return user.client_id
+
+
 def get_user_permissions(user):
     """Return aggregated permissions dict for a user.
     MASTER gets full access on all resources.

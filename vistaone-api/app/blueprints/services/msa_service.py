@@ -18,8 +18,8 @@ def ensure_upload_dir():
 class MsaService:
 
     @staticmethod
-    def get_all(vendor_id=None, status=None):
-        records = MsaRepository.get_all(vendor_id=vendor_id, status=status)
+    def get_all(vendor_id=None, status=None, client_id=None):
+        records = MsaRepository.get_all(vendor_id=vendor_id, status=status, client_id=client_id)
         results = []
         for m in records:
             data = msa_schema.dump(m)
@@ -29,8 +29,8 @@ class MsaService:
         return results, 200
 
     @staticmethod
-    def get_by_id(msa_id):
-        record = MsaRepository.get_by_id(msa_id)
+    def get_by_id(msa_id, client_id=None):
+        record = MsaRepository.get_by_id(msa_id, client_id=client_id)
         if not record:
             return {"message": "MSA not found"}, 404
         data = msa_schema.dump(record)
@@ -76,8 +76,8 @@ class MsaService:
         return data, 201
 
     @staticmethod
-    def update_msa(msa_id, body, user_id):
-        record = MsaRepository.get_by_id(msa_id)
+    def update_msa(msa_id, body, user_id, client_id=None):
+        record = MsaRepository.get_by_id(msa_id, client_id=client_id)
         if not record:
             return {"message": "MSA not found"}, 404
         for field in ["version", "effective_date", "expiration_date", "status"]:

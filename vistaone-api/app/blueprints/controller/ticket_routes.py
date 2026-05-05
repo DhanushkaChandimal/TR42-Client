@@ -2,7 +2,7 @@ from flask import request, jsonify, Blueprint
 from app.blueprints.schema.ticket_schema import ticket_schema, tickets_schema
 from app.blueprints.services.ticket_service import TicketService
 from marshmallow import ValidationError
-from app.utils.util import permission_required
+from app.utils.util import permission_required, get_current_user_client_id
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,11 +13,12 @@ ticket_bp = Blueprint("ticket_bp", __name__)
 @ticket_bp.route("/", methods=["GET"])
 @permission_required("workorders", "read")
 def get_all_tickets(current_user_id):
+    client_id = get_current_user_client_id(current_user_id)
     work_order_id = request.args.get("work_order_id")
     vendor_id = request.args.get("vendor_id")
     status = request.args.get("status")
     tickets = TicketService.get_all_tickets(
-        work_order_id=work_order_id, vendor_id=vendor_id, status=status
+        work_order_id=work_order_id, vendor_id=vendor_id, status=status, client_id=client_id
     )
     return tickets_schema.jsonify(tickets), 200
 
@@ -26,7 +27,8 @@ def get_all_tickets(current_user_id):
 @permission_required("workorders", "read")
 def get_ticket(current_user_id, ticket_id):
     try:
-        ticket = TicketService.get_ticket(ticket_id)
+        client_id = get_current_user_client_id(current_user_id)
+        ticket = TicketService.get_ticket(ticket_id, client_id=client_id)
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
         return jsonify({"error": "Ticket not found"}), 404
@@ -56,9 +58,10 @@ def update_ticket(current_user_id, ticket_id):
     if not json_data:
         return jsonify({"error": "No input data provided"}), 400
     try:
+        client_id = get_current_user_client_id(current_user_id)
         validated_data = ticket_schema.load(json_data, partial=True)
         ticket = TicketService.update_ticket(
-            ticket_id, validated_data, current_user_id
+            ticket_id, validated_data, current_user_id, client_id=client_id
         )
         return ticket_schema.jsonify(ticket), 200
     except ValidationError as err:
@@ -73,7 +76,8 @@ def update_ticket(current_user_id, ticket_id):
 @permission_required("workorders", "write")
 def approve_ticket(current_user_id, ticket_id):
     try:
-        ticket = TicketService.approve_ticket(ticket_id, current_user_id)
+        client_id = get_current_user_client_id(current_user_id)
+        ticket = TicketService.approve_ticket(ticket_id, current_user_id, client_id=client_id)
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
         return jsonify({"error": "Ticket not found"}), 404
@@ -86,7 +90,8 @@ def approve_ticket(current_user_id, ticket_id):
 @permission_required("workorders", "write")
 def reject_ticket(current_user_id, ticket_id):
     try:
-        ticket = TicketService.reject_ticket(ticket_id, current_user_id)
+        client_id = get_current_user_client_id(current_user_id)
+        ticket = TicketService.reject_ticket(ticket_id, current_user_id, client_id=client_id)
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
         return jsonify({"error": "Ticket not found"}), 404
@@ -99,7 +104,8 @@ def reject_ticket(current_user_id, ticket_id):
 @permission_required("workorders", "write")
 def set_pending_ticket(current_user_id, ticket_id):
     try:
-        ticket = TicketService.set_pending_ticket(ticket_id, current_user_id)
+        client_id = get_current_user_client_id(current_user_id)
+        ticket = TicketService.set_pending_ticket(ticket_id, current_user_id, client_id=client_id)
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
         return jsonify({"error": "Ticket not found"}), 404

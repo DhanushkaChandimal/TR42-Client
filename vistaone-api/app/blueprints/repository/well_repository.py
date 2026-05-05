@@ -6,17 +6,23 @@ from app.extensions import db
 
 class WellRepository:
     @staticmethod
-    def get_all():
-        return db.session.query(Well).all()
+    def get_all(client_id=None):
+        query = db.session.query(Well)
+        if client_id:
+            query = query.filter(Well.client_id == client_id)
+        return query.all()
 
     @staticmethod
-    def get_by_id(well_id: UUID | str):
+    def get_by_id(well_id: UUID | str, client_id=None):
         try:
             UUID(str(well_id))
         except ValueError:
             return None
 
-        return db.session.query(Well).filter_by(id=str(well_id)).first()
+        query = db.session.query(Well).filter_by(id=str(well_id))
+        if client_id:
+            query = query.filter(Well.client_id == client_id)
+        return query.first()
 
     @staticmethod
     def create(well: Well):
@@ -38,9 +44,9 @@ class WellRepository:
             raise
 
     @staticmethod
-    def delete(well_id: UUID | str):
+    def delete(well_id: UUID | str, client_id=None):
         try:
-            well = WellRepository.get_by_id(well_id)
+            well = WellRepository.get_by_id(well_id, client_id=client_id)
             if not well:
                 return False
 

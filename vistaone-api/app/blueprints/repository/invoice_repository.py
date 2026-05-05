@@ -23,8 +23,10 @@ class InvoiceRepository:
         return db.session.execute(query).scalars().all()
 
     @staticmethod
-    def get_by_id(invoice_id):
+    def get_by_id(invoice_id, client_id=None):
         query = select(Invoice).where(Invoice.id == invoice_id)
+        if client_id:
+            query = query.where(Invoice.client_id == client_id)
         return db.session.execute(query).scalars().first()
 
     @staticmethod

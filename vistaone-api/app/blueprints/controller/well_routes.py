@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app.blueprints.services.well_service import WellService
 from app.blueprints.schema.well_schema import well_schema, wells_schema
-from app.utils.util import permission_required
+from app.utils.util import permission_required, get_current_user_client_id
 
 well_bp = Blueprint("well_bp", __name__)
 
@@ -9,7 +9,8 @@ well_bp = Blueprint("well_bp", __name__)
 @well_bp.route("/", methods=["GET"])
 @permission_required("wells", "read")
 def get_wells(current_user_id):
-    wells = WellService.get_all_wells()
+    client_id = get_current_user_client_id(current_user_id)
+    wells = WellService.get_all_wells(client_id=client_id)
     return wells_schema.jsonify(wells), 200
 
 
@@ -17,7 +18,8 @@ def get_wells(current_user_id):
 @permission_required("wells", "read")
 def get_well(current_user_id, well_id):
     try:
-        well = WellService.get_well(well_id)
+        client_id = get_current_user_client_id(current_user_id)
+        well = WellService.get_well(well_id, client_id=client_id)
         return jsonify(well_schema.dump(well)), 200
     except ValueError:
         return jsonify({"message": "Well not found"}), 404
@@ -47,8 +49,9 @@ def create_well(current_user_id):
 @permission_required("wells", "write")
 def update_well(current_user_id, well_id):
     data = request.get_json()
+    client_id = get_current_user_client_id(current_user_id)
     try:
-        well = WellService.get_well(well_id)
+        well = WellService.get_well(well_id, client_id=client_id)
     except ValueError:
         return jsonify({"message": "Well not found"}), 404
     try:
@@ -71,7 +74,8 @@ def update_well(current_user_id, well_id):
 @permission_required("wells", "delete")
 def delete_well(current_user_id, well_id):
     try:
-        WellService.delete_well(well_id)
+        client_id = get_current_user_client_id(current_user_id)
+        WellService.delete_well(well_id, client_id=client_id)
         return jsonify({"message": "Well deleted"}), 200
     except ValueError:
         return jsonify({"message": "Well not found"}), 404
