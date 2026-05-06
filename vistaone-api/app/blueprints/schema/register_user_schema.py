@@ -1,5 +1,5 @@
 from app.extensions import ma
-from marshmallow import fields
+from marshmallow import fields, validates, ValidationError
 from app.blueprints.schema.address_schema import AddressSchema
 
 
@@ -7,6 +7,13 @@ class RegisterUserSchema(ma.Schema):
     email = fields.Email(required=True)
     password = fields.String(required=True, load_only=True)
     username = fields.String(required=True)
+
+    @validates("username")
+    def validate_username(self, value):
+        if "@" in value:
+            raise ValidationError("Username must not contain '@'.")
+        if len(value.strip()) < 3:
+            raise ValidationError("Username must be at least 3 characters.")
     first_name = fields.String(required=True)
     middle_name = fields.String()
     last_name = fields.String(required=True)
