@@ -859,209 +859,726 @@ def _write_line_items_sheet(ws_wb, invoices, vendors_by_id):
     _finalize_data_sheet(ws, header_row, cols, len(rows))
 
 
-# ---------------------------------------------------------------------------
-# Tickets workbook
-# ---------------------------------------------------------------------------
+
+# =====================================================================
+# Tickets workbook — executive rebuild
+# =====================================================================
+#
+# Tab order (Executive Summary first, set as active on save):
+#   1. Executive Summary       — KPIs, status mix, top vendors, watch list
+#   2. Tickets Data            — flat source with derived duration columns
+#   3. Vendor Scorecard        — per-vendor formulas vs flat
+#   4. Contractor Utilization  — per-contractor minutes worked + jobs
+#   5. Service Benchmarks      — per-service throughput + duration quartiles
+#   6. Duration Analysis       — overall quartiles + outliers
+#   7. Throughput by Hour      — created/approved counts by hour-of-day
+#   8. Data Quality            — coverage / null counts / duplicates
+#
+# All scalar KPIs and per-vendor metrics are Excel formulas pointing at
+# the flat tab so editing rows in place recalculates the whole book.
+
+T_FLAT_SHEET = "Tickets Data"
+T_REPORT_TITLE = "Tickets Report"
+T_HEADER_ROW = 4
 
 
 def build_tickets_workbook(start=None, end=None):
+    """Executive-quality tickets workbook."""
     wb = Workbook()
     wb.remove(wb.active)
 
     tickets = db.session.execute(select(Ticket)).scalars().all()
     if start or end:
         tickets = [t for t in tickets if _in_range(t.created_at, start, end)]
-    vendors_by_id = {
-        v.id: v for v in db.session.execute(select(Vendor)).scalars().all()
-    }
-    workorders_by_id = {
-        w.id: w for w in db.session.execute(select(WorkOrder)).scalars().all()
-    }
+    vendors_by_id = {v.id: v for v in db.session.execute(select(Vendor)).scalars().all()}
+    workorders_by_id = {w.id: w for w in db.session.execute(select(WorkOrder)).scalars().all()}
 
     period = _period_label(start, end)
-    _write_tickets_summary_sheet(wb, tickets, vendors_by_id, period)
-    _write_tickets_by_vendor_sheet(wb, tickets, vendors_by_id, workorders_by_id)
-    _write_tickets_flat_sheet(wb, tickets, vendors_by_id, workorders_by_id)
+
+    flat_last_row = _t_write_flat(wb, tickets, vendors_by_id, workorders_by_id)
+    _t_write_exec_summary(wb, tickets, vendors_by_id, period, flat_last_row)
+    _t_write_vendor_scorecard(wb, tickets, vendors_by_id, flat_last_row)
+    _t_write_contractor_utilization(wb, tickets)
+    _t_write_service_benchmarks(wb, tickets)
+    _t_write_duration_analysis(wb, tickets)
+    _t_write_throughput_by_hour(wb, tickets)
+    _t_write_data_quality(wb, tickets)
+
+    exec_idx = wb.sheetnames.index("Executive Summary")
+    if exec_idx != 0:
+        wb.move_sheet("Executive Summary", offset=-exec_idx)
+    wb.active = 0
+
+    exec_ws = wb["Executive Summary"]
+    exec_ws.sheet_view.zoomScale = 100
+    exec_ws.sheet_view.selection[0].activeCell = "A1"
+    exec_ws.sheet_view.selection[0].sqref = "A1"
+
+    for ws in wb.worksheets:
+        if ws.title == "Executive Summary":
+            ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+            _wo_print_setup(ws, period, ws.title, gridlines=False, report_title=T_REPORT_TITLE)
+        else:
+            ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+            _wo_print_setup(ws, period, ws.title, gridlines=True, report_title=T_REPORT_TITLE)
+
     return _to_workbook_bytes(wb)
 
 
-def _write_tickets_summary_sheet(ws_wb, tickets, vendors_by_id, period):
-    ws = ws_wb.create_sheet("Summary")
-    _write_title(ws, "Tickets Summary", f"Period: {period}  ·  {len(tickets)} ticket(s)")
+# ---------------------------------------------------------------------
+# Tickets Data (flat) — source of truth
+# ---------------------------------------------------------------------
 
-    # By status
-    by_status = defaultdict(int)
-    by_priority = defaultdict(int)
-    by_vendor = defaultdict(int)
-    for t in tickets:
-        by_status[_enum_value(t.status) or "UNKNOWN"] += 1
-        by_priority[_enum_value(t.priority) or "UNKNOWN"] += 1
-        by_vendor[t.vendor_id or "unknown"] += 1
-
-    row = 5
-    ws.cell(row=row, column=1, value="BY STATUS").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    cols = [("Status", 20, None), ("Count", 12, "#,##0")]
-    _apply_widths(ws, cols)
-    _write_header(ws, row, cols)
-    for status, count in sorted(by_status.items(), key=lambda kv: kv[1], reverse=True):
-        row += 1
-        _write_row(ws, row, cols, [status, count], status_col=0)
-
-    row += 3
-    ws.cell(row=row, column=1, value="BY PRIORITY").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    _write_header(ws, row, cols)
-    for priority, count in sorted(by_priority.items(), key=lambda kv: kv[1], reverse=True):
-        row += 1
-        _write_row(ws, row, cols, [priority, count])
-
-    row += 3
-    ws.cell(row=row, column=1, value="BY VENDOR").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    vcols = [("Vendor", 30, None), ("Count", 12, "#,##0")]
-    _apply_widths(ws, vcols)
-    _write_header(ws, row, vcols)
-    for vid, count in sorted(by_vendor.items(), key=lambda kv: kv[1], reverse=True):
-        v = vendors_by_id.get(vid)
-        row += 1
-        _write_row(ws, row, vcols, [_vendor_name(v), count])
-
-
-def _write_tickets_by_vendor_sheet(ws_wb, tickets, vendors_by_id, workorders_by_id):
-    ws = ws_wb.create_sheet("By Vendor")
-    _write_title(ws, "Tickets by Vendor", "Each vendor's tickets grouped together with a count subtotal.")
+def _t_write_flat(wb, tickets, vendors_by_id, workorders_by_id):
+    ws = wb.create_sheet(T_FLAT_SHEET)
+    note = (
+        "Source-of-truth flat list. Columns R-V are derived in-cell from "
+        "the timestamps to the left (durations in hours, time to approval, "
+        "on-time, open-flag)."
+    )
+    ws.cell(row=1, column=1, value="Tickets - source data").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
 
     cols = [
-        ("Ticket #", 12, None),
-        ("WO #", 10, "#,##0"),
-        ("Description", 40, None),
-        ("Status", 14, None),
-        ("Priority", 12, None),
-        ("Assigned Contractor", 24, None),
-        ("Due Date", 14, "yyyy-mm-dd"),
-        ("Approved", 14, "yyyy-mm-dd"),
-        ("Created", 14, "yyyy-mm-dd"),
+        ("WO #", 10, FMT_INT),
+        ("Vendor", 28, None),
+        ("Ticket ID", 12, None),
+        ("Description", 38, None),
+        ("Status", 18, None),
+        ("Priority", 10, None),
+        ("Service", 18, None),
+        ("Assigned Contractor", 22, None),
+        ("Start Time", 16, FMT_DATETIME),
+        ("End Time", 16, FMT_DATETIME),
+        ("Due Date", 12, FMT_DATE),
+        ("Created", 16, FMT_DATETIME),
+        ("Approved At", 16, FMT_DATETIME),
+        ("Rejected At", 16, FMT_DATETIME),
+        ("Est Quantity", 12, "#,##0.00"),
+        ("Unit", 8, None),
+        ("Anomaly?", 10, None),
+        ("Duration (hrs)", 14, FMT_HOURS),
+        ("Time to Approval (hrs)", 16, FMT_HOURS),
+        ("Time to Completion (hrs)", 18, FMT_HOURS),
+        ("On Time?", 10, None),
+        ("Open?", 8, None),
     ]
     _apply_widths(ws, cols)
 
-    by_vendor = defaultdict(list)
-    for t in tickets:
-        by_vendor[t.vendor_id or "unknown"].append(t)
-
-    row = 5
-    for vid in sorted(by_vendor.keys(), key=lambda x: _vendor_name(vendors_by_id.get(x))):
-        v = vendors_by_id.get(vid)
-        ts = sorted(by_vendor[vid], key=lambda t: t.created_at or datetime.min, reverse=True)
-
-        banner = ws.cell(row=row, column=1, value=_vendor_name(v))
-        banner.font = Font(bold=True, color="FFFFFF", size=12)
-        banner.fill = HEADER_FILL
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=len(cols))
-        row += 1
-
-        _write_header(ws, row, cols)
-        row += 1
-
-        for t in ts:
-            wo = workorders_by_id.get(t.work_order_id)
-            wo_code = getattr(wo, "work_order_code", None) if wo else None
-            _write_row(
-                ws,
-                row,
-                cols,
-                [
-                    t.id[:8],
-                    wo_code,
-                    t.description or "",
-                    _enum_value(t.status),
-                    _enum_value(t.priority),
-                    t.assigned_contractor or "",
-                    _naive(t.due_date),
-                    _naive(getattr(t, "approved_at", None)),
-                    _naive(t.created_at),
-                ],
-                status_col=3,
-            )
-            row += 1
-
-        sub = ws.cell(row=row, column=1, value=f"Vendor subtotal: {len(ts)} ticket(s)")
-        sub.font = SUBHEADER_FONT
-        sub.fill = SUBHEADER_FILL
-        sub.border = THIN_BORDER
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=len(cols))
-        row += 2
-
-    ws.freeze_panes = ws["A5"]
-
-
-def _write_tickets_flat_sheet(ws_wb, tickets, vendors_by_id, workorders_by_id):
-    ws = ws_wb.create_sheet("All Tickets (flat)")
-    _write_title(ws, "All Tickets", "Sortable, filterable list. Auto-filter on the header row.")
-
-    header_row = 5
-    cols = [
-        ("Vendor", 30, None),
-        ("Ticket #", 12, None),
-        ("WO #", 10, "#,##0"),
-        ("Description", 40, None),
-        ("Status", 14, None),
-        ("Priority", 12, None),
-        ("Assigned Contractor", 24, None),
-        ("Service Type", 18, None),
-        ("Due Date", 14, "yyyy-mm-dd"),
-        ("Start Time", 18, "yyyy-mm-dd hh:mm"),
-        ("End Time", 18, "yyyy-mm-dd hh:mm"),
-        ("Approved", 18, "yyyy-mm-dd hh:mm"),
-        ("Rejected", 18, "yyyy-mm-dd hh:mm"),
-        ("Created", 18, "yyyy-mm-dd hh:mm"),
-    ]
-    _apply_widths(ws, cols)
-    _write_header(ws, header_row, cols)
+    header_row = T_HEADER_ROW
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        cell.border = THIN_BORDER
 
     sorted_tickets = sorted(
         tickets,
-        key=lambda t: (
-            _vendor_name(vendors_by_id.get(t.vendor_id)),
-            -(t.created_at.timestamp() if t.created_at else 0),
-        ),
+        key=lambda t: -((t.created_at or datetime.min).timestamp() if t.created_at else 0),
     )
-    for i, t in enumerate(sorted_tickets, start=header_row + 1):
-        v = vendors_by_id.get(t.vendor_id)
-        wo = workorders_by_id.get(t.work_order_id)
+    for offset, t in enumerate(sorted_tickets):
+        row = header_row + 1 + offset
+        wo = workorders_by_id.get(t.work_order_id) if t.work_order_id else None
         wo_code = getattr(wo, "work_order_code", None) if wo else None
-        service = getattr(t.service, "service", None) if t.service else None
-        _write_row(
-            ws,
-            i,
-            cols,
-            [
-                _vendor_name(v),
-                t.id[:8],
-                wo_code,
-                t.description or "",
-                _enum_value(t.status),
-                _enum_value(t.priority),
-                t.assigned_contractor or "",
-                service or "",
-                _naive(t.due_date),
-                _naive(t.start_time),
-                _naive(t.end_time),
-                _naive(getattr(t, "approved_at", None)),
-                _naive(getattr(t, "rejected_at", None)),
-                _naive(t.created_at),
-            ],
-            status_col=4,
+        v = vendors_by_id.get(t.vendor_id) if t.vendor_id else None
+        service = t.service.service if getattr(t, "service", None) else None
+
+        # I = Start (col 9), J = End (col 10), K = Due (col 11),
+        # L = Created (col 12), M = Approved (col 13), E = Status (col 5)
+        duration = f'=IF(AND(I{row}<>"",J{row}<>""),(J{row}-I{row})*24,"")'
+        time_to_approval = f'=IF(AND(L{row}<>"",M{row}<>""),(M{row}-L{row})*24,"")'
+        time_to_completion = f'=IF(AND(L{row}<>"",J{row}<>""),(J{row}-L{row})*24,"")'
+        on_time = (
+            f'=IF(AND(J{row}<>"",K{row}<>""),'
+            f'IF(J{row}<=K{row},"Yes","No"),"")'
         )
-    _finalize_data_sheet(ws, header_row, cols, len(sorted_tickets))
+        open_flag = (
+            f'=IF(OR(E{row}="UNASSIGNED",E{row}="ASSIGNED",E{row}="IN_PROGRESS"),'
+            f'"Yes","No")'
+        )
+
+        values = [
+            wo_code,
+            _vendor_name(v),
+            t.id[:8] if t.id else "",
+            t.description or "",
+            _enum_value(getattr(t, "status", None)),
+            _enum_value(getattr(t, "priority", None)),
+            service or "",
+            getattr(t, "assigned_contractor", None) or "",
+            _naive(getattr(t, "start_time", None)),
+            _naive(getattr(t, "end_time", None)),
+            _naive(getattr(t, "due_date", None)),
+            _naive(t.created_at),
+            _naive(getattr(t, "approved_at", None)),
+            _naive(getattr(t, "rejected_at", None)),
+            float(getattr(t, "estimated_quantity", 0) or 0),
+            getattr(t, "unit", None) or "",
+            "Yes" if getattr(t, "anomaly_flag", False) else "No",
+            duration,
+            time_to_approval,
+            time_to_completion,
+            on_time,
+            open_flag,
+        ]
+
+        for c_idx, ((_, _w, fmt), value) in enumerate(zip(cols, values), start=1):
+            cell = ws.cell(row=row, column=c_idx, value=value)
+            if fmt:
+                cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_data_row = header_row + len(sorted_tickets)
+    last_col = len(cols)
+    last_col_letter = get_column_letter(last_col)
+
+    if sorted_tickets:
+        ws.auto_filter.ref = f"A{header_row}:{last_col_letter}{last_data_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        rng = f"E{header_row + 1}:E{last_data_row}"
+        for status, fill in (
+            ("APPROVED", WO_GREEN_FILL),
+            ("COMPLETED", WO_GREEN_FILL),
+            ("PENDING_APPROVAL", WO_AMBER_FILL),
+            ("IN_PROGRESS", WO_AMBER_FILL),
+            ("ASSIGNED", WO_AMBER_FILL),
+            ("UNASSIGNED", WO_SLATE_FILL),
+            ("REJECTED", WO_RED_FILL),
+        ):
+            ws.conditional_formatting.add(
+                rng, CellIsRule(operator="equal", formula=[f'"{status}"'], fill=fill)
+            )
+        _wo_data_bar(ws, "R", header_row + 1, last_data_row, color="334155")
+        _wo_data_bar(ws, "S", header_row + 1, last_data_row)
+        ws.conditional_formatting.add(
+            f"U{header_row + 1}:U{last_data_row}",
+            CellIsRule(operator="equal", formula=['"No"'], fill=WO_RED_FILL),
+        )
+
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, last_col_letter, max(last_data_row, header_row))
+    return last_data_row
 
 
-# ---------------------------------------------------------------------------
-# Work Orders workbook
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# Executive Summary
+# ---------------------------------------------------------------------
+
+def _t_write_exec_summary(wb, tickets, vendors_by_id, period, flat_last_row):
+    ws = wb.create_sheet("Executive Summary")
+    flat = _wo_quoted(T_FLAT_SHEET)
+    n = len(tickets)
+    a, b = T_HEADER_ROW + 1, flat_last_row
+
+    ws.merge_cells("A1:F1")
+    ws["A1"] = T_REPORT_TITLE
+    ws["A1"].font = WO_TITLE_FONT
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center")
+    ws["A2"] = f"Period: {period}    ·    {n:,} ticket(s)"
+    ws["A2"].font = WO_NOTE_FONT
+    ws["A3"] = f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    ws["A3"].font = WO_NOTE_FONT
+
+    kpi_row = 6
+    kpi_specs = [
+        ("Total tickets", f"=COUNTA({flat}!C{a}:C{b})", FMT_INT),
+        ("Average duration (hrs)",
+         f'=IFERROR(AVERAGE({flat}!R{a}:R{b}),0)', FMT_HOURS),
+        ("On-time completion rate",
+         f'=IFERROR(COUNTIF({flat}!U{a}:U{b},"Yes")'
+         f'/(COUNTIF({flat}!U{a}:U{b},"Yes")'
+         f'+COUNTIF({flat}!U{a}:U{b},"No")),0)', FMT_PCT),
+        ("Open tickets", f'=COUNTIF({flat}!V{a}:V{b},"Yes")', FMT_INT),
+        ("Average time to approval (hrs)",
+         f'=IFERROR(AVERAGE({flat}!S{a}:S{b}),0)', FMT_HOURS),
+        ("Pending approval count",
+         f'=COUNTIF({flat}!E{a}:E{b},"PENDING_APPROVAL")', FMT_INT),
+    ]
+    for idx, (label, formula, fmt) in enumerate(kpi_specs):
+        col = (idx % 3) * 2 + 1
+        row = kpi_row + (idx // 3) * 3
+        l = ws.cell(row=row, column=col, value=label); l.font = WO_KPI_LABEL_FONT
+        v = ws.cell(row=row + 1, column=col, value=formula)
+        v.font = WO_KPI_VALUE_FONT
+        v.number_format = fmt
+        for c in (l, v):
+            c.border = THIN_BORDER
+
+    for col_letter in ("A", "B", "C", "D", "E", "F"):
+        ws.column_dimensions[col_letter].width = 22
+
+    section_row = kpi_row + 7
+    ws.cell(row=section_row, column=1, value="STATUS BREAKDOWN").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    cols = [("Status", 22, None), ("Count", 12, FMT_INT), ("Share", 10, FMT_PCT)]
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD; h.fill = WO_HEADER_FILL
+    statuses = [
+        "UNASSIGNED", "ASSIGNED", "IN_PROGRESS",
+        "PENDING_APPROVAL", "APPROVED", "REJECTED", "COMPLETED",
+    ]
+    total_formula = f"COUNTA({flat}!E{a}:E{b})"
+    for i, status in enumerate(statuses):
+        r = section_row + 1 + i
+        ws.cell(row=r, column=1, value=status).font = WO_BODY_FONT
+        ws.cell(row=r, column=2,
+                value=f'=COUNTIF({flat}!E{a}:E{b},"{status}")').number_format = FMT_INT
+        ws.cell(row=r, column=3,
+                value=f'=IFERROR(COUNTIF({flat}!E{a}:E{b},"{status}")/{total_formula},0)'
+                ).number_format = FMT_PCT
+    status_last = section_row + len(statuses)
+
+    section_row = status_last + 3
+    ws.cell(row=section_row, column=1, value="TOP 5 VENDORS BY TICKET COUNT").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    for c_idx, label in enumerate(["Vendor", "Tickets", "Avg Duration (hrs)"], start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD; h.fill = WO_HEADER_FILL
+    by_vendor = defaultdict(lambda: {"count": 0, "name": "", "durations": []})
+    for t in tickets:
+        if not t.vendor_id:
+            continue
+        slot = by_vendor[t.vendor_id]
+        slot["count"] += 1
+        slot["name"] = _vendor_name(vendors_by_id.get(t.vendor_id))
+        st, et = getattr(t, "start_time", None), getattr(t, "end_time", None)
+        if st and et:
+            slot["durations"].append((et - st).total_seconds() / 3600.0)
+    top = sorted(by_vendor.values(), key=lambda x: x["count"], reverse=True)[:5]
+    for i, slot in enumerate(top):
+        r = section_row + 1 + i
+        avg_dur = sum(slot["durations"]) / len(slot["durations"]) if slot["durations"] else 0
+        ws.cell(row=r, column=1, value=slot["name"]).font = WO_BODY_FONT
+        ws.cell(row=r, column=2, value=slot["count"]).number_format = FMT_INT
+        ws.cell(row=r, column=3, value=avg_dur).number_format = FMT_HOURS
+    top_last = section_row + max(len(top), 1)
+
+    section_row = top_last + 3
+    ws.cell(row=section_row, column=1, value="WATCH LIST").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    for c_idx, label in enumerate(["Indicator", "Count"], start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD; h.fill = WO_HEADER_FILL
+    watch_specs = [
+        ("Open tickets (unassigned, assigned, in progress)",
+         f'=COUNTIF({flat}!V{a}:V{b},"Yes")'),
+        ("Pending approval", f'=COUNTIF({flat}!E{a}:E{b},"PENDING_APPROVAL")'),
+        ("Rejected tickets", f'=COUNTIF({flat}!E{a}:E{b},"REJECTED")'),
+        ("Late completions (On Time = No)",
+         f'=COUNTIF({flat}!U{a}:U{b},"No")'),
+        ("Anomaly-flagged tickets", f'=COUNTIF({flat}!Q{a}:Q{b},"Yes")'),
+    ]
+    for i, (label, formula) in enumerate(watch_specs):
+        r = section_row + 1 + i
+        ws.cell(row=r, column=1, value=label).font = WO_BODY_FONT
+        ws.cell(row=r, column=2, value=formula).number_format = FMT_INT
+
+
+# ---------------------------------------------------------------------
+# Vendor Scorecard
+# ---------------------------------------------------------------------
+
+def _t_write_vendor_scorecard(wb, tickets, vendors_by_id, flat_last_row):
+    ws = wb.create_sheet("Vendor Scorecard")
+    flat = _wo_quoted(T_FLAT_SHEET)
+    note = (
+        "Per-vendor performance vs the flat data tab. All metrics are formulas; "
+        "edit rows in 'Tickets Data' and this tab recalculates."
+    )
+    ws.cell(row=1, column=1, value="Vendor Scorecard").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Vendor", 30, None),
+        ("Tickets", 10, FMT_INT),
+        ("Avg Duration (hrs)", 16, FMT_HOURS),
+        ("Avg Time to Approval (hrs)", 18, FMT_HOURS),
+        ("Completed", 10, FMT_INT),
+        ("Completion Rate", 14, FMT_PCT),
+        ("Distinct Contractors", 14, FMT_INT),
+        ("Tickets per Contractor", 16, "#,##0.0"),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    by_vendor = defaultdict(lambda: {"name": "", "contractors": set()})
+    for t in tickets:
+        if not t.vendor_id:
+            continue
+        slot = by_vendor[t.vendor_id]
+        slot["name"] = _vendor_name(vendors_by_id.get(t.vendor_id))
+        c = (getattr(t, "assigned_contractor", None) or "").strip().lower()
+        if c:
+            slot["contractors"].add(c)
+
+    vendor_rows = sorted(by_vendor.values(), key=lambda x: x["name"])
+    a, b = T_HEADER_ROW + 1, flat_last_row
+    for i, slot in enumerate(vendor_rows):
+        r = header_row + 1 + i
+        v_ref = f"A{r}"
+        ws.cell(row=r, column=1, value=slot["name"]).font = WO_BODY_FONT
+        ws.cell(row=r, column=2,
+                value=f'=COUNTIF({flat}!B{a}:B{b},{v_ref})').number_format = FMT_INT
+        ws.cell(row=r, column=3,
+                value=f'=IFERROR(AVERAGEIFS({flat}!R{a}:R{b},{flat}!B{a}:B{b},{v_ref},{flat}!R{a}:R{b},">0"),0)'
+                ).number_format = FMT_HOURS
+        ws.cell(row=r, column=4,
+                value=f'=IFERROR(AVERAGEIFS({flat}!S{a}:S{b},{flat}!B{a}:B{b},{v_ref},{flat}!S{a}:S{b},">0"),0)'
+                ).number_format = FMT_HOURS
+        ws.cell(row=r, column=5,
+                value=f'=COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!E{a}:E{b},"COMPLETED")'
+                ).number_format = FMT_INT
+        ws.cell(row=r, column=6,
+                value=f'=IFERROR(COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!E{a}:E{b},"COMPLETED")/COUNTIF({flat}!B{a}:B{b},{v_ref}),0)'
+                ).number_format = FMT_PCT
+        ws.cell(row=r, column=7, value=len(slot["contractors"])).number_format = FMT_INT
+        ws.cell(row=r, column=8,
+                value=f'=IFERROR(B{r}/G{r},0)').number_format = "#,##0.0"
+        for c_idx in range(1, len(cols) + 1):
+            ws.cell(row=r, column=c_idx).border = THIN_BORDER
+
+    last_row = header_row + len(vendor_rows)
+    if vendor_rows:
+        ws.auto_filter.ref = f"A{header_row}:H{last_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        _wo_data_bar(ws, "B", header_row + 1, last_row)
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "H", max(last_row, header_row))
+
+
+# ---------------------------------------------------------------------
+# Contractor Utilization
+# ---------------------------------------------------------------------
+
+def _t_write_contractor_utilization(wb, tickets):
+    ws = wb.create_sheet("Contractor Utilization")
+    note = (
+        "Per contractor: tickets worked, total billable minutes "
+        "(end_time - start_time), average minutes per ticket. Tickets with "
+        "missing timestamps are counted but contribute zero minutes."
+    )
+    ws.cell(row=1, column=1, value="Contractor Utilization").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Contractor", 28, None),
+        ("Tickets", 10, FMT_INT),
+        ("Total Minutes", 14, "#,##0"),
+        ("Total Hours", 14, FMT_HOURS),
+        ("Avg Minutes/Ticket", 18, "#,##0.0"),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    by_c = defaultdict(lambda: {"count": 0, "minutes": 0.0})
+    for t in tickets:
+        c = (getattr(t, "assigned_contractor", None) or "").strip()
+        if not c:
+            continue
+        slot = by_c[c]
+        slot["count"] += 1
+        st, et = getattr(t, "start_time", None), getattr(t, "end_time", None)
+        if st and et:
+            slot["minutes"] += (et - st).total_seconds() / 60.0
+
+    rows = sorted(by_c.items(), key=lambda kv: kv[1]["minutes"], reverse=True)
+    for i, (name, slot) in enumerate(rows):
+        r = header_row + 1 + i
+        avg = (slot["minutes"] / slot["count"]) if slot["count"] else 0
+        ws.cell(row=r, column=1, value=name).font = WO_BODY_FONT
+        ws.cell(row=r, column=2, value=slot["count"]).number_format = FMT_INT
+        ws.cell(row=r, column=3, value=slot["minutes"]).number_format = "#,##0"
+        ws.cell(row=r, column=4, value=slot["minutes"] / 60.0).number_format = FMT_HOURS
+        ws.cell(row=r, column=5, value=avg).number_format = "#,##0.0"
+        for c_idx in range(1, len(cols) + 1):
+            ws.cell(row=r, column=c_idx).border = THIN_BORDER
+
+    last_row = header_row + len(rows)
+    if rows:
+        ws.auto_filter.ref = f"A{header_row}:E{last_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        _wo_data_bar(ws, "C", header_row + 1, last_row)
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "E", max(last_row, header_row))
+
+
+# ---------------------------------------------------------------------
+# Service Benchmarks
+# ---------------------------------------------------------------------
+
+def _t_durations_for(filter_fn, tickets):
+    out = []
+    for t in tickets:
+        if not filter_fn(t):
+            continue
+        s, e = getattr(t, "start_time", None), getattr(t, "end_time", None)
+        if s and e:
+            hrs = (e - s).total_seconds() / 3600.0
+            if hrs > 0:
+                out.append(hrs)
+    return out
+
+
+def _t_write_service_benchmarks(wb, tickets):
+    ws = wb.create_sheet("Service Benchmarks")
+    note = (
+        "Per service type ticket counts and duration quartiles. "
+        "Quartiles computed in Python from the snapshot."
+    )
+    ws.cell(row=1, column=1, value="Service Type Benchmarks").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Service", 24, None),
+        ("Count", 10, FMT_INT),
+        ("Avg Duration (hrs)", 16, FMT_HOURS),
+        ("Min", 8, FMT_HOURS),
+        ("p25", 8, FMT_HOURS),
+        ("Median", 10, FMT_HOURS),
+        ("p75", 8, FMT_HOURS),
+        ("p90", 8, FMT_HOURS),
+        ("Max", 10, FMT_HOURS),
+        ("Outliers (>2x median)", 16, FMT_INT),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    services = sorted(
+        {(t.service.service if getattr(t, "service", None) else "(no service)")
+         for t in tickets}
+    )
+    row = header_row
+    for svc in services:
+        row += 1
+        same = [t for t in tickets
+                if (getattr(t.service, "service", None) if getattr(t, "service", None) else "(no service)") == svc]
+        durs = _t_durations_for(
+            lambda t, _svc=svc: ((getattr(t.service, "service", None) if getattr(t, "service", None) else "(no service)") == _svc),
+            tickets,
+        )
+        avg = sum(durs) / len(durs) if durs else 0
+        mn, p25, med, p75, p90, mx = _quartiles(durs)
+        outliers = sum(1 for d in durs if med and d > 2 * med)
+        values = [svc, len(same), avg, mn, p25, med, p75, p90, mx, outliers]
+        for c_idx, ((_, _w, fmt), val) in enumerate(zip(cols, values), start=1):
+            cell = ws.cell(row=row, column=c_idx, value=val)
+            if fmt:
+                cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_row = row
+    if services:
+        ws.auto_filter.ref = f"A{header_row}:J{last_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        _wo_data_bar(ws, "F", header_row + 1, last_row, color="334155")
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "J", max(last_row, header_row))
+
+
+# ---------------------------------------------------------------------
+# Duration Analysis
+# ---------------------------------------------------------------------
+
+def _t_write_duration_analysis(wb, tickets):
+    ws = wb.create_sheet("Duration Analysis")
+    note = (
+        "Overall duration distribution across all tickets with both "
+        "start_time and end_time. Outliers are jobs longer than 2x median."
+    )
+    ws.cell(row=1, column=1, value="Duration Analysis").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    durs = _t_durations_for(lambda t: True, tickets)
+    mn, p25, med, p75, p90, mx = _quartiles(durs)
+    avg = sum(durs) / len(durs) if durs else 0
+    excluded = len(tickets) - len(durs)
+
+    rows = [
+        ("Tickets included (have start + end)", len(durs), FMT_INT),
+        ("Tickets excluded (open or never started)", excluded, FMT_INT),
+        ("Average duration (hrs)", avg, FMT_HOURS),
+        ("Min", mn, FMT_HOURS),
+        ("p25", p25, FMT_HOURS),
+        ("Median", med, FMT_HOURS),
+        ("p75", p75, FMT_HOURS),
+        ("p90", p90, FMT_HOURS),
+        ("Max", mx, FMT_HOURS),
+        ("Outliers (>2x median)", sum(1 for d in durs if med and d > 2 * med), FMT_INT),
+    ]
+    for c_idx, (label, val, fmt) in enumerate(rows):
+        r = 5 + c_idx
+        ws.cell(row=r, column=1, value=label).font = WO_BODY_FONT
+        v = ws.cell(row=r, column=2, value=val)
+        v.font = WO_KPI_VALUE_FONT
+        v.number_format = fmt
+    ws.column_dimensions["A"].width = 44
+    ws.column_dimensions["B"].width = 18
+    ws.print_title_rows = "1:4"
+    _wo_set_print_area(ws, "B", 4 + len(rows))
+
+
+# ---------------------------------------------------------------------
+# Throughput by Hour
+# ---------------------------------------------------------------------
+
+def _t_write_throughput_by_hour(wb, tickets):
+    ws = wb.create_sheet("Throughput by Hour")
+    note = (
+        "Created and approved counts per hour-of-day. Throughput = "
+        "jobs / unit time."
+    )
+    ws.cell(row=1, column=1, value="Throughput by Hour-of-Day").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Hour (UTC)", 10, "00"),
+        ("Created", 10, FMT_INT),
+        ("Approved", 10, FMT_INT),
+        ("Per-minute (created)", 14, "0.000"),
+        ("Per-30min (created)", 14, "0.00"),
+        ("Per-hour (created)", 14, "0.00"),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    created_by_h = defaultdict(int)
+    approved_by_h = defaultdict(int)
+    for t in tickets:
+        if t.created_at:
+            created_by_h[t.created_at.hour] += 1
+        a_at = getattr(t, "approved_at", None)
+        if a_at:
+            approved_by_h[a_at.hour] += 1
+
+    for h in range(24):
+        r = header_row + 1 + h
+        c_count = created_by_h.get(h, 0)
+        cells = [
+            (1, h, "00"),
+            (2, c_count, FMT_INT),
+            (3, approved_by_h.get(h, 0), FMT_INT),
+            (4, c_count / 60.0, "0.000"),
+            (5, c_count / 2.0, "0.00"),
+            (6, float(c_count), "0.00"),
+        ]
+        for col, val, fmt in cells:
+            cell = ws.cell(row=r, column=col, value=val)
+            cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_row = header_row + 24
+    ws.auto_filter.ref = f"A{header_row}:F{last_row}"
+    ws.freeze_panes = ws[f"A{header_row + 1}"]
+    _wo_data_bar(ws, "B", header_row + 1, last_row)
+    _wo_data_bar(ws, "C", header_row + 1, last_row, color="64748B")
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "F", last_row)
+
+
+# ---------------------------------------------------------------------
+# Data Quality
+# ---------------------------------------------------------------------
+
+def _t_write_data_quality(wb, tickets):
+    ws = wb.create_sheet("Data Quality")
+    note = "Coverage and completeness of the ticket source data."
+    ws.cell(row=1, column=1, value="Data Quality").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    n = len(tickets)
+    miss_start = sum(1 for t in tickets if not getattr(t, "start_time", None))
+    miss_end = sum(1 for t in tickets if not getattr(t, "end_time", None))
+    miss_due = sum(1 for t in tickets if not getattr(t, "due_date", None))
+    miss_vendor = sum(1 for t in tickets if not t.vendor_id)
+    miss_contractor = sum(1 for t in tickets if not getattr(t, "assigned_contractor", None))
+
+    seen = set()
+    dup_ids = 0
+    for t in tickets:
+        if t.id is None:
+            continue
+        if t.id in seen:
+            dup_ids += 1
+        else:
+            seen.add(t.id)
+
+    rows = [
+        ("Total ticket rows", n, FMT_INT),
+        ("Missing Start Time", miss_start, FMT_INT),
+        ("Missing End Time", miss_end, FMT_INT),
+        ("Missing Due Date", miss_due, FMT_INT),
+        ("Missing Vendor", miss_vendor, FMT_INT),
+        ("Missing Assigned Contractor", miss_contractor, FMT_INT),
+        ("Duplicate ticket ids", dup_ids, FMT_INT),
+        ("% missing start_time", (miss_start / n) if n else 0, FMT_PCT),
+        ("% missing end_time", (miss_end / n) if n else 0, FMT_PCT),
+    ]
+    for i, (label, val, fmt) in enumerate(rows):
+        r = 5 + i
+        ws.cell(row=r, column=1, value=label).font = WO_BODY_FONT
+        cell = ws.cell(row=r, column=2, value=val)
+        cell.number_format = fmt
+        cell.font = WO_KPI_VALUE_FONT
+    ws.column_dimensions["A"].width = 40
+    ws.column_dimensions["B"].width = 16
+    ws.print_title_rows = "1:4"
+    _wo_set_print_area(ws, "B", 4 + len(rows))
 
 
 # =====================================================================
@@ -1134,7 +1651,7 @@ def _wo_quoted(name):
     return f"'{name}'"
 
 
-def _wo_print_setup(ws, period, tab_name, gridlines=True):
+def _wo_print_setup(ws, period, tab_name, gridlines=True, report_title=None):
     """Apply the workbook-wide print spec to a single tab."""
     # Letter size + landscape if wide tab; orientation set by caller via
     # ws.page_setup.orientation before calling. Default landscape.
@@ -1150,7 +1667,7 @@ def _wo_print_setup(ws, period, tab_name, gridlines=True):
     ws.print_options.gridLines = gridlines
     ws.print_options.gridLinesSet = gridlines
     ws.print_options.horizontalCentered = True
-    ws.oddHeader.left.text = WO_REPORT_TITLE
+    ws.oddHeader.left.text = report_title or WO_REPORT_TITLE
     ws.oddHeader.left.size = 9
     ws.oddHeader.center.text = tab_name
     ws.oddHeader.center.size = 9
