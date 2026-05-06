@@ -269,13 +269,14 @@ class ChatService:
 
     @staticmethod
     def list_contacts(current_user_id):
-        """Return chat partners who are associated with at least one
-        WO / ticket / invoice. Sorted by most recent message first.
+        """Return every user the current user has an existing chat with.
+        Sorted by most recent message first.
 
-        A user counts as "associated" if they:
-          - appear in vendor_user (so they belong to a vendor that has WOs), or
-          - have a name that matches a ticket.assigned_contractor (so they
-            are working on a WO via tickets).
+        Earlier this method also required the partner to appear in
+        vendor_user or match a ticket.assigned_contractor name. That gate
+        hid CLIENT-to-CLIENT chats (and any partner not yet enrolled as a
+        vendor user), leaving the inbox empty even when chats existed.
+        Having a chat row is the source of truth.
         """
         chats = ChatRepository.list_for_user(current_user_id)
         if not chats:
@@ -296,9 +297,7 @@ class ChatService:
         )
         users_by_id = {u.id: u for u in users}
 
-        associated = set()
         vendor_user_role_by_user = {}
-
         vu_rows = db.session.execute(
             select(VendorUser).where(
                 and_(
@@ -308,31 +307,10 @@ class ChatService:
             )
         ).scalars().all()
         for vu in vu_rows:
-            associated.add(vu.user_id)
             vendor_user_role_by_user[vu.user_id] = vu.vendor_user_role
-
-        full_names = {}
-        for u in users:
-            n = _full_name(u).strip().lower()
-            if n:
-                full_names[u.id] = n
-        if full_names:
-            ticket_names = db.session.execute(
-                select(Ticket.assigned_contractor).where(
-                    Ticket.assigned_contractor.isnot(None)
-                )
-            ).scalars().all()
-            normalized = {
-                (n or "").strip().lower() for n in ticket_names if n and n.strip()
-            }
-            for uid, name in full_names.items():
-                if name in normalized:
-                    associated.add(uid)
 
         out = []
         for uid in other_ids:
-            if uid not in associated:
-                continue
             u = users_by_id.get(uid)
             last_msg = (
                 db.session.execute(
