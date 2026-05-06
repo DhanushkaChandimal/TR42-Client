@@ -609,6 +609,43 @@
   cursor: not-allowed;
 }
 
+.ticket-detail-reject-form {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  border-radius: 8px;
+}
+
+.ticket-detail-reject-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #991b1b;
+  margin-bottom: 6px;
+}
+
+.ticket-detail-reject-textarea {
+  width: 100%;
+  resize: vertical;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  font-family: inherit;
+}
+
+.ticket-detail-reject-textarea:focus {
+  outline: none;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.ticket-detail-reject-form .ticket-detail-actions {
+  margin-top: 10px;
+}
+
 .ticket-detail-note {
   margin: 0;
   padding: 10px 12px;
