@@ -14,6 +14,37 @@ def get_wells(current_user_id):
     return wells_schema.jsonify(wells), 200
 
 
+@well_bp.route("/search", methods=["GET"])
+@permission_required("wells", "read")
+def search_wells(current_user_id):
+    try:
+        search_text = request.args.get("q", "")
+        status = request.args.get("status") or None
+        if status == "ALL":
+            status = None
+        page = int(request.args.get("page", 1))
+        per_page = int(request.args.get("per_page", 10))
+        sort_by = request.args.get("sort_by", "created_at")
+        order = request.args.get("order", "desc")
+
+        client_id = get_current_user_client_id()
+        result = WellService.search_wells(
+            search_text, status, page, per_page, sort_by, order, client_id=client_id
+        )
+        return (
+            jsonify({
+                "total": result.total,
+                "count": len(result.items),
+                "page": result.page,
+                "pages": result.pages,
+                "data": wells_schema.dump(result.items),
+            }),
+            200,
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @well_bp.route("/<well_id>", methods=["GET"])
 @permission_required("wells", "read")
 def get_well(current_user_id, well_id):

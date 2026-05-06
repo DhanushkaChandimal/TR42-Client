@@ -12,6 +12,7 @@ from .ticket_routes import ticket_bp
 from .ai_routes import ai_bp
 from .chat_routes import chat_bp
 from .export_routes import export_bp
+from .dashboard_routes import dashboard_bp
 
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     "ai_bp",
     "chat_bp",
     "export_bp",
+    "dashboard_bp",
 ]

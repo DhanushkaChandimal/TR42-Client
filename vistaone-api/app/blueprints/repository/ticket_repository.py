@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, or_, cast, String, desc, asc
 from sqlalchemy.orm import joinedload, selectinload
 from app.extensions import db
 from app.models.ticket import Ticket
@@ -78,3 +78,44 @@ class TicketRepository:
             db.session.rollback()
             logger.error(f"Error updating ticket: {str(e)}")
             raise e
+
+    @staticmethod
+    def search(
+        search_text=None,
+        status=None,
+        page=1,
+        per_page=10,
+        sort_by="created_at",
+        order="desc",
+        client_id=None,
+        work_order_id=None,
+    ):
+        try:
+            query = Ticket.query.options(
+                joinedload(Ticket.vendor),
+                joinedload(Ticket.work_order),
+            )
+            if client_id:
+                query = query.join(WorkOrder, Ticket.work_order_id == WorkOrder.id).filter(
+                    WorkOrder.client_id == client_id
+                )
+            if work_order_id:
+                query = query.filter(Ticket.work_order_id == work_order_id)
+            if status:
+                query = query.filter(Ticket.status == status)
+            if search_text:
+                for word in search_text.lower().split():
+                    pattern = f"%{word}%"
+                    query = query.filter(
+                        or_(
+                            Ticket.description.ilike(pattern),
+                            cast(Ticket.status, String).ilike(pattern),
+                            cast(Ticket.priority, String).ilike(pattern),
+                            Ticket.assigned_contractor.ilike(pattern),
+                        )
+                    )
+            sort_column = getattr(Ticket, sort_by, Ticket.created_at)
+            query = query.order_by(desc(sort_column) if order.lower() == "desc" else asc(sort_column))
+            return query.paginate(page=page, per_page=per_page, error_out=False)
+        except Exception as e:
+            raise Exception(f"Error during ticket search: {str(e)}")

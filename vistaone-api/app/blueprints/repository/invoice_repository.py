@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, or_, cast, String, desc, asc
 from app.extensions import db
 from app.models.invoice import Invoice
 from app.models.line_item import LineItem
@@ -51,6 +51,43 @@ class InvoiceRepository:
             db.session.rollback()
             logger.error(f"Error updating invoice: {str(e)}")
             raise e
+
+    @staticmethod
+    def search(
+        search_text=None,
+        status=None,
+        page=1,
+        per_page=10,
+        sort_by="created_at",
+        order="desc",
+        client_id=None,
+        work_order_id=None,
+    ):
+        try:
+            query = Invoice.query
+            if client_id:
+                query = query.filter(Invoice.client_id == client_id)
+            if work_order_id:
+                query = query.filter(Invoice.work_order_id == work_order_id)
+            if status:
+                query = query.filter(Invoice.invoice_status == status)
+            if search_text:
+                for word in search_text.lower().split():
+                    pattern = f"%{word}%"
+                    query = query.filter(
+                        or_(
+                            cast(Invoice.invoice_status, String).ilike(pattern),
+                            cast(Invoice.total_amount, String).ilike(pattern),
+                            Invoice.id.ilike(pattern),
+                            Invoice.vendor_id.ilike(pattern),
+                            Invoice.work_order_id.ilike(pattern),
+                        )
+                    )
+            sort_column = getattr(Invoice, sort_by, Invoice.created_at)
+            query = query.order_by(desc(sort_column) if order.lower() == "desc" else asc(sort_column))
+            return query.paginate(page=page, per_page=per_page, error_out=False)
+        except Exception as e:
+            raise Exception(f"Error during invoice search: {str(e)}")
 
     @staticmethod
     def create_line_item(line_item):

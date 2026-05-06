@@ -8,6 +8,20 @@ async function parseError(res, fallback) {
 }
 
 export const invoiceService = {
+  search: async ({ q = '', status = '', work_order_id = '', page = 1, per_page = 10, sort_by = 'created_at', order = 'desc' } = {}) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (status) params.set('status', status);
+    if (work_order_id) params.set('work_order_id', work_order_id);
+    params.set('page', String(page));
+    params.set('per_page', String(per_page));
+    params.set('sort_by', sort_by);
+    params.set('order', order);
+    const response = await authFetch(`${INVOICE_ENDPOINT}/search?${params.toString()}`, { method: 'GET' });
+    if (!response.ok) await parseError(response, 'Failed to search invoices');
+    return await response.json();
+  },
+
   getAll: async (params = {}) => {
     const query = new URLSearchParams();
     if (params.vendor_id) query.append("vendor_id", params.vendor_id);

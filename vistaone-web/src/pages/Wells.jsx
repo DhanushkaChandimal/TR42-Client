@@ -1,18 +1,32 @@
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useState } from "react";
 import AppShell from "../components/AppShell";
 import CreateOrEditWellModal from "../components/CreateOrEditWellModal";
-import { useWell } from "../hooks/useWell";
+import Pagination from "../components/Pagination";
+import { usePaginatedList } from "../hooks/usePaginatedList";
+import { searchWells, createWell, updateWell } from "../services/wellService";
 import "../styles/workorder.css";
 
 export default function Wells() {
   const [showModal, setShowModal] = useState(false);
   const [editWell, setEditWell] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const { wells, loading, fetchWells, createWell, updateWell } = useWell();
 
-  useEffect(() => {
-    fetchWells();
-  }, [fetchWells]);
+  const fetcher = useCallback(
+    (page, perPage) => searchWells({ q: searchTerm.trim(), page, per_page: perPage }),
+    [searchTerm],
+  );
+
+  const {
+    items: wells,
+    total,
+    pages,
+    page,
+    perPage,
+    loading,
+    setPage,
+    setPerPage,
+    refresh,
+  } = usePaginatedList(fetcher);
 
   const handleSubmitWell = async (wellData) => {
     if (editWell) {
@@ -22,23 +36,26 @@ export default function Wells() {
     }
     setShowModal(false);
     setEditWell(null);
+    refresh();
   };
-
-  const filteredWells = useMemo(() => {
-    const normalized = searchTerm.trim().toLowerCase();
-    return wells.filter(
-      (well) =>
-        well.well_name?.toLowerCase().includes(normalized) ||
-        well.api_number?.toLowerCase().includes(normalized),
-    );
-  }, [wells, searchTerm]);
 
   return (
     <AppShell
       title="Oil Wells"
       subtitle="Manage oil well details"
-      loading={loading}
+      loading={loading && wells.length === 0}
       loadingText="Loading wells..."
+      controls={
+        <button
+          className="workorders-create-btn"
+          onClick={() => {
+            setEditWell(null);
+            setShowModal(true);
+          }}
+        >
+          + Add Well
+        </button>
+      }
     >
       <section className="workorders-controls">
         <input
@@ -49,30 +66,10 @@ export default function Wells() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </section>
-      <button
-        className="fab-create-workorder"
-        onClick={() => {
-          setEditWell(null);
-          setShowModal(true);
-        }}
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle cx="12" cy="12" r="12" fill="#007bff" />
-          <rect x="11" y="6" width="2" height="12" rx="1" fill="#fff" />
-          <rect x="6" y="11" width="12" height="2" rx="1" fill="#fff" />
-        </svg>
-        <span className="fab-label">Add Well</span>
-      </button>
       <section className="workorders-table-wrap">
-        {loading ? (
+        {loading && wells.length === 0 ? (
           <div className="workorders-state">Loading wells...</div>
-        ) : filteredWells.length === 0 ? (
+        ) : wells.length === 0 ? (
           <div className="workorders-state">No wells found</div>
         ) : (
           <table className="workorders-table">
@@ -86,7 +83,7 @@ export default function Wells() {
               </tr>
             </thead>
             <tbody>
-              {filteredWells.map((well) => (
+              {wells.map((well) => (
                 <tr
                   key={well.id}
                   style={{ cursor: "pointer" }}
@@ -105,10 +102,25 @@ export default function Wells() {
             </tbody>
           </table>
         )}
+        <Pagination
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={(n) => {
+            setPerPage(n);
+            setPage(1);
+          }}
+          disabled={loading}
+        />
       </section>
       {showModal && (
         <CreateOrEditWellModal
-          setShowModal={setShowModal}
+          setShowModal={(open) => {
+            if (!open) setEditWell(null);
+            setShowModal(open);
+          }}
           onSubmit={handleSubmitWell}
           initialData={editWell}
           mode={editWell ? "edit" : "create"}

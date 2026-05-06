@@ -3,8 +3,6 @@ import { Link } from "react-router-dom";
 import { invoiceService } from "../../../services/invoiceService";
 import { formatCurrency, formatDate, statusClass } from "../widgetUtils";
 
-const PENDING_STATUSES = ["pending", "submitted", "in_review"];
-
 export default function InvoicesPendingWidget() {
     const [state, setState] = useState({
         loading: true,
@@ -15,22 +13,15 @@ export default function InvoicesPendingWidget() {
     useEffect(() => {
         let cancelled = false;
         invoiceService
-            .getAll()
-            .then((rows) => {
+            .search({
+                status: "SUBMITTED",
+                per_page: 6,
+                sort_by: "invoice_date",
+                order: "desc",
+            })
+            .then((res) => {
                 if (cancelled) return;
-                const pending = (rows || [])
-                    .filter((r) =>
-                        PENDING_STATUSES.includes(
-                            String(r.invoice_status || "").toLowerCase(),
-                        ),
-                    )
-                    .sort(
-                        (a, b) =>
-                            new Date(b.invoice_date || 0) -
-                            new Date(a.invoice_date || 0),
-                    )
-                    .slice(0, 6);
-                setState({ loading: false, error: null, items: pending });
+                setState({ loading: false, error: null, items: res?.data || [] });
             })
             .catch((err) => {
                 if (cancelled) return;
@@ -59,7 +50,7 @@ export default function InvoicesPendingWidget() {
                     <li key={inv.id} className="widget-list__row">
                         <div className="widget-list__primary">
                             <span className="widget-list__name">
-                                {inv.vendor?.name || "Vendor"}
+                                {inv.vendor?.company_name || inv.vendor?.name || "Vendor"}
                             </span>
                             <span className="widget-list__meta">
                                 Due {formatDate(inv.due_date)}

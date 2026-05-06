@@ -23,6 +23,39 @@ def get_all_tickets(current_user_id):
     return tickets_schema.jsonify(tickets), 200
 
 
+@ticket_bp.route("/search", methods=["GET"])
+@permission_required("workorders", "read")
+def search_tickets(current_user_id):
+    try:
+        search_text = request.args.get("q", "")
+        status = request.args.get("status") or None
+        if status == "ALL":
+            status = None
+        work_order_id = request.args.get("work_order_id") or None
+        page = int(request.args.get("page", 1))
+        per_page = int(request.args.get("per_page", 10))
+        sort_by = request.args.get("sort_by", "created_at")
+        order = request.args.get("order", "desc")
+
+        client_id = get_current_user_client_id()
+        result = TicketService.search_tickets(
+            search_text, status, page, per_page, sort_by, order,
+            client_id=client_id, work_order_id=work_order_id,
+        )
+        return (
+            jsonify({
+                "total": result.total,
+                "count": len(result.items),
+                "page": result.page,
+                "pages": result.pages,
+                "data": tickets_schema.dump(result.items),
+            }),
+            200,
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @ticket_bp.route("/<string:ticket_id>", methods=["GET"])
 @permission_required("workorders", "read")
 def get_ticket(current_user_id, ticket_id):

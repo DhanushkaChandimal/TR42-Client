@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import stateData from "../assets/state_codes.json";
 import MapPicker from "./MapPicker";
 
@@ -125,7 +126,7 @@ export default function CreateOrEditWellModal({
     setLoading(false);
   };
 
-  return (
+  return createPortal(
     <div
       className="workorders-modal-overlay"
       onClick={() => setShowModal(false)}
@@ -245,6 +246,7 @@ export default function CreateOrEditWellModal({
           </button>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -13,18 +13,10 @@ export default function WorkOrdersRecentWidget() {
     useEffect(() => {
         let cancelled = false;
         workOrderService
-            .getAll()
-            .then((rows) => {
+            .search({ per_page: 6, sort_by: "created_at", order: "desc" })
+            .then((res) => {
                 if (cancelled) return;
-                const recent = (rows || [])
-                    .slice()
-                    .sort(
-                        (a, b) =>
-                            new Date(b.created_at || 0) -
-                            new Date(a.created_at || 0),
-                    )
-                    .slice(0, 6);
-                setState({ loading: false, error: null, items: recent });
+                setState({ loading: false, error: null, items: res?.data || [] });
             })
             .catch((err) => {
                 if (cancelled) return;
@@ -57,7 +49,7 @@ export default function WorkOrdersRecentWidget() {
                                 {wo.description || wo.work_order_code || "Work order"}
                             </span>
                             <span className="widget-list__meta">
-                                {wo.vendor?.name || "—"} ·{" "}
+                                {wo.vendor?.company_name || wo.vendor?.name || "—"} ·{" "}
                                 {formatDate(wo.created_at)}
                             </span>
                         </div>

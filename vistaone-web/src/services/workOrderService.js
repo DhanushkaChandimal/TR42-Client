@@ -15,6 +15,19 @@ export const workOrderService = {
     return await response.json();
   },
 
+  search: async ({ q = '', status = '', page = 1, per_page = 10, sort_by = 'created_at', order = 'desc' } = {}) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (status) params.set('status', status);
+    params.set('page', String(page));
+    params.set('per_page', String(per_page));
+    params.set('sort_by', sort_by);
+    params.set('order', order);
+    const response = await authFetch(`${WORKORDER_ENDPOINT}/search?${params.toString()}`, { method: 'GET' });
+    if (!response.ok) await parseError(response, 'Failed to search work orders');
+    return await response.json();
+  },
+
   getById: async (id) => {
     const response = await authFetch(`${WORKORDER_ENDPOINT}/${id}`, { method: 'GET' });
     if (!response.ok) await parseError(response, 'Failed to fetch work order');

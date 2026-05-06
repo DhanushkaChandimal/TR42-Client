@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
+import Pagination from "../components/Pagination";
 import TicketDetailModal from "../components/TicketDetailModal";
 import { exportService } from "../services/exportService";
 import { ticketService } from "../services/ticketService";
 import { workOrderService } from "../services/workOrderService";
+import { usePaginatedList } from "../hooks/usePaginatedList";
 import "../styles/tickets.css";
 
 const STATUS_OPTIONS = [
@@ -220,34 +222,43 @@ function formatCurrency(n) {
 }
 
 export default function Tickets() {
-  const [tickets, setTickets] = useState([]);
   const [workOrders, setWorkOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("due_asc");
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
+  const fetcher = useCallback(
+    (page, perPage) => ticketService.search({
+      q: searchTerm.trim(),
+      status: statusFilter === "ALL" ? "" : statusFilter,
+      page,
+      per_page: perPage,
+    }),
+    [searchTerm, statusFilter],
+  );
+
+  const {
+    items: tickets,
+    total,
+    pages,
+    page,
+    perPage,
+    loading,
+    setPage,
+    setPerPage,
+    refresh,
+  } = usePaginatedList(fetcher);
+
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      try {
-        const [ticketData, woData] = await Promise.all([
-          ticketService.getAll(),
-          workOrderService.getAll().catch(() => []),
-        ]);
-        if (cancelled) return;
-        setTickets(ticketData);
-        setWorkOrders(Array.isArray(woData) ? woData : []);
-      } catch (err) {
-        if (!cancelled) setError(err.message || "Failed to load tickets");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
+    workOrderService
+      .getAll()
+      .then((data) => {
+        if (!cancelled) setWorkOrders(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -326,7 +337,6 @@ export default function Tickets() {
       loadingText="Loading tickets..."
       controls={<ExportButton withDateRange onExport={exportService.tickets} />}
     >
-      {error && <div className="tickets-error">{error}</div>}
 
       <section className="tickets-controls">
         <input
@@ -473,17 +483,25 @@ export default function Tickets() {
             </tbody>
           </table>
         )}
+        <Pagination
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={(n) => {
+            setPerPage(n);
+            setPage(1);
+          }}
+          disabled={loading}
+        />
       </section>
 
       {selectedTicketId && (
         <TicketDetailModal
           ticketId={selectedTicketId}
           onClose={() => setSelectedTicketId(null)}
-          onStatusChange={(updated) => {
-            setTickets((prev) =>
-              prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
-            );
-          }}
+          onStatusChange={refresh}
         />
       )}
     </AppShell>
