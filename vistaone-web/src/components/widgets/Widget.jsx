@@ -159,11 +159,14 @@ export default function Widget({
 
 export function WidgetPickerModal({
     currentType,
+    usedTypes = [],
     onPick,
     onClose,
     title = "Add widget",
 }) {
-    const options = widgetTypeOptions();
+    const options = widgetTypeOptions().filter(
+        (opt) => opt.type === currentType || !usedTypes.includes(opt.type)
+    );
     const grouped = options.reduce((acc, opt) => {
         (acc[opt.category] = acc[opt.category] || []).push(opt);
         return acc;
@@ -193,42 +196,48 @@ export function WidgetPickerModal({
                     </button>
                 </header>
                 <div className="widget-picker__body">
-                    {Object.entries(grouped).map(([category, items]) => (
-                        <section
-                            key={category}
-                            className="widget-picker__group"
-                        >
-                            <h3 className="widget-picker__group-title">
-                                {category}
-                            </h3>
-                            <div className="widget-picker__grid">
-                                {items.map((opt) => (
-                                    <button
-                                        key={opt.type}
-                                        type="button"
-                                        className={
-                                            opt.type === currentType
-                                                ? "widget-picker__card is-current"
-                                                : "widget-picker__card"
-                                        }
-                                        onClick={() => onPick(opt.type)}
-                                    >
-                                        <span className="widget-picker__card-name">
-                                            {opt.name}
-                                        </span>
-                                        <span className="widget-picker__card-desc">
-                                            {opt.description}
-                                        </span>
-                                        {opt.type === currentType && (
-                                            <span className="widget-picker__current-badge">
-                                                Current
+                    {options.length === 0 ? (
+                        <p className="text-muted small text-center py-3 mb-0">
+                            All available widgets are already on your dashboard.
+                        </p>
+                    ) : (
+                        Object.entries(grouped).map(([category, items]) => (
+                            <section
+                                key={category}
+                                className="widget-picker__group"
+                            >
+                                <h3 className="widget-picker__group-title">
+                                    {category}
+                                </h3>
+                                <div className="widget-picker__grid">
+                                    {items.map((opt) => (
+                                        <button
+                                            key={opt.type}
+                                            type="button"
+                                            className={
+                                                opt.type === currentType
+                                                    ? "widget-picker__card is-current"
+                                                    : "widget-picker__card"
+                                            }
+                                            onClick={() => onPick(opt.type)}
+                                        >
+                                            <span className="widget-picker__card-name">
+                                                {opt.name}
                                             </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </section>
-                    ))}
+                                            <span className="widget-picker__card-desc">
+                                                {opt.description}
+                                            </span>
+                                            {opt.type === currentType && (
+                                                <span className="widget-picker__current-badge">
+                                                    Current
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        ))
+                    )}
                 </div>
             </div>
         </div>,

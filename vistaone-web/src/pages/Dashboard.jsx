@@ -99,6 +99,7 @@ export default function Dashboard() {
 
             {pickerOpen && (
                 <WidgetPickerModal
+                    usedTypes={layout.map((i) => i.type)}
                     onPick={(type) => {
                         addWidget(
                             type,
