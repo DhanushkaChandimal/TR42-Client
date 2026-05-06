@@ -19,8 +19,8 @@ logger = logging.getLogger()
 
 class LoginService:
     @staticmethod
-    def login_user(email, password):
-        user = LoginRepository.get_user_by_email(email)
+    def login_user(identifier, password):
+        user = LoginRepository.get_user_by_identifier(identifier)
 
         if not user or not user.check_password(password):
             return {"message": "Invalid email or password"}, 401
