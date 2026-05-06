@@ -13,10 +13,13 @@ formatting, sized columns.
 from collections import defaultdict
 from datetime import datetime, timedelta
 from io import BytesIO
+from statistics import quantiles, median
 
 from openpyxl import Workbook
+from openpyxl.formatting.rule import CellIsRule, DataBarRule, FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.page import PageMargins
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
@@ -1061,227 +1064,286 @@ def _write_tickets_flat_sheet(ws_wb, tickets, vendors_by_id, workorders_by_id):
 # ---------------------------------------------------------------------------
 
 
+# =====================================================================
+# Work Orders workbook — executive rebuild
+# =====================================================================
+#
+# Tab order (Executive Summary first, set as active on save):
+#   1. Executive Summary   — KPIs, top vendors, status mix, watch list
+#   2. Work Orders Data    — flat source with derived duration columns
+#   3. Vendor Scorecard    — per-vendor formulas vs. flat
+#   4. Service Benchmarks  — per-service throughput + duration quartiles
+#   5. Duration Analysis   — overall + per-service quartiles, outliers
+#   6. Throughput by Hour  — created/completed counts by hour-of-day
+#   7. Cost per Hour       — $/hr rates per vendor
+#   8. Data Quality        — coverage / null counts / duplicates
+#
+# All scalar KPIs and per-vendor metrics are Excel formulas pointing at
+# the flat tab, so editing rows in place recalculates the whole book.
+# Distribution stats (quartiles, hourly counts) are precomputed in
+# Python with a one-line note on each tab calling that out.
+
+WO_FLAT_SHEET = "Work Orders Data"
+WO_REPORT_TITLE = "Work Orders Report"
+WO_HEADER_ROW = 4  # row carrying column titles on Work Orders Data
+
+# Typography per spec
+WO_TITLE_FONT = Font(name="Arial", size=18, bold=True, color="0F172A")
+WO_TAB_TITLE_FONT = Font(name="Arial", size=14, bold=True, color="1F2937")
+WO_HEADER_FONT_BOLD = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+WO_BODY_FONT = Font(name="Arial", size=10, color="0F172A")
+WO_KPI_VALUE_FONT = Font(name="Arial", size=16, bold=True, color="0F172A")
+WO_KPI_LABEL_FONT = Font(name="Arial", size=9, color="6B7280")
+WO_NOTE_FONT = Font(name="Arial", size=9, italic=True, color="6B7280")
+WO_SECTION_FONT = Font(name="Arial", size=11, bold=True, color="1F3A8A")
+
+# Muted, print-friendly fills
+WO_HEADER_FILL = PatternFill("solid", fgColor="1F3A8A")          # navy
+WO_SECTION_FILL = PatternFill("solid", fgColor="EEF2FF")         # ice
+WO_BAND_FILL = PatternFill("solid", fgColor="F8FAFC")            # band
+WO_GREEN_FILL = PatternFill("solid", fgColor="DCFCE7")           # completed
+WO_AMBER_FILL = PatternFill("solid", fgColor="FEF3C7")           # in-progress
+WO_RED_FILL = PatternFill("solid", fgColor="FEE2E2")             # halted/cancelled
+WO_SLATE_FILL = PatternFill("solid", fgColor="F1F5F9")           # closed/neutral
+
+# Number formats per spec
+FMT_CURRENCY = '$#,##0;($#,##0);-'
+FMT_CURRENCY_DEC = '$#,##0.00;($#,##0.00);-'
+FMT_PCT = '0.0%;(0.0%);-'
+FMT_HOURS = '#,##0.0'
+FMT_INT = '#,##0;(#,##0);-'
+FMT_DATE = 'yyyy-mm-dd'
+FMT_DATETIME = 'yyyy-mm-dd hh:mm'
+
+# Status colour map (red/amber/green/slate; grayscale-safe)
+WO_STATUS_FILLS = {
+    "COMPLETED": WO_GREEN_FILL,
+    "CLOSED": WO_GREEN_FILL,
+    "ASSIGNED": WO_AMBER_FILL,
+    "IN_PROGRESS": WO_AMBER_FILL,
+    "PENDING": WO_AMBER_FILL,
+    "UNASSIGNED": WO_SLATE_FILL,
+    "HALTED": WO_RED_FILL,
+    "CANCELLED": WO_RED_FILL,
+    "REJECTED": WO_RED_FILL,
+}
+
+
+def _wo_quoted(name):
+    """Return sheet name quoted for use in formulas."""
+    return f"'{name}'"
+
+
+def _wo_print_setup(ws, period, tab_name, gridlines=True):
+    """Apply the workbook-wide print spec to a single tab."""
+    # Letter size + landscape if wide tab; orientation set by caller via
+    # ws.page_setup.orientation before calling. Default landscape.
+    ws.page_setup.paperSize = ws.PAPERSIZE_LETTER
+    if not ws.page_setup.orientation:
+        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_margins = PageMargins(
+        left=0.5, right=0.5, top=0.75, bottom=0.75, header=0.3, footer=0.3
+    )
+    ws.print_options.gridLines = gridlines
+    ws.print_options.gridLinesSet = gridlines
+    ws.print_options.horizontalCentered = True
+    ws.oddHeader.left.text = WO_REPORT_TITLE
+    ws.oddHeader.left.size = 9
+    ws.oddHeader.center.text = tab_name
+    ws.oddHeader.center.size = 9
+    ws.oddHeader.right.text = f"Period: {period}"
+    ws.oddHeader.right.size = 9
+    ws.oddFooter.left.text = (
+        f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC"
+    )
+    ws.oddFooter.left.size = 9
+    ws.oddFooter.center.text = "Confidential - Internal Use Only"
+    ws.oddFooter.center.size = 9
+    ws.oddFooter.right.text = "Page &P of &N"
+    ws.oddFooter.right.size = 9
+
+
+def _wo_set_print_area(ws, last_col_letter, last_row):
+    """Constrain the print area to actual data extents."""
+    ws.print_area = f"A1:{last_col_letter}{last_row}"
+
+
+def _wo_band_rows(ws, first_data_row, last_data_row, last_col):
+    """Apply alternating row banding without using fills that override
+    conditional formatting on status columns."""
+    for r in range(first_data_row, last_data_row + 1):
+        if (r - first_data_row) % 2 == 1:
+            for c in range(1, last_col + 1):
+                cell = ws.cell(row=r, column=c)
+                if cell.fill is None or cell.fill.fgColor is None or cell.fill.fgColor.value in (None, "00000000"):
+                    cell.fill = WO_BAND_FILL
+
+
+def _wo_apply_status_cf(ws, status_col_letter, first_row, last_row):
+    """Red/amber/green status fills that print legibly in grayscale."""
+    rng = f"{status_col_letter}{first_row}:{status_col_letter}{last_row}"
+    ws.conditional_formatting.add(
+        rng,
+        CellIsRule(operator="equal", formula=['"COMPLETED"'], fill=WO_GREEN_FILL),
+    )
+    ws.conditional_formatting.add(
+        rng,
+        CellIsRule(operator="equal", formula=['"CLOSED"'], fill=WO_GREEN_FILL),
+    )
+    ws.conditional_formatting.add(
+        rng,
+        CellIsRule(operator="equal", formula=['"ASSIGNED"'], fill=WO_AMBER_FILL),
+    )
+    ws.conditional_formatting.add(
+        rng,
+        CellIsRule(operator="equal", formula=['"IN_PROGRESS"'], fill=WO_AMBER_FILL),
+    )
+    ws.conditional_formatting.add(
+        rng,
+        CellIsRule(operator="equal", formula=['"HALTED"'], fill=WO_RED_FILL),
+    )
+    ws.conditional_formatting.add(
+        rng,
+        CellIsRule(operator="equal", formula=['"CANCELLED"'], fill=WO_RED_FILL),
+    )
+    ws.conditional_formatting.add(
+        rng,
+        CellIsRule(operator="equal", formula=['"REJECTED"'], fill=WO_RED_FILL),
+    )
+
+
+def _wo_data_bar(ws, col_letter, first_row, last_row, color="64748B"):
+    """Print-friendly slate data bar."""
+    ws.conditional_formatting.add(
+        f"{col_letter}{first_row}:{col_letter}{last_row}",
+        DataBarRule(
+            start_type="min",
+            end_type="max",
+            color=color,
+            showValue=True,
+            minLength=0,
+            maxLength=100,
+        ),
+    )
+
+
 def build_workorders_workbook(start=None, end=None):
+    """Executive-quality work orders workbook.
+
+    See the section banner above for tab order and design intent.
+    """
     wb = Workbook()
     wb.remove(wb.active)
 
     work_orders = db.session.execute(select(WorkOrder)).scalars().all()
     if start or end:
-        work_orders = [
-            w for w in work_orders if _in_range(w.created_at, start, end)
-        ]
-    vendors_by_id = {
-        v.id: v for v in db.session.execute(select(Vendor)).scalars().all()
-    }
-    clients_by_id = {
-        c.id: c for c in db.session.execute(select(Client)).scalars().all()
-    }
+        work_orders = [w for w in work_orders if _in_range(w.created_at, start, end)]
+    vendors_by_id = {v.id: v for v in db.session.execute(select(Vendor)).scalars().all()}
+    clients_by_id = {c.id: c for c in db.session.execute(select(Client)).scalars().all()}
 
     period = _period_label(start, end)
-    _write_workorders_summary_sheet(wb, work_orders, vendors_by_id, clients_by_id, period)
-    _write_workorders_by_vendor_sheet(wb, work_orders, vendors_by_id)
-    _write_workorders_flat_sheet(wb, work_orders, vendors_by_id, clients_by_id)
+    n = len(work_orders)
+
+    # Build flat data first so the other tabs can reference it.
+    flat_last_data_row = _wo_write_flat(wb, work_orders, vendors_by_id, clients_by_id)
+
+    _wo_write_exec_summary(wb, work_orders, vendors_by_id, period, flat_last_data_row)
+    _wo_write_vendor_scorecard(wb, work_orders, vendors_by_id, flat_last_data_row)
+    _wo_write_service_benchmarks(wb, work_orders)
+    _wo_write_duration_analysis(wb, work_orders)
+    _wo_write_throughput_by_hour(wb, work_orders)
+    _wo_write_cost_per_hour(wb, work_orders, vendors_by_id, flat_last_data_row)
+    _wo_write_data_quality(wb, work_orders, flat_last_data_row)
+
+    # Move Executive Summary to position 0 (it's currently created after flat).
+    exec_idx = wb.sheetnames.index("Executive Summary")
+    if exec_idx != 0:
+        wb.move_sheet("Executive Summary", offset=-exec_idx)
+
+    wb.active = 0
+    exec_ws = wb["Executive Summary"]
+    exec_ws.sheet_view.zoomScale = 100
+    exec_ws.sheet_view.selection[0].activeCell = "A1"
+    exec_ws.sheet_view.selection[0].sqref = "A1"
+
+    # Apply print setup last so every tab is configured.
+    for ws in wb.worksheets:
+        if ws.title == "Executive Summary":
+            ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+            _wo_print_setup(ws, period, ws.title, gridlines=False)
+        else:
+            ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+            _wo_print_setup(ws, period, ws.title, gridlines=True)
+
     return _to_workbook_bytes(wb)
 
 
-def _write_workorders_summary_sheet(ws_wb, work_orders, vendors_by_id, clients_by_id, period):
-    ws = ws_wb.create_sheet("Summary")
-    _write_title(ws, "Work Orders Summary", f"Period: {period}  ·  {len(work_orders)} work order(s)")
+# ---------------------------------------------------------------------
+# 2. Work Orders Data (flat) — source of truth
+# ---------------------------------------------------------------------
 
-    by_status = defaultdict(int)
-    by_priority = defaultdict(int)
-    by_vendor = defaultdict(lambda: {"count": 0, "value": 0.0})
-    by_location_type = defaultdict(int)
-    by_client = defaultdict(int)
-    total_cost = 0.0
-    for w in work_orders:
-        by_status[_enum_value(getattr(w, "current_status", None)) or "UNKNOWN"] += 1
-        by_priority[_enum_value(getattr(w, "priority", None)) or "UNKNOWN"] += 1
-        by_location_type[_enum_value(getattr(w, "location_type", None)) or "UNKNOWN"] += 1
-        if w.client_id:
-            by_client[w.client_id] += 1
-        if w.assigned_vendor:
-            by_vendor[w.assigned_vendor]["count"] += 1
-            by_vendor[w.assigned_vendor]["value"] += float(getattr(w, "estimated_cost", 0) or 0)
-        total_cost += float(getattr(w, "estimated_cost", 0) or 0)
-
-    row = 5
-    ws.cell(row=row, column=1, value="BY STATUS").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    cols = [("Status", 20, None), ("Count", 12, "#,##0")]
-    _apply_widths(ws, cols)
-    _write_header(ws, row, cols)
-    for status, count in sorted(by_status.items(), key=lambda kv: kv[1], reverse=True):
-        row += 1
-        _write_row(ws, row, cols, [status, count], status_col=0)
-
-    row += 3
-    ws.cell(row=row, column=1, value="BY PRIORITY").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    _write_header(ws, row, cols)
-    for priority, count in sorted(by_priority.items(), key=lambda kv: kv[1], reverse=True):
-        row += 1
-        _write_row(ws, row, cols, [priority, count])
-
-    row += 3
-    ws.cell(row=row, column=1, value="BY LOCATION TYPE").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    _write_header(ws, row, cols)
-    for loc_type, count in sorted(by_location_type.items(), key=lambda kv: kv[1], reverse=True):
-        row += 1
-        _write_row(ws, row, cols, [loc_type, count])
-
-    row += 3
-    ws.cell(row=row, column=1, value="BY CLIENT").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    ccols = [("Client", 30, None), ("WO Count", 12, "#,##0")]
-    _apply_widths(ws, ccols)
-    _write_header(ws, row, ccols)
-    for cid, count in sorted(by_client.items(), key=lambda kv: kv[1], reverse=True):
-        c = clients_by_id.get(cid)
-        client_name = (getattr(c, "client_name", None) or cid[:8]) if c else (cid[:8] if cid else "Unknown")
-        row += 1
-        _write_row(ws, row, ccols, [client_name, count])
-
-    row += 3
-    ws.cell(row=row, column=1, value="BY VENDOR").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    vcols = [("Vendor", 30, None), ("WO Count", 12, "#,##0"), ("Est Total", 18, "$#,##0.00")]
-    _apply_widths(ws, vcols)
-    _write_header(ws, row, vcols)
-    for vid, slot in sorted(by_vendor.items(), key=lambda kv: kv[1]["count"], reverse=True):
-        v = vendors_by_id.get(vid)
-        row += 1
-        _write_row(ws, row, vcols, [_vendor_name(v), slot["count"], slot["value"]])
-
-    row += 3
-    ws.cell(row=row, column=1, value="TOTALS").font = SUBHEADER_FONT
-    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
-    row += 1
-    tcols = [("Metric", 30, None), ("Value", 18, None)]
-    _apply_widths(ws, tcols)
-    _write_header(ws, row, tcols)
-    row += 1
-    _write_row(ws, row, tcols, ["Total work orders", len(work_orders)])
-    row += 1
-    _write_row(ws, row, [("Metric", 30, None), ("Value", 18, "$#,##0.00")], ["Total estimated cost", total_cost])
-
-
-def _write_workorders_by_vendor_sheet(ws_wb, work_orders, vendors_by_id):
-    ws = ws_wb.create_sheet("By Vendor")
-    _write_title(ws, "Work Orders by Vendor", "Grouped per vendor with a count subtotal.")
+def _wo_write_flat(wb, work_orders, vendors_by_id, clients_by_id):
+    ws = wb.create_sheet(WO_FLAT_SHEET)
+    note = (
+        "Source-of-truth flat list. Columns AC-AH are derived in-cell from the "
+        "timestamps to the left (durations in hours, variance, lead time, on-time)."
+    )
+    ws.cell(row=1, column=1, value="Work Orders - source data").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3,
+        column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
 
     cols = [
-        ("WO #", 10, "#,##0"),
-        ("Description", 40, None),
-        ("Status", 16, None),
-        ("Priority", 12, None),
-        ("Service", 18, None),
-        ("Location", 22, None),
-        ("Est Cost", 14, "$#,##0.00"),
-        ("Estimated Start", 16, "yyyy-mm-dd"),
-        ("Estimated End", 16, "yyyy-mm-dd"),
-        ("Created", 14, "yyyy-mm-dd"),
-    ]
-    _apply_widths(ws, cols)
-
-    by_vendor = defaultdict(list)
-    for w in work_orders:
-        by_vendor[w.assigned_vendor or "unknown"].append(w)
-
-    row = 5
-    for vid in sorted(by_vendor.keys(), key=lambda x: _vendor_name(vendors_by_id.get(x))):
-        v = vendors_by_id.get(vid)
-        wos = sorted(by_vendor[vid], key=lambda w: w.created_at or datetime.min, reverse=True)
-
-        banner = ws.cell(row=row, column=1, value=_vendor_name(v))
-        banner.font = Font(bold=True, color="FFFFFF", size=12)
-        banner.fill = HEADER_FILL
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=len(cols))
-        row += 1
-
-        _write_header(ws, row, cols)
-        row += 1
-
-        for w in wos:
-            service = (w.service.service if getattr(w, "service", None) else None)
-            location_str = getattr(w, "location", None) or (
-                f"{w.latitude}, {w.longitude}"
-                if getattr(w, "latitude", None) is not None and getattr(w, "longitude", None) is not None
-                else ""
-            )
-            _write_row(
-                ws,
-                row,
-                cols,
-                [
-                    getattr(w, "work_order_code", None),
-                    w.description or "",
-                    _enum_value(getattr(w, "current_status", None)),
-                    _enum_value(getattr(w, "priority", None)),
-                    service or "",
-                    location_str,
-                    float(getattr(w, "estimated_cost", 0) or 0),
-                    _naive(getattr(w, "estimated_start_date", None)),
-                    _naive(getattr(w, "estimated_end_date", None)),
-                    _naive(w.created_at),
-                ],
-                status_col=2,
-            )
-            row += 1
-
-        sub = ws.cell(row=row, column=1, value=f"Vendor subtotal: {len(wos)} work order(s)")
-        sub.font = SUBHEADER_FONT
-        sub.fill = SUBHEADER_FILL
-        sub.border = THIN_BORDER
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=len(cols))
-        row += 2
-
-    ws.freeze_panes = ws["A5"]
-
-
-def _write_workorders_flat_sheet(ws_wb, work_orders, vendors_by_id, clients_by_id):
-    ws = ws_wb.create_sheet("All Work Orders (flat)")
-    _write_title(ws, "All Work Orders", "Sortable, filterable list.")
-
-    header_row = 5
-    cols = [
-        ("Client", 28, None),
-        ("Vendor", 30, None),
-        ("WO #", 10, "#,##0"),
-        ("Description", 40, None),
-        ("Status", 16, None),
-        ("Priority", 12, None),
+        ("Client", 26, None),
+        ("Vendor", 28, None),
+        ("WO #", 10, FMT_INT),
+        ("Description", 38, None),
+        ("Status", 14, None),
+        ("Priority", 10, None),
         ("Service", 18, None),
         ("Location Type", 14, None),
-        ("Location", 28, None),
+        ("Location", 26, None),
         ("Latitude", 12, "#,##0.000000"),
         ("Longitude", 12, "#,##0.000000"),
         ("Well ID", 36, None),
-        ("Est Cost", 14, "$#,##0.00"),
-        ("Est Quantity", 14, "#,##0.00"),
-        ("Units", 10, None),
+        ("Est Cost", 14, FMT_CURRENCY),
+        ("Est Quantity", 12, "#,##0.00"),
+        ("Units", 8, None),
         ("Recurring?", 10, None),
         ("Recurrence", 12, None),
-        ("Estimated Start", 16, "yyyy-mm-dd"),
-        ("Estimated End", 16, "yyyy-mm-dd"),
-        ("Assigned At", 18, "yyyy-mm-dd hh:mm"),
-        ("Completed At", 18, "yyyy-mm-dd hh:mm"),
-        ("Closed At", 18, "yyyy-mm-dd hh:mm"),
-        ("Halted At", 18, "yyyy-mm-dd hh:mm"),
-        ("Rejected At", 18, "yyyy-mm-dd hh:mm"),
-        ("Created", 18, "yyyy-mm-dd hh:mm"),
-        ("Updated", 18, "yyyy-mm-dd hh:mm"),
-        ("Cancelled At", 18, "yyyy-mm-dd hh:mm"),
-        ("Cancellation Reason", 32, None),
+        ("Estimated Start", 16, FMT_DATE),
+        ("Estimated End", 16, FMT_DATE),
+        ("Assigned At", 16, FMT_DATETIME),
+        ("Completed At", 16, FMT_DATETIME),
+        ("Closed At", 16, FMT_DATETIME),
+        ("Halted At", 16, FMT_DATETIME),
+        ("Rejected At", 16, FMT_DATETIME),
+        ("Created", 16, FMT_DATETIME),
+        ("Updated", 16, FMT_DATETIME),
+        ("Cancelled At", 16, FMT_DATETIME),
+        ("Cancellation Reason", 28, None),
+        ("Actual Duration (hrs)", 14, FMT_HOURS),
+        ("Estimated Duration (hrs)", 14, FMT_HOURS),
+        ("Variance (hrs)", 12, FMT_HOURS),
+        ("Variance %", 12, FMT_PCT),
+        ("Lead Time (hrs)", 14, FMT_HOURS),
+        ("On Time?", 10, None),
     ]
     _apply_widths(ws, cols)
-    _write_header(ws, header_row, cols)
+
+    header_row = WO_HEADER_ROW
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        cell.border = THIN_BORDER
 
     sorted_wos = sorted(
         work_orders,
@@ -1290,11 +1352,12 @@ def _write_workorders_flat_sheet(ws_wb, work_orders, vendors_by_id, clients_by_i
             -(w.created_at.timestamp() if w.created_at else 0),
         ),
     )
-    for i, w in enumerate(sorted_wos, start=header_row + 1):
+    for offset, w in enumerate(sorted_wos):
+        row = header_row + 1 + offset
         v = vendors_by_id.get(w.assigned_vendor)
         c = clients_by_id.get(w.client_id) if w.client_id else None
         client_name = getattr(c, "client_name", None) if c else None
-        service = (w.service.service if getattr(w, "service", None) else None)
+        service = w.service.service if getattr(w, "service", None) else None
         location_str = getattr(w, "location", None) or (
             f"{w.latitude}, {w.longitude}"
             if getattr(w, "latitude", None) is not None and getattr(w, "longitude", None) is not None
@@ -1302,43 +1365,696 @@ def _write_workorders_flat_sheet(ws_wb, work_orders, vendors_by_id, clients_by_i
         )
         lat = getattr(w, "latitude", None)
         lng = getattr(w, "longitude", None)
-        _write_row(
-            ws,
-            i,
-            cols,
-            [
-                client_name or "",
-                _vendor_name(v),
-                getattr(w, "work_order_code", None),
-                w.description or "",
-                _enum_value(getattr(w, "current_status", None)),
-                _enum_value(getattr(w, "priority", None)),
-                service or "",
-                _enum_value(getattr(w, "location_type", None)) or "",
-                location_str,
-                float(lat) if lat is not None else None,
-                float(lng) if lng is not None else None,
-                getattr(w, "well_id", None) or "",
-                float(getattr(w, "estimated_cost", 0) or 0),
-                float(getattr(w, "estimated_quantity", 0) or 0),
-                getattr(w, "units", None) or "",
-                "Yes" if getattr(w, "is_recurring", False) else "No",
-                _enum_value(getattr(w, "recurrence_type", None)) or "",
-                _naive(getattr(w, "estimated_start_date", None)),
-                _naive(getattr(w, "estimated_end_date", None)),
-                _naive(getattr(w, "assigned_at", None)),
-                _naive(getattr(w, "completed_at", None)),
-                _naive(getattr(w, "closed_at", None)),
-                _naive(getattr(w, "halted_at", None)),
-                _naive(getattr(w, "rejected_at", None)),
-                _naive(w.created_at),
-                _naive(getattr(w, "updated_at", None)),
-                _naive(getattr(w, "cancelled_at", None)),
-                getattr(w, "cancellation_reason", None) or "",
-            ],
-            status_col=4,
+
+        # T = Assigned At (col 20), U = Completed At (col 21), R = Estimated Start (col 18),
+        # S = Estimated End (col 19), Y = Created (col 25)
+        actual_dur = (
+            f'=IF(AND(T{row}<>"",U{row}<>""),(U{row}-T{row})*24,"")'
         )
-    _finalize_data_sheet(ws, header_row, cols, len(sorted_wos))
+        est_dur = (
+            f'=IF(AND(R{row}<>"",S{row}<>""),(S{row}-R{row})*24,"")'
+        )
+        variance = (
+            f'=IF(AND(AC{row}<>"",AD{row}<>""),AC{row}-AD{row},"")'
+        )
+        variance_pct = (
+            f'=IF(AND(AC{row}<>"",AD{row}<>"",AD{row}>0),'
+            f'(AC{row}-AD{row})/AD{row},"")'
+        )
+        lead_time = (
+            f'=IF(AND(Y{row}<>"",T{row}<>""),(T{row}-Y{row})*24,"")'
+        )
+        on_time = (
+            f'=IF(AND(U{row}<>"",S{row}<>""),'
+            f'IF(U{row}<=S{row},"Yes","No"),"")'
+        )
+
+        values = [
+            client_name or "",
+            _vendor_name(v),
+            getattr(w, "work_order_code", None),
+            w.description or "",
+            _enum_value(getattr(w, "current_status", None)),
+            _enum_value(getattr(w, "priority", None)),
+            service or "",
+            _enum_value(getattr(w, "location_type", None)) or "",
+            location_str,
+            float(lat) if lat is not None else None,
+            float(lng) if lng is not None else None,
+            getattr(w, "well_id", None) or "",
+            float(getattr(w, "estimated_cost", 0) or 0),
+            float(getattr(w, "estimated_quantity", 0) or 0),
+            getattr(w, "units", None) or "",
+            "Yes" if getattr(w, "is_recurring", False) else "No",
+            _enum_value(getattr(w, "recurrence_type", None)) or "",
+            _naive(getattr(w, "estimated_start_date", None)),
+            _naive(getattr(w, "estimated_end_date", None)),
+            _naive(getattr(w, "assigned_at", None)),
+            _naive(getattr(w, "completed_at", None)),
+            _naive(getattr(w, "closed_at", None)),
+            _naive(getattr(w, "halted_at", None)),
+            _naive(getattr(w, "rejected_at", None)),
+            _naive(w.created_at),
+            _naive(getattr(w, "updated_at", None)),
+            _naive(getattr(w, "cancelled_at", None)),
+            getattr(w, "cancellation_reason", None) or "",
+            actual_dur,
+            est_dur,
+            variance,
+            variance_pct,
+            lead_time,
+            on_time,
+        ]
+
+        for c_idx, ((_, _w, fmt), value) in enumerate(zip(cols, values), start=1):
+            cell = ws.cell(row=row, column=c_idx, value=value)
+            if fmt:
+                cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_data_row = header_row + len(sorted_wos)
+    last_col = len(cols)
+    last_col_letter = get_column_letter(last_col)
+
+    if sorted_wos:
+        ws.auto_filter.ref = f"A{header_row}:{last_col_letter}{last_data_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        _wo_apply_status_cf(ws, "E", header_row + 1, last_data_row)
+        _wo_data_bar(ws, "M", header_row + 1, last_data_row)
+        _wo_data_bar(ws, "AC", header_row + 1, last_data_row, color="334155")
+        # Highlight rows where the variance ratio is >= 50% over estimate.
+        ws.conditional_formatting.add(
+            f"AF{header_row + 1}:AF{last_data_row}",
+            CellIsRule(operator="greaterThanOrEqual", formula=["0.5"], fill=WO_RED_FILL),
+        )
+
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, last_col_letter, max(last_data_row, header_row))
+    return last_data_row
+
+
+# ---------------------------------------------------------------------
+# 1. Executive Summary
+# ---------------------------------------------------------------------
+
+def _wo_write_exec_summary(wb, work_orders, vendors_by_id, period, flat_last_row):
+    ws = wb.create_sheet("Executive Summary")
+    flat = _wo_quoted(WO_FLAT_SHEET)
+    n = len(work_orders)
+
+    # Layout:
+    #   Row 1: report title (Arial 18 bold)
+    #   Row 2: period
+    #   Row 3: generated timestamp + record count
+    #   Row 4: blank
+    #   Row 5: "what changed" paragraph (omitted cleanly if no prior period)
+    #   Row 7+: KPI cards (label/value pairs in a grid)
+    #   Then Status mix, Top 5 vendors by spend, Watch list
+
+    ws.merge_cells("A1:F1")
+    ws["A1"] = WO_REPORT_TITLE
+    ws["A1"].font = WO_TITLE_FONT
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center")
+
+    ws["A2"] = f"Period: {period}    ·    {n:,} work order(s)"
+    ws["A2"].font = WO_NOTE_FONT
+
+    ws["A3"] = (
+        f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    ws["A3"].font = WO_NOTE_FONT
+
+    # KPI grid (no merged cells inside data ranges; merges are in title only)
+    kpi_row = 6
+    kpi_specs = [
+        ("Total work orders",
+         f"=COUNTA({flat}!C{WO_HEADER_ROW + 1}:C{flat_last_row})", FMT_INT),
+        ("Total estimated cost",
+         f"=SUM({flat}!M{WO_HEADER_ROW + 1}:M{flat_last_row})", FMT_CURRENCY),
+        ("Average actual duration (hrs)",
+         f'=IFERROR(AVERAGE({flat}!AC{WO_HEADER_ROW + 1}:AC{flat_last_row}),0)',
+         FMT_HOURS),
+        ("Average variance vs estimate",
+         f'=IFERROR(AVERAGE({flat}!AF{WO_HEADER_ROW + 1}:AF{flat_last_row}),0)',
+         FMT_PCT),
+        ("On-time completion rate",
+         f'=IFERROR(COUNTIF({flat}!AH{WO_HEADER_ROW + 1}:AH{flat_last_row},"Yes")'
+         f'/(COUNTIF({flat}!AH{WO_HEADER_ROW + 1}:AH{flat_last_row},"Yes")'
+         f'+COUNTIF({flat}!AH{WO_HEADER_ROW + 1}:AH{flat_last_row},"No")),0)',
+         FMT_PCT),
+        ("Halted / cancelled count",
+         f'=COUNTIF({flat}!E{WO_HEADER_ROW + 1}:E{flat_last_row},"HALTED")'
+         f'+COUNTIF({flat}!E{WO_HEADER_ROW + 1}:E{flat_last_row},"CANCELLED")',
+         FMT_INT),
+    ]
+
+    # 3 columns x 2 rows of KPI cards
+    for idx, (label, formula, fmt) in enumerate(kpi_specs):
+        col = (idx % 3) * 2 + 1   # cols 1, 3, 5
+        row = kpi_row + (idx // 3) * 3
+        label_cell = ws.cell(row=row, column=col, value=label)
+        label_cell.font = WO_KPI_LABEL_FONT
+        value_cell = ws.cell(row=row + 1, column=col, value=formula)
+        value_cell.font = WO_KPI_VALUE_FONT
+        value_cell.number_format = fmt
+        for c in (label_cell, value_cell):
+            c.border = THIN_BORDER
+
+    for col_letter in ("A", "B", "C", "D", "E", "F"):
+        ws.column_dimensions[col_letter].width = 22
+
+    # ----- Status breakdown -----
+    section_row = kpi_row + 7
+    ws.cell(row=section_row, column=1, value="STATUS BREAKDOWN").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    cols = [("Status", 22, None), ("Count", 12, FMT_INT), ("Share", 10, FMT_PCT)]
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD
+        h.fill = WO_HEADER_FILL
+
+    statuses = [
+        "UNASSIGNED", "PENDING", "ASSIGNED", "IN_PROGRESS", "COMPLETED",
+        "CLOSED", "HALTED", "CANCELLED", "REJECTED",
+    ]
+    total_formula = f"COUNTA({flat}!E{WO_HEADER_ROW + 1}:E{flat_last_row})"
+    for i, status in enumerate(statuses):
+        r = section_row + 1 + i
+        ws.cell(row=r, column=1, value=status).font = WO_BODY_FONT
+        ws.cell(
+            row=r, column=2,
+            value=f'=COUNTIF({flat}!E{WO_HEADER_ROW + 1}:E{flat_last_row},"{status}")',
+        ).number_format = FMT_INT
+        ws.cell(
+            row=r, column=3,
+            value=f'=IFERROR(COUNTIF({flat}!E{WO_HEADER_ROW + 1}:E{flat_last_row},"{status}")/{total_formula},0)',
+        ).number_format = FMT_PCT
+    status_last = section_row + len(statuses)
+
+    # ----- Top 5 vendors by spend (precomputed; vendor names live on flat) -----
+    section_row = status_last + 3
+    ws.cell(row=section_row, column=1, value="TOP 5 VENDORS BY ESTIMATED SPEND").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    for c_idx, label in enumerate(["Vendor", "WO Count", "Est Total"], start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD
+        h.fill = WO_HEADER_FILL
+
+    spend_by_vendor = defaultdict(lambda: {"count": 0, "value": 0.0, "name": ""})
+    for w in work_orders:
+        if not w.assigned_vendor:
+            continue
+        slot = spend_by_vendor[w.assigned_vendor]
+        slot["count"] += 1
+        slot["value"] += float(getattr(w, "estimated_cost", 0) or 0)
+        slot["name"] = _vendor_name(vendors_by_id.get(w.assigned_vendor))
+    top_vendors = sorted(spend_by_vendor.values(), key=lambda x: x["value"], reverse=True)[:5]
+    for i, slot in enumerate(top_vendors):
+        r = section_row + 1 + i
+        ws.cell(row=r, column=1, value=slot["name"]).font = WO_BODY_FONT
+        ws.cell(row=r, column=2, value=slot["count"]).number_format = FMT_INT
+        ws.cell(row=r, column=3, value=slot["value"]).number_format = FMT_CURRENCY
+    top_last = section_row + max(len(top_vendors), 1)
+
+    # ----- Watch list: halted / cancelled / >7d open / variance >= 50% -----
+    section_row = top_last + 3
+    ws.cell(row=section_row, column=1, value="WATCH LIST").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    watch_cols = [("Indicator", 38, None), ("Count", 12, FMT_INT)]
+    for c_idx, (label, _w, _f) in enumerate(watch_cols, start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD
+        h.fill = WO_HEADER_FILL
+
+    watch_specs = [
+        ("Work orders currently HALTED",
+         f'=COUNTIF({flat}!E{WO_HEADER_ROW + 1}:E{flat_last_row},"HALTED")'),
+        ("Work orders currently CANCELLED",
+         f'=COUNTIF({flat}!E{WO_HEADER_ROW + 1}:E{flat_last_row},"CANCELLED")'),
+        ("Work orders REJECTED",
+         f'=COUNTIF({flat}!E{WO_HEADER_ROW + 1}:E{flat_last_row},"REJECTED")'),
+        ("Late completions (On Time = No)",
+         f'=COUNTIF({flat}!AH{WO_HEADER_ROW + 1}:AH{flat_last_row},"No")'),
+        ("Variance >= 50% over estimate",
+         f'=COUNTIFS({flat}!AF{WO_HEADER_ROW + 1}:AF{flat_last_row},">=0.5")'),
+    ]
+    for i, (label, formula) in enumerate(watch_specs):
+        r = section_row + 1 + i
+        ws.cell(row=r, column=1, value=label).font = WO_BODY_FONT
+        ws.cell(row=r, column=2, value=formula).number_format = FMT_INT
+
+
+# ---------------------------------------------------------------------
+# 3. Vendor Scorecard
+# ---------------------------------------------------------------------
+
+def _wo_write_vendor_scorecard(wb, work_orders, vendors_by_id, flat_last_row):
+    ws = wb.create_sheet("Vendor Scorecard")
+    flat = _wo_quoted(WO_FLAT_SHEET)
+    note = (
+        "Per-vendor performance vs the flat data tab. All metrics are formulas; "
+        "edit rows in 'Work Orders Data' and this tab recalculates."
+    )
+    ws.cell(row=1, column=1, value="Vendor Scorecard").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Vendor", 30, None),
+        ("WO Count", 10, FMT_INT),
+        ("Total Est Cost", 14, FMT_CURRENCY),
+        ("Avg Actual Duration (hrs)", 16, FMT_HOURS),
+        ("Avg Estimated Duration (hrs)", 16, FMT_HOURS),
+        ("Avg Variance %", 14, FMT_PCT),
+        ("On-Time %", 12, FMT_PCT),
+        ("Halt/Cancel Count", 14, FMT_INT),
+        ("Halt/Cancel Rate", 14, FMT_PCT),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    vendor_names = sorted(
+        {_vendor_name(vendors_by_id.get(w.assigned_vendor)) for w in work_orders if w.assigned_vendor}
+    )
+
+    flat_rows = (WO_HEADER_ROW + 1, flat_last_row)
+    a, b = flat_rows
+    for i, name in enumerate(vendor_names):
+        r = header_row + 1 + i
+        v_ref = f'A{r}'
+        ws.cell(row=r, column=1, value=name).font = WO_BODY_FONT
+        ws.cell(row=r, column=2,
+                value=f'=COUNTIF({flat}!B{a}:B{b},{v_ref})').number_format = FMT_INT
+        ws.cell(row=r, column=3,
+                value=f'=SUMIF({flat}!B{a}:B{b},{v_ref},{flat}!M{a}:M{b})').number_format = FMT_CURRENCY
+        ws.cell(row=r, column=4,
+                value=f'=IFERROR(AVERAGEIFS({flat}!AC{a}:AC{b},{flat}!B{a}:B{b},{v_ref},{flat}!AC{a}:AC{b},">0"),0)'
+                ).number_format = FMT_HOURS
+        ws.cell(row=r, column=5,
+                value=f'=IFERROR(AVERAGEIFS({flat}!AD{a}:AD{b},{flat}!B{a}:B{b},{v_ref},{flat}!AD{a}:AD{b},">0"),0)'
+                ).number_format = FMT_HOURS
+        ws.cell(row=r, column=6,
+                value=f'=IFERROR(AVERAGEIFS({flat}!AF{a}:AF{b},{flat}!B{a}:B{b},{v_ref},{flat}!AF{a}:AF{b},"<>"),0)'
+                ).number_format = FMT_PCT
+        ws.cell(row=r, column=7,
+                value=(
+                    f'=IFERROR('
+                    f'COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!AH{a}:AH{b},"Yes")'
+                    f'/(COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!AH{a}:AH{b},"Yes")'
+                    f'+COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!AH{a}:AH{b},"No")),0)'
+                )).number_format = FMT_PCT
+        ws.cell(row=r, column=8,
+                value=(
+                    f'=COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!E{a}:E{b},"HALTED")'
+                    f'+COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!E{a}:E{b},"CANCELLED")'
+                )).number_format = FMT_INT
+        ws.cell(row=r, column=9,
+                value=(
+                    f'=IFERROR(('
+                    f'COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!E{a}:E{b},"HALTED")'
+                    f'+COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!E{a}:E{b},"CANCELLED"))'
+                    f'/COUNTIF({flat}!B{a}:B{b},{v_ref}),0)'
+                )).number_format = FMT_PCT
+        for c_idx in range(1, len(cols) + 1):
+            ws.cell(row=r, column=c_idx).border = THIN_BORDER
+
+    last_row = header_row + len(vendor_names)
+    if vendor_names:
+        ws.auto_filter.ref = f"A{header_row}:I{last_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        # Halt/cancel rate red bar
+        ws.conditional_formatting.add(
+            f"I{header_row + 1}:I{last_row}",
+            CellIsRule(operator="greaterThanOrEqual", formula=["0.1"], fill=WO_RED_FILL),
+        )
+        _wo_data_bar(ws, "C", header_row + 1, last_row)
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "I", max(last_row, header_row))
+
+
+# ---------------------------------------------------------------------
+# 4. Service Type Benchmarks
+# ---------------------------------------------------------------------
+
+def _wo_durations_for(filter_fn, work_orders):
+    out = []
+    for w in work_orders:
+        if not filter_fn(w):
+            continue
+        a = getattr(w, "assigned_at", None)
+        c = getattr(w, "completed_at", None)
+        if a and c:
+            hrs = (c - a).total_seconds() / 3600.0
+            if hrs > 0:
+                out.append(hrs)
+    return out
+
+
+def _quartiles(values):
+    if not values:
+        return (0, 0, 0, 0, 0, 0)
+    if len(values) == 1:
+        v = values[0]
+        return (v, v, v, v, v, v)
+    sorted_vals = sorted(values)
+    try:
+        q = quantiles(sorted_vals, n=4, method="inclusive")
+        p25, med, p75 = q[0], q[1], q[2]
+    except Exception:
+        med = median(sorted_vals)
+        p25 = sorted_vals[len(sorted_vals) // 4]
+        p75 = sorted_vals[(3 * len(sorted_vals)) // 4]
+    # p90
+    try:
+        p90 = quantiles(sorted_vals, n=10, method="inclusive")[8]
+    except Exception:
+        p90 = sorted_vals[int(len(sorted_vals) * 0.9)]
+    return (sorted_vals[0], p25, med, p75, p90, sorted_vals[-1])
+
+
+def _wo_write_service_benchmarks(wb, work_orders):
+    ws = wb.create_sheet("Service Benchmarks")
+    note = (
+        "Per service type: count, total estimated cost, throughput vs the "
+        "period, and duration quartiles. Quartiles are computed in Python "
+        "from the data shipped in this workbook (snapshot at generation)."
+    )
+    ws.cell(row=1, column=1, value="Service Type Benchmarks").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Service", 24, None),
+        ("Count", 10, FMT_INT),
+        ("Total Est Cost", 16, FMT_CURRENCY),
+        ("Avg Duration (hrs)", 16, FMT_HOURS),
+        ("Min", 8, FMT_HOURS),
+        ("p25", 8, FMT_HOURS),
+        ("Median", 10, FMT_HOURS),
+        ("p75", 8, FMT_HOURS),
+        ("p90", 8, FMT_HOURS),
+        ("Max", 10, FMT_HOURS),
+        ("Outliers (>2x median)", 16, FMT_INT),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    services = sorted(
+        {(w.service.service if getattr(w, "service", None) else "(no service)")
+         for w in work_orders}
+    )
+    row = header_row
+    for svc in services:
+        row += 1
+        same = [w for w in work_orders
+                if (getattr(w.service, "service", None) if getattr(w, "service", None) else "(no service)") == svc]
+        durs = _wo_durations_for(
+            lambda w, _svc=svc: ((getattr(w.service, "service", None) if getattr(w, "service", None) else "(no service)") == _svc),
+            work_orders,
+        )
+        total_cost = sum(float(getattr(w, "estimated_cost", 0) or 0) for w in same)
+        avg = sum(durs) / len(durs) if durs else 0
+        mn, p25, med, p75, p90, mx = _quartiles(durs)
+        outliers = sum(1 for d in durs if med and d > 2 * med)
+        values = [svc, len(same), total_cost, avg, mn, p25, med, p75, p90, mx, outliers]
+        for c_idx, ((_, _w, fmt), val) in enumerate(zip(cols, values), start=1):
+            cell = ws.cell(row=row, column=c_idx, value=val)
+            if fmt:
+                cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_row = row
+    if services:
+        ws.auto_filter.ref = f"A{header_row}:K{last_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        _wo_data_bar(ws, "C", header_row + 1, last_row)
+        _wo_data_bar(ws, "G", header_row + 1, last_row, color="334155")
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "K", max(last_row, header_row))
+
+
+# ---------------------------------------------------------------------
+# 5. Duration Analysis (overall)
+# ---------------------------------------------------------------------
+
+def _wo_write_duration_analysis(wb, work_orders):
+    ws = wb.create_sheet("Duration Analysis")
+    note = (
+        "Overall duration distribution across all work orders with both "
+        "timestamps. Outliers are jobs longer than 2x the overall median."
+    )
+    ws.cell(row=1, column=1, value="Duration Analysis").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    durs = _wo_durations_for(lambda w: True, work_orders)
+    mn, p25, med, p75, p90, mx = _quartiles(durs)
+    avg = sum(durs) / len(durs) if durs else 0
+    excluded = len(work_orders) - len(durs)
+
+    rows = [
+        ("Jobs included (have assigned + completed)", len(durs), FMT_INT),
+        ("Jobs excluded (open or never assigned)", excluded, FMT_INT),
+        ("Average duration (hrs)", avg, FMT_HOURS),
+        ("Min", mn, FMT_HOURS),
+        ("p25", p25, FMT_HOURS),
+        ("Median", med, FMT_HOURS),
+        ("p75", p75, FMT_HOURS),
+        ("p90", p90, FMT_HOURS),
+        ("Max", mx, FMT_HOURS),
+        ("Outliers (>2x median)", sum(1 for d in durs if med and d > 2 * med), FMT_INT),
+    ]
+    for c_idx, (label, val, fmt) in enumerate(rows):
+        r = 5 + c_idx
+        l = ws.cell(row=r, column=1, value=label)
+        l.font = WO_BODY_FONT
+        v = ws.cell(row=r, column=2, value=val)
+        v.font = WO_KPI_VALUE_FONT
+        v.number_format = fmt
+    ws.column_dimensions["A"].width = 44
+    ws.column_dimensions["B"].width = 18
+    ws.print_title_rows = "1:4"
+    _wo_set_print_area(ws, "B", 4 + len(rows))
+
+
+# ---------------------------------------------------------------------
+# 6. Throughput by Hour
+# ---------------------------------------------------------------------
+
+def _wo_write_throughput_by_hour(wb, work_orders):
+    ws = wb.create_sheet("Throughput by Hour")
+    note = (
+        "Created and completed counts per hour-of-day across the period, "
+        "showing when activity is concentrated. Throughput = jobs / unit time."
+    )
+    ws.cell(row=1, column=1, value="Throughput by Hour-of-Day").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Hour (UTC)", 10, "00"),
+        ("Created", 10, FMT_INT),
+        ("Completed", 10, FMT_INT),
+        ("Per-minute (created)", 14, "0.000"),
+        ("Per-30min (created)", 14, "0.00"),
+        ("Per-hour (created)", 14, "0.00"),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    created_by_h = defaultdict(int)
+    completed_by_h = defaultdict(int)
+    for w in work_orders:
+        if w.created_at:
+            created_by_h[w.created_at.hour] += 1
+        completed = getattr(w, "completed_at", None)
+        if completed:
+            completed_by_h[completed.hour] += 1
+
+    for h in range(24):
+        r = header_row + 1 + h
+        c_count = created_by_h.get(h, 0)
+        cells = [
+            (1, h, "00"),
+            (2, c_count, FMT_INT),
+            (3, completed_by_h.get(h, 0), FMT_INT),
+            (4, c_count / 60.0, "0.000"),
+            (5, c_count / 2.0, "0.00"),
+            (6, float(c_count), "0.00"),
+        ]
+        for col, val, fmt in cells:
+            cell = ws.cell(row=r, column=col, value=val)
+            cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_row = header_row + 24
+    ws.auto_filter.ref = f"A{header_row}:F{last_row}"
+    ws.freeze_panes = ws[f"A{header_row + 1}"]
+    _wo_data_bar(ws, "B", header_row + 1, last_row)
+    _wo_data_bar(ws, "C", header_row + 1, last_row, color="64748B")
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "F", last_row)
+
+
+# ---------------------------------------------------------------------
+# 7. Cost per Hour (per vendor)
+# ---------------------------------------------------------------------
+
+def _wo_write_cost_per_hour(wb, work_orders, vendors_by_id, flat_last_row):
+    ws = wb.create_sheet("Cost per Hour")
+    flat = _wo_quoted(WO_FLAT_SHEET)
+    note = (
+        "$/hr by vendor: total estimated cost / total actual duration hours "
+        "(jobs without both assigned + completed timestamps are excluded). "
+        "Per-30min and per-minute rates derived from $/hr."
+    )
+    ws.cell(row=1, column=1, value="Cost per Unit Time").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Vendor", 30, None),
+        ("Total Est Cost", 16, FMT_CURRENCY),
+        ("Total Hours", 12, FMT_HOURS),
+        ("$/hour", 12, FMT_CURRENCY_DEC),
+        ("$/30min", 12, FMT_CURRENCY_DEC),
+        ("$/minute", 12, FMT_CURRENCY_DEC),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    vendor_names = sorted(
+        {_vendor_name(vendors_by_id.get(w.assigned_vendor))
+         for w in work_orders if w.assigned_vendor}
+    )
+    a, b = WO_HEADER_ROW + 1, flat_last_row
+    for i, name in enumerate(vendor_names):
+        r = header_row + 1 + i
+        v_ref = f"A{r}"
+        ws.cell(row=r, column=1, value=name).font = WO_BODY_FONT
+        ws.cell(row=r, column=2,
+                value=f'=SUMIF({flat}!B{a}:B{b},{v_ref},{flat}!M{a}:M{b})').number_format = FMT_CURRENCY
+        ws.cell(row=r, column=3,
+                value=f'=IFERROR(SUMIFS({flat}!AC{a}:AC{b},{flat}!B{a}:B{b},{v_ref},{flat}!AC{a}:AC{b},">0"),0)'
+                ).number_format = FMT_HOURS
+        ws.cell(row=r, column=4,
+                value=f'=IFERROR(B{r}/C{r},0)').number_format = FMT_CURRENCY_DEC
+        ws.cell(row=r, column=5,
+                value=f'=D{r}/2').number_format = FMT_CURRENCY_DEC
+        ws.cell(row=r, column=6,
+                value=f'=D{r}/60').number_format = FMT_CURRENCY_DEC
+        for c_idx in range(1, len(cols) + 1):
+            ws.cell(row=r, column=c_idx).border = THIN_BORDER
+
+    last_row = header_row + len(vendor_names)
+    if vendor_names:
+        ws.auto_filter.ref = f"A{header_row}:F{last_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        _wo_data_bar(ws, "D", header_row + 1, last_row)
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "F", max(last_row, header_row))
+
+
+# ---------------------------------------------------------------------
+# 8. Data Quality
+# ---------------------------------------------------------------------
+
+def _wo_write_data_quality(wb, work_orders, flat_last_row):
+    ws = wb.create_sheet("Data Quality")
+    note = (
+        "Coverage and completeness of the source data driving the report."
+    )
+    ws.cell(row=1, column=1, value="Data Quality").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    n = len(work_orders)
+    miss_assigned = sum(1 for w in work_orders if not getattr(w, "assigned_at", None))
+    miss_completed = sum(1 for w in work_orders if not getattr(w, "completed_at", None))
+    miss_estimated_dates = sum(
+        1 for w in work_orders
+        if not getattr(w, "estimated_start_date", None) or not getattr(w, "estimated_end_date", None)
+    )
+    miss_cost = sum(1 for w in work_orders if not getattr(w, "estimated_cost", None))
+    miss_vendor = sum(1 for w in work_orders if not w.assigned_vendor)
+
+    seen = set()
+    dup_codes = 0
+    for w in work_orders:
+        code = getattr(w, "work_order_code", None)
+        if code is None:
+            continue
+        if code in seen:
+            dup_codes += 1
+        else:
+            seen.add(code)
+
+    rows = [
+        ("Total work order rows", n, FMT_INT),
+        ("Missing Assigned At", miss_assigned, FMT_INT),
+        ("Missing Completed At", miss_completed, FMT_INT),
+        ("Missing Estimated Start/End", miss_estimated_dates, FMT_INT),
+        ("Missing Estimated Cost", miss_cost, FMT_INT),
+        ("Missing Assigned Vendor", miss_vendor, FMT_INT),
+        ("Duplicate work_order_code values", dup_codes, FMT_INT),
+        ("% missing assigned timestamps", (miss_assigned / n) if n else 0, FMT_PCT),
+        ("% missing completed timestamps", (miss_completed / n) if n else 0, FMT_PCT),
+    ]
+    for i, (label, val, fmt) in enumerate(rows):
+        r = 5 + i
+        ws.cell(row=r, column=1, value=label).font = WO_BODY_FONT
+        cell = ws.cell(row=r, column=2, value=val)
+        cell.number_format = fmt
+        cell.font = WO_KPI_VALUE_FONT
+    ws.column_dimensions["A"].width = 40
+    ws.column_dimensions["B"].width = 16
+    ws.print_title_rows = "1:4"
+    _wo_set_print_area(ws, "B", 4 + len(rows))
+
 
 
 # ---------------------------------------------------------------------------
