@@ -129,6 +129,12 @@ def _to_workbook_bytes(wb):
     return buf
 
 
+def _vendor_name(v):
+    if not v:
+        return "Unknown"
+    return v.company_name or getattr(v, "name", None) or "Unknown"
+
+
 # ---------------------------------------------------------------------------
 # Analytics workbook
 # ---------------------------------------------------------------------------
@@ -464,400 +470,670 @@ def _write_msa_expiry_sheet(ws_wb, msas, vendors_by_id, work_orders):
     _finalize_data_sheet(ws, header_row, cols, len(rows))
 
 
-# ---------------------------------------------------------------------------
-# Invoices workbook
-# ---------------------------------------------------------------------------
+# =====================================================================
+# Invoices workbook — executive rebuild
+# =====================================================================
+#
+# Tab order (Executive Summary first, set as active on save):
+#   1. Executive Summary  — KPIs, status mix, top vendors, watch list
+#   2. Invoices Data      — flat source with derived days-to-pay columns
+#   3. Vendor Scorecard   — per-vendor formulas vs flat
+#   4. Aging              — past-due aging buckets
+#   5. Line Items         — flat line item list
+#   6. Throughput by Hour — created/approved/paid counts by hour-of-day
+#   7. Data Quality       — coverage / null counts / duplicates
+#
+# All scalar KPIs and per-vendor metrics are Excel formulas pointing at
+# the flat tab so editing rows in place recalculates the whole book.
+
+I_FLAT_SHEET = "Invoices Data"
+I_REPORT_TITLE = "Invoices Report"
+I_HEADER_ROW = 4
 
 
 def build_invoices_workbook(start=None, end=None):
+    """Executive-quality invoices workbook."""
     wb = Workbook()
     wb.remove(wb.active)
 
-    invoices = (
-        db.session.execute(
-            select(Invoice).options(joinedload(Invoice.line_items))
-        )
-        .unique()
-        .scalars()
-        .all()
-    )
+    invoices = db.session.execute(select(Invoice)).scalars().all()
     if start or end:
-        invoices = [
-            i for i in invoices if _in_range(i.invoice_date, start, end)
-        ]
-    vendors = {v.id: v for v in db.session.execute(select(Vendor)).scalars().all()}
-    work_orders = {
-        w.id: w for w in db.session.execute(select(WorkOrder)).scalars().all()
-    }
+        invoices = [i for i in invoices if _in_range(i.invoice_date, start, end)]
+    vendors_by_id = {v.id: v for v in db.session.execute(select(Vendor)).scalars().all()}
+    workorders_by_id = {w.id: w for w in db.session.execute(select(WorkOrder)).scalars().all()}
+    line_items = db.session.execute(select(LineItem)).scalars().all()
+    line_items_by_invoice = defaultdict(list)
+    for li in line_items:
+        line_items_by_invoice[li.invoice_id].append(li)
 
-    _write_invoice_summary_sheet(wb, invoices, vendors, period=_period_label(start, end))
-    _write_invoices_by_vendor_sheet(wb, invoices, vendors, work_orders)
-    _write_invoices_flat_sheet(wb, invoices, vendors, work_orders)
-    _write_line_items_sheet(wb, invoices, vendors)
+    period = _period_label(start, end)
+
+    flat_last_row = _i_write_flat(wb, invoices, vendors_by_id, workorders_by_id)
+    _i_write_exec_summary(wb, invoices, vendors_by_id, period, flat_last_row)
+    _i_write_vendor_scorecard(wb, invoices, vendors_by_id, flat_last_row)
+    _i_write_aging(wb, invoices)
+    _i_write_line_items(wb, invoices, vendors_by_id, line_items_by_invoice)
+    _i_write_throughput_by_hour(wb, invoices)
+    _i_write_data_quality(wb, invoices)
+
+    exec_idx = wb.sheetnames.index("Executive Summary")
+    if exec_idx != 0:
+        wb.move_sheet("Executive Summary", offset=-exec_idx)
+    wb.active = 0
+
+    exec_ws = wb["Executive Summary"]
+    exec_ws.sheet_view.zoomScale = 100
+    exec_ws.sheet_view.selection[0].activeCell = "A1"
+    exec_ws.sheet_view.selection[0].sqref = "A1"
+
+    for ws in wb.worksheets:
+        if ws.title == "Executive Summary":
+            ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+            _wo_print_setup(ws, period, ws.title, gridlines=False, report_title=I_REPORT_TITLE)
+        else:
+            ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+            _wo_print_setup(ws, period, ws.title, gridlines=True, report_title=I_REPORT_TITLE)
 
     return _to_workbook_bytes(wb)
 
 
-def _vendor_name(v):
-    if not v:
-        return "Unknown vendor"
-    return v.company_name or v.name or "Unknown vendor"
+# ---------------------------------------------------------------------
+# Invoices Data (flat) — source of truth
+# ---------------------------------------------------------------------
 
-
-def _invoice_dates_range(invoices):
-    dates = [_naive(inv.invoice_date) for inv in invoices if inv.invoice_date]
-    if not dates:
-        return None, None
-    return min(dates), max(dates)
-
-
-def _write_invoice_summary_sheet(ws_wb, invoices, vendors_by_id, period=None):
-    ws = ws_wb.create_sheet("Summary")
-
-    if period and period != "All time":
-        subtitle = f"Period covered: {period}"
-    else:
-        period_start, period_end = _invoice_dates_range(invoices)
-        if period_start and period_end:
-            subtitle = (
-                f"Period covered: {period_start.strftime('%Y-%m-%d')} "
-                f"to {period_end.strftime('%Y-%m-%d')}"
-            )
-        else:
-            subtitle = "Period covered: (no invoices)"
-
-    _write_title(
-        ws,
-        "Invoice Summary Report",
-        subtitle,
+def _i_write_flat(wb, invoices, vendors_by_id, workorders_by_id):
+    ws = wb.create_sheet(I_FLAT_SHEET)
+    note = (
+        "Source-of-truth flat list. Columns L-O are derived in-cell: "
+        "Days to Approval, Days to Pay, Past Due?, Days Overdue."
     )
+    ws.cell(row=1, column=1, value="Invoices - source data").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
 
-    # KPI block
-    by_status = defaultdict(lambda: {"count": 0, "amount": 0.0})
-    by_vendor_outstanding = defaultdict(lambda: {"count": 0, "amount": 0.0})
-    grand_total = 0.0
-    paid_total = 0.0
-    outstanding_total = 0.0
-    for inv in invoices:
-        status = _enum_value(inv.invoice_status) or "UNKNOWN"
-        amount = float(inv.total_amount or 0)
-        grand_total += amount
-        by_status[status]["count"] += 1
-        by_status[status]["amount"] += amount
-        if status == "PAID":
-            paid_total += amount
-        elif status not in ("REJECTED",):
-            outstanding_total += amount
-            vid = inv.vendor_id or "unknown"
-            by_vendor_outstanding[vid]["count"] += 1
-            by_vendor_outstanding[vid]["amount"] += amount
-
-    kpi_row = 5
-    ws.cell(row=kpi_row, column=1, value="KEY METRICS").font = SUBHEADER_FONT
-    ws.cell(row=kpi_row, column=1).fill = SUBHEADER_FILL
-    kpis = [
-        ("Total invoices", len(invoices), "#,##0"),
-        ("Total invoiced", grand_total, "$#,##0.00"),
-        ("Paid", paid_total, "$#,##0.00"),
-        ("Outstanding (not paid, not rejected)", outstanding_total, "$#,##0.00"),
+    cols = [
+        ("Invoice ID", 14, None),
+        ("Vendor", 28, None),
+        ("WO #", 10, FMT_INT),
+        ("Status", 14, None),
+        ("Total Amount", 14, FMT_CURRENCY),
+        ("Invoice Date", 14, FMT_DATE),
+        ("Due Date", 14, FMT_DATE),
+        ("Approved At", 16, FMT_DATETIME),
+        ("Paid At", 16, FMT_DATETIME),
+        ("Rejected At", 16, FMT_DATETIME),
+        ("Created", 16, FMT_DATETIME),
+        ("Days to Approval", 16, FMT_HOURS),
+        ("Days to Pay", 14, FMT_HOURS),
+        ("Past Due?", 10, None),
+        ("Days Overdue", 14, FMT_INT),
     ]
-    for i, (label, value, fmt) in enumerate(kpis, start=kpi_row + 1):
-        ws.cell(row=i, column=1, value=label).border = THIN_BORDER
-        cell = ws.cell(row=i, column=2, value=value)
+    _apply_widths(ws, cols)
+
+    header_row = I_HEADER_ROW
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.alignment = Alignment(horizontal="left", vertical="center")
         cell.border = THIN_BORDER
-        if fmt:
-            cell.number_format = fmt
-    ws.column_dimensions["A"].width = 38
-    ws.column_dimensions["B"].width = 22
-
-    # Status breakdown table
-    status_header_row = kpi_row + len(kpis) + 3
-    ws.cell(row=status_header_row - 1, column=1, value="BREAKDOWN BY STATUS").font = SUBHEADER_FONT
-    ws.cell(row=status_header_row - 1, column=1).fill = SUBHEADER_FILL
-    cols = [
-        ("Status", 18, None),
-        ("Count", 12, "#,##0"),
-        ("Total", 18, "$#,##0.00"),
-    ]
-    _write_header(ws, status_header_row, cols)
-    status_rows = sorted(
-        by_status.items(), key=lambda kv: kv[1]["amount"], reverse=True
-    )
-    for i, (status, slot) in enumerate(status_rows, start=status_header_row + 1):
-        _write_row(
-            ws,
-            i,
-            cols,
-            [status, slot["count"], slot["amount"]],
-            status_col=0,
-        )
-    bottom = status_header_row + len(status_rows)
-    grand_row = bottom + 1
-    ws.cell(row=grand_row, column=1, value="GRAND TOTAL").font = SUBHEADER_FONT
-    ws.cell(row=grand_row, column=1).fill = SUBHEADER_FILL
-    ws.cell(row=grand_row, column=1).border = THIN_BORDER
-    cnt_cell = ws.cell(
-        row=grand_row,
-        column=2,
-        value=sum(s["count"] for s in by_status.values()),
-    )
-    cnt_cell.number_format = "#,##0"
-    cnt_cell.font = SUBHEADER_FONT
-    cnt_cell.border = THIN_BORDER
-    total_cell = ws.cell(row=grand_row, column=3, value=grand_total)
-    total_cell.number_format = "$#,##0.00"
-    total_cell.font = SUBHEADER_FONT
-    total_cell.border = THIN_BORDER
-
-    # Top outstanding vendors
-    sub_row = grand_row + 3
-    ws.cell(row=sub_row - 1, column=1, value="OUTSTANDING BY VENDOR (not paid, not rejected)").font = SUBHEADER_FONT
-    ws.cell(row=sub_row - 1, column=1).fill = SUBHEADER_FILL
-    sub_cols = [
-        ("Vendor", 32, None),
-        ("Open invoices", 14, "#,##0"),
-        ("Outstanding", 20, "$#,##0.00"),
-    ]
-    _apply_widths(ws, sub_cols)
-    _write_header(ws, sub_row, sub_cols)
-    sub_rows = sorted(
-        by_vendor_outstanding.items(),
-        key=lambda kv: kv[1]["amount"],
-        reverse=True,
-    )
-    for i, (vid, slot) in enumerate(sub_rows, start=sub_row + 1):
-        v = vendors_by_id.get(vid)
-        _write_row(ws, i, sub_cols, [_vendor_name(v), slot["count"], slot["amount"]])
-
-
-def _write_invoices_by_vendor_sheet(
-    ws_wb, invoices, vendors_by_id, workorders_by_id
-):
-    """Per-vendor groupings with subtotals -- the client-friendly view."""
-    ws = ws_wb.create_sheet("By Vendor")
-    _write_title(
-        ws,
-        "Invoices by Vendor",
-        "Grouped per vendor with a subtotal beneath each block. Rows are color-coded by status.",
-    )
-
-    cols = [
-        ("Invoice #", 12, None),
-        ("WO #", 10, "#,##0"),
-        ("Status", 14, None),
-        ("Invoice Date", 14, "yyyy-mm-dd"),
-        ("Due Date", 14, "yyyy-mm-dd"),
-        ("Period Start", 14, "yyyy-mm-dd"),
-        ("Period End", 14, "yyyy-mm-dd"),
-        ("Approved", 14, "yyyy-mm-dd"),
-        ("Paid", 14, "yyyy-mm-dd"),
-        ("Amount", 16, "$#,##0.00"),
-    ]
-    _apply_widths(ws, cols)
-
-    # Group by vendor
-    by_vendor = defaultdict(list)
-    for inv in invoices:
-        by_vendor[inv.vendor_id or "unknown"].append(inv)
-
-    # Sort vendors by total (desc) so largest billers are first
-    vendor_totals = {
-        vid: sum(float(i.total_amount or 0) for i in invs)
-        for vid, invs in by_vendor.items()
-    }
-    sorted_vendors = sorted(
-        by_vendor.keys(),
-        key=lambda vid: vendor_totals[vid],
-        reverse=True,
-    )
-
-    row = 5
-    for vid in sorted_vendors:
-        v = vendors_by_id.get(vid)
-        invs = sorted(
-            by_vendor[vid],
-            key=lambda inv: inv.invoice_date or datetime.min,
-            reverse=True,
-        )
-
-        # Vendor banner
-        banner = ws.cell(row=row, column=1, value=_vendor_name(v))
-        banner.font = Font(bold=True, color="FFFFFF", size=12)
-        banner.fill = HEADER_FILL
-        ws.merge_cells(
-            start_row=row, start_column=1, end_row=row, end_column=len(cols)
-        )
-        row += 1
-
-        # Vendor meta line (code + contact)
-        if v:
-            meta_parts = []
-            if v.vendor_code:
-                meta_parts.append(f"Vendor code: {v.vendor_code}")
-            if v.primary_contact_name:
-                meta_parts.append(f"Contact: {v.primary_contact_name}")
-            if v.company_email:
-                meta_parts.append(v.company_email)
-            if v.company_phone:
-                meta_parts.append(v.company_phone)
-            if meta_parts:
-                meta_cell = ws.cell(row=row, column=1, value=" · ".join(meta_parts))
-                meta_cell.font = META_FONT
-                ws.merge_cells(
-                    start_row=row, start_column=1, end_row=row, end_column=len(cols)
-                )
-                row += 1
-
-        # Column headers for this block
-        _write_header(ws, row, cols)
-        row += 1
-
-        vendor_total = 0.0
-        for inv in invs:
-            wo = workorders_by_id.get(inv.work_order_id)
-            wo_code = getattr(wo, "work_order_code", None) if wo else None
-            status = _enum_value(inv.invoice_status)
-            amount = float(inv.total_amount or 0)
-            vendor_total += amount
-            _write_row(
-                ws,
-                row,
-                cols,
-                [
-                    inv.id[:8],
-                    wo_code,
-                    status,
-                    _naive(inv.invoice_date),
-                    _naive(inv.due_date),
-                    _naive(inv.period_start),
-                    _naive(inv.period_end),
-                    _naive(inv.approved_at),
-                    _naive(inv.paid_at),
-                    amount,
-                ],
-                status_col=2,
-            )
-            row += 1
-
-        # Subtotal row
-        sub = ws.cell(row=row, column=1, value="Vendor subtotal")
-        sub.font = SUBHEADER_FONT
-        sub.fill = SUBHEADER_FILL
-        sub.border = THIN_BORDER
-        for c in range(2, len(cols)):
-            ws.cell(row=row, column=c, value=None).fill = SUBHEADER_FILL
-            ws.cell(row=row, column=c).border = THIN_BORDER
-        amount_cell = ws.cell(row=row, column=len(cols), value=vendor_total)
-        amount_cell.number_format = "$#,##0.00"
-        amount_cell.font = SUBHEADER_FONT
-        amount_cell.fill = SUBHEADER_FILL
-        amount_cell.border = THIN_BORDER
-        row += 2  # blank row between vendors
-
-    ws.freeze_panes = ws["A5"]
-
-
-def _write_invoices_flat_sheet(ws_wb, invoices, vendors_by_id, workorders_by_id):
-    """Flat sortable/filterable sheet -- for analysts who want one big table."""
-    ws = ws_wb.create_sheet("All Invoices (flat)")
-    _write_title(
-        ws,
-        "All Invoices",
-        "Flat list of every invoice. Use the auto-filter on the header row to slice.",
-    )
-
-    header_row = 5
-    cols = [
-        ("Vendor", 30, None),
-        ("Invoice #", 12, None),
-        ("WO #", 10, "#,##0"),
-        ("Status", 14, None),
-        ("Invoice Date", 14, "yyyy-mm-dd"),
-        ("Due Date", 14, "yyyy-mm-dd"),
-        ("Period Start", 14, "yyyy-mm-dd"),
-        ("Period End", 14, "yyyy-mm-dd"),
-        ("Amount", 16, "$#,##0.00"),
-        ("Approved at", 18, "yyyy-mm-dd hh:mm"),
-        ("Paid at", 18, "yyyy-mm-dd hh:mm"),
-        ("Rejected at", 18, "yyyy-mm-dd hh:mm"),
-        ("Created at", 18, "yyyy-mm-dd hh:mm"),
-    ]
-    _apply_widths(ws, cols)
-    _write_header(ws, header_row, cols)
 
     sorted_invoices = sorted(
         invoices,
-        key=lambda inv: (
-            _vendor_name(vendors_by_id.get(inv.vendor_id)),
-            -((inv.invoice_date or datetime.min).timestamp() if inv.invoice_date else 0),
-        ),
+        key=lambda i: -((i.invoice_date or datetime.min).timestamp() if i.invoice_date else 0),
     )
-    for i, inv in enumerate(sorted_invoices, start=header_row + 1):
-        v = vendors_by_id.get(inv.vendor_id)
-        wo = workorders_by_id.get(inv.work_order_id)
+    for offset, inv in enumerate(sorted_invoices):
+        row = header_row + 1 + offset
+        v = vendors_by_id.get(inv.vendor_id) if inv.vendor_id else None
+        wo = workorders_by_id.get(inv.work_order_id) if inv.work_order_id else None
         wo_code = getattr(wo, "work_order_code", None) if wo else None
-        status = _enum_value(inv.invoice_status)
-        _write_row(
-            ws,
-            i,
-            cols,
-            [
-                _vendor_name(v),
-                inv.id[:8],
-                wo_code,
-                status,
-                _naive(inv.invoice_date),
-                _naive(inv.due_date),
-                _naive(inv.period_start),
-                _naive(inv.period_end),
-                float(inv.total_amount or 0),
-                _naive(inv.approved_at),
-                _naive(inv.paid_at),
-                _naive(inv.rejected_at),
-                _naive(inv.created_at),
-            ],
-            status_col=3,
+
+        # F = Invoice Date, G = Due Date, H = Approved At, I = Paid At, D = Status
+        days_to_approval = (
+            f'=IF(AND(F{row}<>"",H{row}<>""),H{row}-F{row},"")'
         )
-    _finalize_data_sheet(ws, header_row, cols, len(sorted_invoices))
+        days_to_pay = (
+            f'=IF(AND(H{row}<>"",I{row}<>""),I{row}-H{row},"")'
+        )
+        past_due = (
+            f'=IF(AND(G{row}<>"",I{row}="",D{row}<>"PAID",TODAY()>G{row}),"Yes","No")'
+        )
+        days_overdue = (
+            f'=IF(N{row}="Yes",TODAY()-G{row},"")'
+        )
+
+        values = [
+            inv.id[:8] if inv.id else "",
+            _vendor_name(v),
+            wo_code,
+            _enum_value(getattr(inv, "invoice_status", None)),
+            float(getattr(inv, "total_amount", 0) or 0),
+            _naive(getattr(inv, "invoice_date", None)),
+            _naive(getattr(inv, "due_date", None)),
+            _naive(getattr(inv, "approved_at", None)),
+            _naive(getattr(inv, "paid_at", None)),
+            _naive(getattr(inv, "rejected_at", None)),
+            _naive(getattr(inv, "created_at", None)),
+            days_to_approval,
+            days_to_pay,
+            past_due,
+            days_overdue,
+        ]
+
+        for c_idx, ((_, _w, fmt), value) in enumerate(zip(cols, values), start=1):
+            cell = ws.cell(row=row, column=c_idx, value=value)
+            if fmt:
+                cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_data_row = header_row + len(sorted_invoices)
+    last_col_letter = get_column_letter(len(cols))
+
+    if sorted_invoices:
+        ws.auto_filter.ref = f"A{header_row}:{last_col_letter}{last_data_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        rng = f"D{header_row + 1}:D{last_data_row}"
+        for status, fill in (
+            ("PAID", WO_GREEN_FILL),
+            ("APPROVED", WO_GREEN_FILL),
+            ("SUBMITTED", WO_AMBER_FILL),
+            ("DRAFT", WO_SLATE_FILL),
+            ("REJECTED", WO_RED_FILL),
+        ):
+            ws.conditional_formatting.add(
+                rng, CellIsRule(operator="equal", formula=[f'"{status}"'], fill=fill)
+            )
+        _wo_data_bar(ws, "E", header_row + 1, last_data_row)
+        ws.conditional_formatting.add(
+            f"N{header_row + 1}:N{last_data_row}",
+            CellIsRule(operator="equal", formula=['"Yes"'], fill=WO_RED_FILL),
+        )
+
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, last_col_letter, max(last_data_row, header_row))
+    return last_data_row
 
 
-def _write_line_items_sheet(ws_wb, invoices, vendors_by_id):
-    ws = ws_wb.create_sheet("Line Items")
-    _write_title(ws, "Invoice Line Items", "Every line item, joined back to its invoice and vendor.")
+# ---------------------------------------------------------------------
+# Executive Summary
+# ---------------------------------------------------------------------
 
-    header_row = 5
+def _i_write_exec_summary(wb, invoices, vendors_by_id, period, flat_last_row):
+    ws = wb.create_sheet("Executive Summary")
+    flat = _wo_quoted(I_FLAT_SHEET)
+    n = len(invoices)
+    a, b = I_HEADER_ROW + 1, flat_last_row
+
+    ws.merge_cells("A1:F1")
+    ws["A1"] = I_REPORT_TITLE
+    ws["A1"].font = WO_TITLE_FONT
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center")
+    ws["A2"] = f"Period: {period}    ·    {n:,} invoice(s)"
+    ws["A2"].font = WO_NOTE_FONT
+    ws["A3"] = f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    ws["A3"].font = WO_NOTE_FONT
+
+    kpi_row = 6
+    kpi_specs = [
+        ("Total invoiced",
+         f"=SUM({flat}!E{a}:E{b})", FMT_CURRENCY),
+        ("Invoice count",
+         f"=COUNTA({flat}!A{a}:A{b})", FMT_INT),
+        ("Approval rate",
+         f'=IFERROR((COUNTIF({flat}!D{a}:D{b},"APPROVED")'
+         f'+COUNTIF({flat}!D{a}:D{b},"PAID"))'
+         f'/COUNTA({flat}!D{a}:D{b}),0)', FMT_PCT),
+        ("Average days to approval",
+         f'=IFERROR(AVERAGE({flat}!L{a}:L{b}),0)', "#,##0.0"),
+        ("Average days to pay",
+         f'=IFERROR(AVERAGE({flat}!M{a}:M{b}),0)', "#,##0.0"),
+        ("% past due",
+         f'=IFERROR(COUNTIF({flat}!N{a}:N{b},"Yes")'
+         f'/COUNTA({flat}!N{a}:N{b}),0)', FMT_PCT),
+    ]
+    for idx, (label, formula, fmt) in enumerate(kpi_specs):
+        col = (idx % 3) * 2 + 1
+        row = kpi_row + (idx // 3) * 3
+        l = ws.cell(row=row, column=col, value=label); l.font = WO_KPI_LABEL_FONT
+        v = ws.cell(row=row + 1, column=col, value=formula)
+        v.font = WO_KPI_VALUE_FONT
+        v.number_format = fmt
+        for c in (l, v):
+            c.border = THIN_BORDER
+
+    for col_letter in ("A", "B", "C", "D", "E", "F"):
+        ws.column_dimensions[col_letter].width = 22
+
+    section_row = kpi_row + 7
+    ws.cell(row=section_row, column=1, value="STATUS BREAKDOWN").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    cols = [("Status", 22, None), ("Count", 12, FMT_INT), ("Total", 16, FMT_CURRENCY), ("Share", 10, FMT_PCT)]
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD; h.fill = WO_HEADER_FILL
+    statuses = ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PAID"]
+    total_formula = f"COUNTA({flat}!D{a}:D{b})"
+    for i, status in enumerate(statuses):
+        r = section_row + 1 + i
+        ws.cell(row=r, column=1, value=status).font = WO_BODY_FONT
+        ws.cell(row=r, column=2,
+                value=f'=COUNTIF({flat}!D{a}:D{b},"{status}")').number_format = FMT_INT
+        ws.cell(row=r, column=3,
+                value=f'=SUMIF({flat}!D{a}:D{b},"{status}",{flat}!E{a}:E{b})'
+                ).number_format = FMT_CURRENCY
+        ws.cell(row=r, column=4,
+                value=f'=IFERROR(COUNTIF({flat}!D{a}:D{b},"{status}")/{total_formula},0)'
+                ).number_format = FMT_PCT
+    status_last = section_row + len(statuses)
+
+    section_row = status_last + 3
+    ws.cell(row=section_row, column=1, value="TOP 5 VENDORS BY INVOICED $").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    for c_idx, label in enumerate(["Vendor", "Invoices", "Invoiced $"], start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD; h.fill = WO_HEADER_FILL
+    by_vendor = defaultdict(lambda: {"count": 0, "total": 0.0, "name": ""})
+    for inv in invoices:
+        if not inv.vendor_id:
+            continue
+        slot = by_vendor[inv.vendor_id]
+        slot["count"] += 1
+        slot["total"] += float(getattr(inv, "total_amount", 0) or 0)
+        slot["name"] = _vendor_name(vendors_by_id.get(inv.vendor_id))
+    top = sorted(by_vendor.values(), key=lambda x: x["total"], reverse=True)[:5]
+    for i, slot in enumerate(top):
+        r = section_row + 1 + i
+        ws.cell(row=r, column=1, value=slot["name"]).font = WO_BODY_FONT
+        ws.cell(row=r, column=2, value=slot["count"]).number_format = FMT_INT
+        ws.cell(row=r, column=3, value=slot["total"]).number_format = FMT_CURRENCY
+    top_last = section_row + max(len(top), 1)
+
+    section_row = top_last + 3
+    ws.cell(row=section_row, column=1, value="WATCH LIST").font = WO_SECTION_FONT
+    ws.cell(row=section_row, column=1).fill = WO_SECTION_FILL
+    section_row += 1
+    for c_idx, label in enumerate(["Indicator", "Count"], start=1):
+        h = ws.cell(row=section_row, column=c_idx, value=label)
+        h.font = WO_HEADER_FONT_BOLD; h.fill = WO_HEADER_FILL
+    watch_specs = [
+        ("Past due invoices",
+         f'=COUNTIF({flat}!N{a}:N{b},"Yes")'),
+        ("Rejected invoices",
+         f'=COUNTIF({flat}!D{a}:D{b},"REJECTED")'),
+        ("Submitted (awaiting approval)",
+         f'=COUNTIF({flat}!D{a}:D{b},"SUBMITTED")'),
+        ("Days overdue >= 30 (any)",
+         f'=COUNTIFS({flat}!O{a}:O{b},">=30")'),
+        ("Days overdue >= 60 (any)",
+         f'=COUNTIFS({flat}!O{a}:O{b},">=60")'),
+    ]
+    for i, (label, formula) in enumerate(watch_specs):
+        r = section_row + 1 + i
+        ws.cell(row=r, column=1, value=label).font = WO_BODY_FONT
+        ws.cell(row=r, column=2, value=formula).number_format = FMT_INT
+
+
+# ---------------------------------------------------------------------
+# Vendor Scorecard
+# ---------------------------------------------------------------------
+
+def _i_write_vendor_scorecard(wb, invoices, vendors_by_id, flat_last_row):
+    ws = wb.create_sheet("Vendor Scorecard")
+    flat = _wo_quoted(I_FLAT_SHEET)
+    note = (
+        "Per-vendor performance vs the flat data tab. All metrics are formulas; "
+        "edit rows in 'Invoices Data' and this tab recalculates."
+    )
+    ws.cell(row=1, column=1, value="Vendor Scorecard").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
     cols = [
         ("Vendor", 30, None),
-        ("Invoice #", 12, None),
-        ("Line #", 12, None),
-        ("Description", 40, None),
-        ("Quantity", 12, "#,##0"),
-        ("Rate", 14, "$#,##0.00"),
-        ("Amount", 16, "$#,##0.00"),
+        ("Invoices", 10, FMT_INT),
+        ("Total Invoiced", 16, FMT_CURRENCY),
+        ("Approval Rate", 14, FMT_PCT),
+        ("Rejection Rate", 14, FMT_PCT),
+        ("Avg Days to Approval", 18, "#,##0.0"),
+        ("Avg Days to Pay", 16, "#,##0.0"),
+        ("Past Due Count", 14, FMT_INT),
+        ("% Past Due", 12, FMT_PCT),
     ]
     _apply_widths(ws, cols)
-    _write_header(ws, header_row, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    vendor_names = sorted(
+        {_vendor_name(vendors_by_id.get(inv.vendor_id))
+         for inv in invoices if inv.vendor_id}
+    )
+    a, b = I_HEADER_ROW + 1, flat_last_row
+    for i, name in enumerate(vendor_names):
+        r = header_row + 1 + i
+        v_ref = f"A{r}"
+        ws.cell(row=r, column=1, value=name).font = WO_BODY_FONT
+        ws.cell(row=r, column=2,
+                value=f'=COUNTIF({flat}!B{a}:B{b},{v_ref})').number_format = FMT_INT
+        ws.cell(row=r, column=3,
+                value=f'=SUMIF({flat}!B{a}:B{b},{v_ref},{flat}!E{a}:E{b})'
+                ).number_format = FMT_CURRENCY
+        ws.cell(row=r, column=4,
+                value=(
+                    f'=IFERROR(('
+                    f'COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!D{a}:D{b},"APPROVED")'
+                    f'+COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!D{a}:D{b},"PAID"))'
+                    f'/COUNTIF({flat}!B{a}:B{b},{v_ref}),0)'
+                )).number_format = FMT_PCT
+        ws.cell(row=r, column=5,
+                value=f'=IFERROR(COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!D{a}:D{b},"REJECTED")/COUNTIF({flat}!B{a}:B{b},{v_ref}),0)'
+                ).number_format = FMT_PCT
+        ws.cell(row=r, column=6,
+                value=f'=IFERROR(AVERAGEIFS({flat}!L{a}:L{b},{flat}!B{a}:B{b},{v_ref},{flat}!L{a}:L{b},">=0"),0)'
+                ).number_format = "#,##0.0"
+        ws.cell(row=r, column=7,
+                value=f'=IFERROR(AVERAGEIFS({flat}!M{a}:M{b},{flat}!B{a}:B{b},{v_ref},{flat}!M{a}:M{b},">=0"),0)'
+                ).number_format = "#,##0.0"
+        ws.cell(row=r, column=8,
+                value=f'=COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!N{a}:N{b},"Yes")'
+                ).number_format = FMT_INT
+        ws.cell(row=r, column=9,
+                value=f'=IFERROR(COUNTIFS({flat}!B{a}:B{b},{v_ref},{flat}!N{a}:N{b},"Yes")/COUNTIF({flat}!B{a}:B{b},{v_ref}),0)'
+                ).number_format = FMT_PCT
+        for c_idx in range(1, len(cols) + 1):
+            ws.cell(row=r, column=c_idx).border = THIN_BORDER
+
+    last_row = header_row + len(vendor_names)
+    if vendor_names:
+        ws.auto_filter.ref = f"A{header_row}:I{last_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        # Highlight rejection rate >10%
+        ws.conditional_formatting.add(
+            f"E{header_row + 1}:E{last_row}",
+            CellIsRule(operator="greaterThan", formula=["0.1"], fill=WO_RED_FILL),
+        )
+        ws.conditional_formatting.add(
+            f"I{header_row + 1}:I{last_row}",
+            CellIsRule(operator="greaterThan", formula=["0.2"], fill=WO_RED_FILL),
+        )
+        _wo_data_bar(ws, "C", header_row + 1, last_row)
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "I", max(last_row, header_row))
+
+
+# ---------------------------------------------------------------------
+# Aging
+# ---------------------------------------------------------------------
+
+def _i_write_aging(wb, invoices):
+    ws = wb.create_sheet("Aging")
+    note = (
+        "Aging buckets for unpaid, past-due invoices, calculated from "
+        "today's date when the workbook was generated."
+    )
+    ws.cell(row=1, column=1, value="Invoice Aging").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Bucket", 18, None),
+        ("Invoices", 10, FMT_INT),
+        ("Total $", 16, FMT_CURRENCY),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    today = datetime.utcnow().date()
+    buckets = {
+        "Current (not past due)": (None, 0, [], 0.0),
+        "1-30 days": (1, 30, [], 0.0),
+        "31-60 days": (31, 60, [], 0.0),
+        "61-90 days": (61, 90, [], 0.0),
+        "90+ days": (91, None, [], 0.0),
+    }
+    for inv in invoices:
+        if getattr(inv, "paid_at", None):
+            continue
+        if _enum_value(getattr(inv, "invoice_status", None)) == "PAID":
+            continue
+        due = getattr(inv, "due_date", None)
+        if not due:
+            continue
+        due_d = due.date() if hasattr(due, "date") else due
+        days = (today - due_d).days
+        amt = float(getattr(inv, "total_amount", 0) or 0)
+        if days <= 0:
+            buckets["Current (not past due)"][2].append(inv)
+            buckets["Current (not past due)"] = (None, 0,
+                                                 buckets["Current (not past due)"][2],
+                                                 buckets["Current (not past due)"][3] + amt)
+        elif days <= 30:
+            buckets["1-30 days"][2].append(inv)
+            buckets["1-30 days"] = (1, 30, buckets["1-30 days"][2], buckets["1-30 days"][3] + amt)
+        elif days <= 60:
+            buckets["31-60 days"][2].append(inv)
+            buckets["31-60 days"] = (31, 60, buckets["31-60 days"][2], buckets["31-60 days"][3] + amt)
+        elif days <= 90:
+            buckets["61-90 days"][2].append(inv)
+            buckets["61-90 days"] = (61, 90, buckets["61-90 days"][2], buckets["61-90 days"][3] + amt)
+        else:
+            buckets["90+ days"][2].append(inv)
+            buckets["90+ days"] = (91, None, buckets["90+ days"][2], buckets["90+ days"][3] + amt)
+
+    row = header_row
+    for label, (_lo, _hi, items, total) in buckets.items():
+        row += 1
+        ws.cell(row=row, column=1, value=label).font = WO_BODY_FONT
+        ws.cell(row=row, column=2, value=len(items)).number_format = FMT_INT
+        ws.cell(row=row, column=3, value=total).number_format = FMT_CURRENCY
+        for c_idx in range(1, len(cols) + 1):
+            ws.cell(row=row, column=c_idx).border = THIN_BORDER
+
+    if buckets:
+        _wo_data_bar(ws, "C", header_row + 1, row)
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "C", row)
+
+
+# ---------------------------------------------------------------------
+# Line Items
+# ---------------------------------------------------------------------
+
+def _i_write_line_items(wb, invoices, vendors_by_id, line_items_by_invoice):
+    ws = wb.create_sheet("Line Items")
+    note = "Every line item across every invoice in the period."
+    ws.cell(row=1, column=1, value="Line Items").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Invoice ID", 14, None),
+        ("Vendor", 28, None),
+        ("Description", 38, None),
+        ("Quantity", 10, "#,##0.00"),
+        ("Unit Price", 12, FMT_CURRENCY_DEC),
+        ("Amount", 14, FMT_CURRENCY_DEC),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
 
     rows = []
     for inv in invoices:
-        v = vendors_by_id.get(inv.vendor_id)
-        for li in inv.line_items or []:
-            rows.append(
-                [
-                    _vendor_name(v),
-                    inv.id[:8],
-                    li.id[:8],
-                    li.description or "",
-                    int(li.quantity or 0),
-                    float(li.rate or 0),
-                    float(li.amount or 0),
-                ]
-            )
-    rows.sort(key=lambda r: (r[0], r[1]))
-    for i, row in enumerate(rows, start=header_row + 1):
-        _write_row(ws, i, cols, row)
-    _finalize_data_sheet(ws, header_row, cols, len(rows))
+        items = line_items_by_invoice.get(inv.id, [])
+        v = vendors_by_id.get(inv.vendor_id) if inv.vendor_id else None
+        for li in items:
+            qty = float(getattr(li, "quantity", 0) or 0)
+            unit_price = float(getattr(li, "unit_price", 0) or 0)
+            amount = float(getattr(li, "amount", None) or qty * unit_price)
+            rows.append([
+                inv.id[:8] if inv.id else "",
+                _vendor_name(v),
+                getattr(li, "description", None) or "",
+                qty,
+                unit_price,
+                amount,
+            ])
 
+    for i, vals in enumerate(rows):
+        r = header_row + 1 + i
+        for c_idx, ((_, _w, fmt), val) in enumerate(zip(cols, vals), start=1):
+            cell = ws.cell(row=r, column=c_idx, value=val)
+            if fmt:
+                cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_row = header_row + len(rows)
+    if rows:
+        ws.auto_filter.ref = f"A{header_row}:F{last_row}"
+        ws.freeze_panes = ws[f"A{header_row + 1}"]
+        _wo_data_bar(ws, "F", header_row + 1, last_row)
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "F", max(last_row, header_row))
+
+
+# ---------------------------------------------------------------------
+# Throughput by Hour
+# ---------------------------------------------------------------------
+
+def _i_write_throughput_by_hour(wb, invoices):
+    ws = wb.create_sheet("Throughput by Hour")
+    note = "Created, approved, and paid counts per hour-of-day."
+    ws.cell(row=1, column=1, value="Throughput by Hour-of-Day").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    cols = [
+        ("Hour (UTC)", 10, "00"),
+        ("Created", 10, FMT_INT),
+        ("Approved", 10, FMT_INT),
+        ("Paid", 10, FMT_INT),
+    ]
+    _apply_widths(ws, cols)
+    header_row = 4
+    for c_idx, (label, _w, _f) in enumerate(cols, start=1):
+        cell = ws.cell(row=header_row, column=c_idx, value=label)
+        cell.font = WO_HEADER_FONT_BOLD
+        cell.fill = WO_HEADER_FILL
+        cell.border = THIN_BORDER
+
+    created_by_h = defaultdict(int)
+    approved_by_h = defaultdict(int)
+    paid_by_h = defaultdict(int)
+    for inv in invoices:
+        if getattr(inv, "created_at", None):
+            created_by_h[inv.created_at.hour] += 1
+        if getattr(inv, "approved_at", None):
+            approved_by_h[inv.approved_at.hour] += 1
+        if getattr(inv, "paid_at", None):
+            paid_by_h[inv.paid_at.hour] += 1
+
+    for h in range(24):
+        r = header_row + 1 + h
+        cells = [
+            (1, h, "00"),
+            (2, created_by_h.get(h, 0), FMT_INT),
+            (3, approved_by_h.get(h, 0), FMT_INT),
+            (4, paid_by_h.get(h, 0), FMT_INT),
+        ]
+        for col, val, fmt in cells:
+            cell = ws.cell(row=r, column=col, value=val)
+            cell.number_format = fmt
+            cell.font = WO_BODY_FONT
+            cell.border = THIN_BORDER
+
+    last_row = header_row + 24
+    ws.auto_filter.ref = f"A{header_row}:D{last_row}"
+    ws.freeze_panes = ws[f"A{header_row + 1}"]
+    _wo_data_bar(ws, "B", header_row + 1, last_row)
+    _wo_data_bar(ws, "C", header_row + 1, last_row, color="64748B")
+    ws.print_title_rows = f"1:{header_row}"
+    _wo_set_print_area(ws, "D", last_row)
+
+
+# ---------------------------------------------------------------------
+# Data Quality
+# ---------------------------------------------------------------------
+
+def _i_write_data_quality(wb, invoices):
+    ws = wb.create_sheet("Data Quality")
+    note = "Coverage and completeness of the invoice source data."
+    ws.cell(row=1, column=1, value="Data Quality").font = WO_TAB_TITLE_FONT
+    ws.cell(row=2, column=1, value=note).font = WO_NOTE_FONT
+    ws.cell(
+        row=3, column=1,
+        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+    ).font = WO_NOTE_FONT
+
+    n = len(invoices)
+    miss_invoice_date = sum(1 for inv in invoices if not getattr(inv, "invoice_date", None))
+    miss_due = sum(1 for inv in invoices if not getattr(inv, "due_date", None))
+    miss_amount = sum(1 for inv in invoices if not getattr(inv, "total_amount", None))
+    miss_vendor = sum(1 for inv in invoices if not inv.vendor_id)
+    miss_wo = sum(1 for inv in invoices if not inv.work_order_id)
+
+    seen = set()
+    dup_ids = 0
+    for inv in invoices:
+        if inv.id is None:
+            continue
+        if inv.id in seen:
+            dup_ids += 1
+        else:
+            seen.add(inv.id)
+
+    rows = [
+        ("Total invoice rows", n, FMT_INT),
+        ("Missing Invoice Date", miss_invoice_date, FMT_INT),
+        ("Missing Due Date", miss_due, FMT_INT),
+        ("Missing Total Amount", miss_amount, FMT_INT),
+        ("Missing Vendor", miss_vendor, FMT_INT),
+        ("Missing Work Order link", miss_wo, FMT_INT),
+        ("Duplicate invoice ids", dup_ids, FMT_INT),
+        ("% missing invoice_date", (miss_invoice_date / n) if n else 0, FMT_PCT),
+        ("% missing due_date", (miss_due / n) if n else 0, FMT_PCT),
+    ]
+    for i, (label, val, fmt) in enumerate(rows):
+        r = 5 + i
+        ws.cell(row=r, column=1, value=label).font = WO_BODY_FONT
+        cell = ws.cell(row=r, column=2, value=val)
+        cell.number_format = fmt
+        cell.font = WO_KPI_VALUE_FONT
+    ws.column_dimensions["A"].width = 40
+    ws.column_dimensions["B"].width = 16
+    ws.print_title_rows = "1:4"
+    _wo_set_print_area(ws, "B", 4 + len(rows))
 
 
 # =====================================================================
