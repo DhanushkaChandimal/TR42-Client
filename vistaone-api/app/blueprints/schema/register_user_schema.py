@@ -9,7 +9,9 @@ class RegisterUserSchema(ma.Schema):
     username = fields.String(required=True)
 
     @validates("username")
-    def validate_username(self, value):
+    def validate_username(self, value, **kwargs):
+        # Marshmallow 4 passes context kwargs (data_key, partial, ...) to
+        # @validates methods. Accept **kwargs so the call doesn't TypeError.
         if "@" in value:
             raise ValidationError("Username must not contain '@'.")
         if len(value.strip()) < 3:
