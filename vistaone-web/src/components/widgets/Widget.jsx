@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { WIDGET_REGISTRY, WIDGET_SIZES, widgetTypeOptions } from "./registry";
 
 const SIZE_LABELS = { small: "Small", medium: "Medium", large: "Large" };
@@ -168,7 +169,7 @@ export function WidgetPickerModal({
         return acc;
     }, {});
 
-    return (
+    return createPortal(
         <div
             className="widget-picker__backdrop"
             onClick={onClose}
@@ -230,6 +231,7 @@ export function WidgetPickerModal({
                     ))}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
