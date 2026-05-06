@@ -83,6 +83,11 @@ function SideBar({ navData }) {
                                 {getIcon(item.icon)}
                             </span>
                             <span>{item.label}</span>
+                            {item.badge ? (
+                                <span className="sidebar-badge">
+                                    {item.badge > 9 ? "9+" : item.badge}
+                                </span>
+                            ) : null}
                         </li>
                     ))}
                 </ul>

@@ -4,6 +4,7 @@ import SideBar from "./SideBar";
 import { sidebarNav } from "../data/dashboardData";
 import LoadingOverlay from "./LoadingOverlay";
 import { useAuthContext } from "../context/AuthContext";
+import { usePendingApprovalCount } from "../hooks/usePendingApprovalCount";
 
 function AppShell({
     title,
@@ -15,6 +16,7 @@ function AppShell({
     loadingText = "Loading...",
 }) {
     const { isMaster, isAdmin, user, hasPermission } = useAuthContext();
+    const pendingApprovalCount = usePendingApprovalCount();
 
     const adminSection = [];
     if (isAdmin) {
@@ -35,8 +37,15 @@ function AppShell({
     const filterNav = (items) =>
         items.filter((item) => !item.permission || hasPermission(item.permission, "read"));
 
+    const decorate = (item) => {
+        if (item.to === "/tickets" && pendingApprovalCount > 0) {
+            return { ...item, badge: pendingApprovalCount };
+        }
+        return item;
+    };
+
     const navData = {
-        main: filterNav(sidebarNav.main),
+        main: filterNav(sidebarNav.main).map(decorate),
         account: filterNav(sidebarNav.account),
         admin: adminSection,
         userName: user ? `${user.first_name} ${user.last_name}` : "User",

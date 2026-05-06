@@ -67,10 +67,20 @@ class TicketService:
         return saved
 
     @staticmethod
-    def reject_ticket(ticket_id, current_user_id, client_id=None):
-        saved = TicketService._set_status(
-            ticket_id, TicketStatusEnum.REJECTED, current_user_id, client_id=client_id
-        )
+    def reject_ticket(ticket_id, current_user_id, client_id=None, note=None):
+        # Pull the ticket up front so we can stamp the rejection note onto
+        # ticket.notes alongside the status change. The vendor and contractor
+        # apps share this database, so writing the reason here is enough for
+        # them to see it without us touching their code.
+        ticket = TicketRepository.get_by_id(ticket_id, client_id=client_id)
+        if not ticket:
+            raise ValueError("Ticket not found")
+        ticket.status = TicketStatusEnum.REJECTED
+        ticket.updated_by = current_user_id
+        if note is not None:
+            cleaned = note.strip()
+            ticket.notes = cleaned if cleaned else None
+        saved = TicketRepository.update(ticket)
         logger.info(f"Ticket rejected: {saved.id}")
         return saved
 

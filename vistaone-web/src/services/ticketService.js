@@ -32,8 +32,13 @@ export const ticketService = {
     return await response.json();
   },
 
-  reject: async (ticketId) => {
-    const response = await authFetch(`${TICKET_ENDPOINT}/${ticketId}/reject`, { method: "PUT" });
+  reject: async (ticketId, note) => {
+    const body = note != null ? JSON.stringify({ note }) : undefined;
+    const response = await authFetch(`${TICKET_ENDPOINT}/${ticketId}/reject`, {
+      method: "PUT",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body,
+    });
     if (!response.ok) await parseError(response, "Failed to reject ticket");
     return await response.json();
   },

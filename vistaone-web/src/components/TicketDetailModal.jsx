@@ -63,6 +63,8 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [rejectNote, setRejectNote] = useState("");
 
   const runAction = async (fn, successMessage) => {
     setActionLoading(true);
@@ -80,9 +82,41 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
   };
 
   const handleApprove = () => runAction(ticketService.approve, "Ticket approved");
-  const handleReject = () => runAction(ticketService.reject, "Ticket rejected");
   const handleUndo = () =>
     runAction(ticketService.setPending, "Ticket set to pending approval");
+
+  const handleRejectClick = () => {
+    setShowRejectForm(true);
+    setRejectNote("");
+    setActionMessage("");
+  };
+
+  const handleRejectCancel = () => {
+    setShowRejectForm(false);
+    setRejectNote("");
+  };
+
+  const handleRejectConfirm = async () => {
+    const trimmed = rejectNote.trim();
+    if (!trimmed) {
+      setActionMessage("Please add a note explaining the rejection.");
+      return;
+    }
+    setActionLoading(true);
+    setActionMessage("");
+    try {
+      const updated = await ticketService.reject(ticketId, trimmed);
+      setTicket(updated);
+      setActionMessage("Ticket rejected");
+      setShowRejectForm(false);
+      setRejectNote("");
+      if (onStatusChange) onStatusChange(updated);
+    } catch (err) {
+      setActionMessage(err.message || "Action failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -358,7 +392,7 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
                 <div className="ticket-detail-action-message">{actionMessage}</div>
               )}
 
-              {ticket.status === "PENDING_APPROVAL" && (
+              {ticket.status === "PENDING_APPROVAL" && !showRejectForm && (
                 <div className="ticket-detail-actions">
                   <button
                     className="ticket-btn-approve"
@@ -369,11 +403,48 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
                   </button>
                   <button
                     className="ticket-btn-reject"
-                    onClick={handleReject}
+                    onClick={handleRejectClick}
                     disabled={actionLoading}
                   >
-                    {actionLoading ? "Processing..." : "Reject Ticket"}
+                    Reject Ticket
                   </button>
+                </div>
+              )}
+
+              {ticket.status === "PENDING_APPROVAL" && showRejectForm && (
+                <div className="ticket-detail-reject-form">
+                  <label
+                    htmlFor="ticket-reject-note"
+                    className="ticket-detail-reject-label"
+                  >
+                    Reason for rejection
+                  </label>
+                  <textarea
+                    id="ticket-reject-note"
+                    className="ticket-detail-reject-textarea"
+                    rows={3}
+                    value={rejectNote}
+                    onChange={(e) => setRejectNote(e.target.value)}
+                    placeholder="Explain what was wrong so the contractor and vendor can address it."
+                    disabled={actionLoading}
+                    autoFocus
+                  />
+                  <div className="ticket-detail-actions">
+                    <button
+                      className="ticket-btn-reject"
+                      onClick={handleRejectConfirm}
+                      disabled={actionLoading || !rejectNote.trim()}
+                    >
+                      {actionLoading ? "Rejecting..." : "Confirm Rejection"}
+                    </button>
+                    <button
+                      className="ticket-btn-undo"
+                      onClick={handleRejectCancel}
+                      disabled={actionLoading}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
 

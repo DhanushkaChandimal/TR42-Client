@@ -89,9 +89,13 @@ def approve_ticket(current_user_id, ticket_id):
 @ticket_bp.route("/<string:ticket_id>/reject", methods=["PUT"])
 @permission_required("workorders", "write")
 def reject_ticket(current_user_id, ticket_id):
+    payload = request.get_json(silent=True) or {}
+    note = payload.get("note")
     try:
         client_id = get_current_user_client_id()
-        ticket = TicketService.reject_ticket(ticket_id, current_user_id, client_id=client_id)
+        ticket = TicketService.reject_ticket(
+            ticket_id, current_user_id, client_id=client_id, note=note
+        )
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
         return jsonify({"error": "Ticket not found"}), 404
