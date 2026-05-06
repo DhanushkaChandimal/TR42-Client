@@ -28,6 +28,9 @@ class LoginService:
         if not user or not user.check_password(password):
             return {"message": "Invalid email or password"}, 401
 
+        if user.user_type != UserType.CLIENT:
+            return {"message": "Invalid email or password"}, 401
+
         match user.status:
             case UserStatus.PENDING_EMAIL_VERIFICATION:
                 return {
