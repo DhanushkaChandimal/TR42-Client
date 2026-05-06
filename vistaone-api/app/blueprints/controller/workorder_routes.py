@@ -21,6 +21,9 @@ def create_workorder(current_user_id):
     if not current_user_id:
         raise Exception("current_user_id not provided!")
 
+    # Always source client_id from the JWT — never trust the caller.
+    json_data["client_id"] = get_current_user_client_id()
+
     try:
         validated_workorder_data = workorder_schema.load(json_data)
         workorder = WorkOrderService.create_workorder(

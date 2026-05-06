@@ -44,7 +44,7 @@ function dateValue(value) {
 }
 
 function vendorLabel(o) {
-  return (o.vendor?.name || "").toLowerCase();
+  return (o.vendor?.company_name || o.vendor?.name || "").toLowerCase();
 }
 
 function jobTypeLabel(o) {
@@ -222,7 +222,18 @@ export default function WorkOrders() {
       subtitle="Manage field work orders"
       loading={loading}
       loadingText="Loading work orders..."
-      controls={<ExportButton withDateRange onExport={exportService.workorders} />}
+      controls={
+        <>
+          <ExportButton withDateRange onExport={exportService.workorders} />
+          <button
+            className="workorders-create-btn"
+            onClick={handleOpenModal}
+            title="Create Work Order"
+          >
+            + Create Work Order
+          </button>
+        </>
+      }
     >
       <section className="workorders-controls">
         <input
@@ -244,25 +255,6 @@ export default function WorkOrders() {
           ))}
         </select>
       </section>
-
-      <button
-        className="fab-create-workorder"
-        onClick={handleOpenModal}
-        title="Create Work Order"
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle cx="12" cy="12" r="12" fill="#007bff" />
-          <rect x="11" y="6" width="2" height="12" rx="1" fill="#fff" />
-          <rect x="6" y="11" width="12" height="2" rx="1" fill="#fff" />
-        </svg>
-        <span className="fab-label">Create Work Order</span>
-      </button>
 
       <section className="workorders-table-wrap">
         {loading ? (
@@ -310,11 +302,17 @@ export default function WorkOrders() {
                     }
                   }}
                 >
-                  <td>{order.work_order_code}</td>
-                  <td>{order.vendor.name}</td>
-                  <td>{order.service.service}</td>
-                  <td>{order.location_type}</td>
-                  <td>{`${order.latitude}, ${order.longitude}`}</td>
+                  <td>{order.work_order_code ?? "—"}</td>
+                  <td>{order.vendor?.company_name || order.vendor?.name || "—"}</td>
+                  <td>{order.service?.service || "—"}</td>
+                  <td>{order.location_type || "—"}</td>
+                  <td>
+                    {order.location_type === "ADDRESS" && order.location
+                      ? order.location
+                      : order.latitude != null && order.longitude != null
+                      ? `${order.latitude}, ${order.longitude}`
+                      : "—"}
+                  </td>
                   <td>{formatDate(order.created_at)}</td>
                   <td>
                     {(() => {
@@ -346,6 +344,7 @@ export default function WorkOrders() {
         <WorkOrderDetailModal
           workOrder={detailOrder}
           onClose={() => setDetailOrder(null)}
+          onSaved={fetchWorkOrders}
         />
       )}
     </AppShell>

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import "../styles/exportButton.css";
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const yearStartIso = () => `${new Date().getFullYear()}-01-01`;
+
 export default function ExportButton({
   label = "Export to Excel",
   onExport,
@@ -8,8 +11,10 @@ export default function ExportButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  // Default range: Jan 1 of current year through today. Clearing either field
+  // tells the backend "no bound" and exports everything in that direction.
+  const [from, setFrom] = useState(withDateRange ? yearStartIso() : "");
+  const [to, setTo] = useState(withDateRange ? todayIso() : "");
 
   const handle = async () => {
     setBusy(true);

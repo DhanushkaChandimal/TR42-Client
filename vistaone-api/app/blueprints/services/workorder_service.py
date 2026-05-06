@@ -1,4 +1,6 @@
 from datetime import datetime
+from sqlalchemy import func
+from app.extensions import db
 from app.models import WorkOrder
 from app.blueprints.repository.workorder_repository import WorkOrderRepository
 import logging
@@ -19,6 +21,12 @@ class WorkOrderService:
 
             work_order.created_by = current_user_id
             work_order.updated_by = current_user_id
+
+            # Allocate next sequential work_order_code so the row is visible
+            # in the list (UI keys on this column) and matches seeded format.
+            if work_order.work_order_code is None:
+                next_code = db.session.query(func.max(WorkOrder.work_order_code)).scalar()
+                work_order.work_order_code = (next_code or 99999) + 1
 
             location_type = validated_workorder_data.get("location_type")
             logger.info(f"Creating workorder with location type: {location_type}")
