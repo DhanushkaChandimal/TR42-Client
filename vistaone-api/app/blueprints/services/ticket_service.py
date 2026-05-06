@@ -60,10 +60,14 @@ class TicketService:
 
     @staticmethod
     def approve_ticket(ticket_id, current_user_id, client_id=None):
+        # Client approval is the final word from this app's side: the work is
+        # accepted, the ticket is done, and the vendor can bill against it.
+        # We move directly to COMPLETED rather than parking in an intermediate
+        # APPROVED state nobody else advances.
         saved = TicketService._set_status(
-            ticket_id, TicketStatusEnum.APPROVED, current_user_id, client_id=client_id
+            ticket_id, TicketStatusEnum.COMPLETED, current_user_id, client_id=client_id
         )
-        logger.info(f"Ticket approved: {saved.id}")
+        logger.info(f"Ticket approved (set to COMPLETED): {saved.id}")
         return saved
 
     @staticmethod

@@ -81,7 +81,8 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
     }
   };
 
-  const handleApprove = () => runAction(ticketService.approve, "Ticket approved");
+  const handleApprove = () =>
+    runAction(ticketService.approve, "Ticket approved and marked completed");
   const handleUndo = () =>
     runAction(ticketService.setPending, "Ticket set to pending approval");
 
