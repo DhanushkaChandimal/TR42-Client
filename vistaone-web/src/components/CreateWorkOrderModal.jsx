@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import MapPicker from "./MapPicker";
 import { useWorkOrder } from "../hooks/useWorkOrder";
 import { vendorService } from "../services/vendorService";
@@ -180,57 +181,73 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
     e.preventDefault();
     setError("");
     setLoading(true);
-    let locationDisplay = "";
-    if (formData.locationMethod === "well") {
-      const selectedWell = wellOptions.find((w) => w.id === formData.well);
-      locationDisplay = selectedWell ? selectedWell.label : "";
-    } else if (formData.locationMethod === "gps") {
-      locationDisplay = formData.gpsCoordinates.trim();
-    } else {
-      locationDisplay = formData.physicalAddress.trim();
+
+    if (!formData.vendor || !formData.jobType) {
+      setError("Please pick a vendor and job type.");
+      setLoading(false);
+      return;
     }
 
-    // Parse latitude/longitude from GPS coordinates if present
-    let latitude = "";
-    let longitude = "";
-    if (formData.gpsCoordinates) {
-      const [lat, lng] = formData.gpsCoordinates
+    const locationType =
+      formData.locationMethod === "gps"
+        ? "GPS"
+        : formData.locationMethod === "address"
+          ? "ADDRESS"
+          : "WELL";
+
+    // Build location fields mutually exclusive per the backend schema:
+    // GPS -> latitude/longitude only; ADDRESS -> location only; WELL -> well_id only.
+    let locationFields;
+    if (locationType === "GPS") {
+      const [lat, lng] = (formData.gpsCoordinates || "")
         .split(",")
         .map((v) => v.trim());
-      latitude = lat || "";
-      longitude = lng || "";
+      if (!lat || !lng) {
+        setError("Please set GPS coordinates.");
+        setLoading(false);
+        return;
+      }
+      locationFields = { latitude: lat, longitude: lng };
+    } else if (locationType === "ADDRESS") {
+      const street = (formData.street || "").trim();
+      const city = (formData.city || "").trim();
+      const state = (formData.state || "").trim();
+      const zip = (formData.zip || "").trim();
+      if (!street || !city || !state || !zip) {
+        setError("Please complete the address fields.");
+        setLoading(false);
+        return;
+      }
+      locationFields = { location: `${street}, ${city}, ${state} ${zip}` };
+    } else {
+      if (!formData.well) {
+        setError("Please pick a well.");
+        setLoading(false);
+        return;
+      }
+      locationFields = { well_id: formData.well };
     }
 
+    // Marshmallow DateTime expects full ISO 8601, not bare YYYY-MM-DD.
+    const toIso = (d) => (d ? `${d}T00:00:00` : null);
+
     const newWorkOrder = {
-      client_id: formData.client_id || "11111111-1111-1111-1111-111111111111",
-      vendor_id: formData.vendor,
-      service_type_id: formData.jobType,
+      assigned_vendor: formData.vendor,
+      service_type: formData.jobType,
       description: formData.description.trim(),
-      location_type:
-        formData.locationMethod === "gps"
-          ? "GPS"
-          : formData.locationMethod === "address"
-            ? "ADDRESS"
-            : "WELL",
-      latitude,
-      longitude,
-      units: formData.units,
-      estimated_quantity: formData.quantity ? formData.quantity : 0,
+      location_type: locationType,
+      units: formData.units || null,
+      estimated_quantity: formData.quantity ? Number(formData.quantity) : 0,
       priority: formData.priority?.toUpperCase() || "MEDIUM",
       is_recurring: !!formData.recurring,
       recurrence_type: formData.recurring
         ? formData.recurringInterval?.toUpperCase() || "ONE_TIME"
         : "ONE_TIME",
-      estimated_start_date: formData.date,
-      estimated_end_date: formData.endDate ? formData.endDate : formData.date,
-      address_id: formData.address_id || null,
+      estimated_start_date: toIso(formData.date),
+      estimated_end_date: toIso(formData.endDate || formData.date),
+      ...locationFields,
     };
 
-    if (!locationDisplay || !formData.jobType || !formData.vendor) {
-      setError("Please fill all required fields.");
-      setLoading(false);
-      return;
-    }
     try {
       await createWorkOrder(newWorkOrder);
       if (fetchWorkOrders) await fetchWorkOrders();
@@ -247,7 +264,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
     setFormData(emptyForm);
   };
 
-  return (
+  return createPortal(
     <div className="workorders-modal-overlay" onClick={handleCloseModal}>
       <div
         className="workorders-modal workorder-modal-card"
@@ -638,7 +655,8 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
           </button>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

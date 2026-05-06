@@ -39,8 +39,11 @@ export const workOrderService = {
     return await response.json();
   },
 
-  remove: async (id) => {
-    const response = await authFetch(`${WORKORDER_ENDPOINT}/${id}`, { method: 'DELETE' });
+  remove: async (id, cancellation_reason = 'Cancelled before assignment') => {
+    const response = await authFetch(`${WORKORDER_ENDPOINT}/${id}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ cancellation_reason }),
+    });
     if (!response.ok) await parseError(response, 'Failed to delete work order');
     return await response.json();
   },

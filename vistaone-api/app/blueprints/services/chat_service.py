@@ -55,13 +55,13 @@ class ChatService:
 
         recipients = {}
 
-        # Vendor users
-        if wo.vendor_id:
+        # Vendor users (work_order stores vendor uuid in `assigned_vendor` text)
+        if wo.assigned_vendor:
             vendor_users = (
                 db.session.execute(
                     select(User, VendorUser.vendor_user_role)
                     .join(VendorUser, VendorUser.user_id == User.id)
-                    .where(VendorUser.vendor_id == wo.vendor_id)
+                    .where(VendorUser.vendor_id == wo.assigned_vendor)
                 )
                 .all()
             )

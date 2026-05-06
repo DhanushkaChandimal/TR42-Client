@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
+from app.models.client import Client
 from app.models.invoice import Invoice
 from app.models.line_item import LineItem
 from app.models.msa import Msa
@@ -181,7 +182,7 @@ def _write_summary_sheet(ws_wb, tickets, vendors, invoices, work_orders, msas, p
     active_wo = sum(
         1
         for w in work_orders
-        if _enum_value(getattr(w, "status", None)) not in ("CANCELLED", "CLOSED")
+        if _enum_value(getattr(w, "current_status", None)) not in ("CANCELLED", "CLOSED")
     )
 
     rows = [
@@ -400,7 +401,7 @@ def _write_wo_status_sheet(ws_wb, work_orders):
 
     by_status = defaultdict(int)
     for w in work_orders:
-        by_status[_enum_value(getattr(w, "status", None)) or "UNKNOWN"] += 1
+        by_status[_enum_value(getattr(w, "current_status", None)) or "UNKNOWN"] += 1
 
     header_row = 5
     cols = [("Status", 18, None), ("Count", 12, "#,##0")]
@@ -420,10 +421,10 @@ def _write_msa_expiry_sheet(ws_wb, msas, vendors_by_id, work_orders):
     cutoff = today + timedelta(days=90)
     active_wo_by_vendor = defaultdict(int)
     for w in work_orders:
-        if _enum_value(getattr(w, "status", None)) in ("CANCELLED", "CLOSED"):
+        if _enum_value(getattr(w, "current_status", None)) in ("CANCELLED", "CLOSED"):
             continue
-        if w.vendor_id:
-            active_wo_by_vendor[w.vendor_id] += 1
+        if w.assigned_vendor:
+            active_wo_by_vendor[w.assigned_vendor] += 1
 
     rows = []
     for m in msas:
@@ -711,7 +712,7 @@ def _write_invoices_by_vendor_sheet(
         vendor_total = 0.0
         for inv in invs:
             wo = workorders_by_id.get(inv.work_order_id)
-            wo_code = getattr(wo, "work_order_id", None) if wo else None
+            wo_code = getattr(wo, "work_order_code", None) if wo else None
             status = _enum_value(inv.invoice_status)
             amount = float(inv.total_amount or 0)
             vendor_total += amount
@@ -791,7 +792,7 @@ def _write_invoices_flat_sheet(ws_wb, invoices, vendors_by_id, workorders_by_id)
     for i, inv in enumerate(sorted_invoices, start=header_row + 1):
         v = vendors_by_id.get(inv.vendor_id)
         wo = workorders_by_id.get(inv.work_order_id)
-        wo_code = getattr(wo, "work_order_id", None) if wo else None
+        wo_code = getattr(wo, "work_order_code", None) if wo else None
         status = _enum_value(inv.invoice_status)
         _write_row(
             ws,
@@ -964,7 +965,7 @@ def _write_tickets_by_vendor_sheet(ws_wb, tickets, vendors_by_id, workorders_by_
 
         for t in ts:
             wo = workorders_by_id.get(t.work_order_id)
-            wo_code = getattr(wo, "work_order_id", None) if wo else None
+            wo_code = getattr(wo, "work_order_code", None) if wo else None
             _write_row(
                 ws,
                 row,
@@ -1028,7 +1029,7 @@ def _write_tickets_flat_sheet(ws_wb, tickets, vendors_by_id, workorders_by_id):
     for i, t in enumerate(sorted_tickets, start=header_row + 1):
         v = vendors_by_id.get(t.vendor_id)
         wo = workorders_by_id.get(t.work_order_id)
-        wo_code = getattr(wo, "work_order_id", None) if wo else None
+        wo_code = getattr(wo, "work_order_code", None) if wo else None
         service = getattr(t.service, "service", None) if t.service else None
         _write_row(
             ws,
@@ -1072,27 +1073,37 @@ def build_workorders_workbook(start=None, end=None):
     vendors_by_id = {
         v.id: v for v in db.session.execute(select(Vendor)).scalars().all()
     }
+    clients_by_id = {
+        c.id: c for c in db.session.execute(select(Client)).scalars().all()
+    }
 
     period = _period_label(start, end)
-    _write_workorders_summary_sheet(wb, work_orders, vendors_by_id, period)
+    _write_workorders_summary_sheet(wb, work_orders, vendors_by_id, clients_by_id, period)
     _write_workorders_by_vendor_sheet(wb, work_orders, vendors_by_id)
-    _write_workorders_flat_sheet(wb, work_orders, vendors_by_id)
+    _write_workorders_flat_sheet(wb, work_orders, vendors_by_id, clients_by_id)
     return _to_workbook_bytes(wb)
 
 
-def _write_workorders_summary_sheet(ws_wb, work_orders, vendors_by_id, period):
+def _write_workorders_summary_sheet(ws_wb, work_orders, vendors_by_id, clients_by_id, period):
     ws = ws_wb.create_sheet("Summary")
     _write_title(ws, "Work Orders Summary", f"Period: {period}  ·  {len(work_orders)} work order(s)")
 
     by_status = defaultdict(int)
     by_priority = defaultdict(int)
     by_vendor = defaultdict(lambda: {"count": 0, "value": 0.0})
+    by_location_type = defaultdict(int)
+    by_client = defaultdict(int)
+    total_cost = 0.0
     for w in work_orders:
-        by_status[_enum_value(getattr(w, "status", None)) or "UNKNOWN"] += 1
+        by_status[_enum_value(getattr(w, "current_status", None)) or "UNKNOWN"] += 1
         by_priority[_enum_value(getattr(w, "priority", None)) or "UNKNOWN"] += 1
-        if w.vendor_id:
-            by_vendor[w.vendor_id]["count"] += 1
-            by_vendor[w.vendor_id]["value"] += float(getattr(w, "estimated_cost", 0) or 0)
+        by_location_type[_enum_value(getattr(w, "location_type", None)) or "UNKNOWN"] += 1
+        if w.client_id:
+            by_client[w.client_id] += 1
+        if w.assigned_vendor:
+            by_vendor[w.assigned_vendor]["count"] += 1
+            by_vendor[w.assigned_vendor]["value"] += float(getattr(w, "estimated_cost", 0) or 0)
+        total_cost += float(getattr(w, "estimated_cost", 0) or 0)
 
     row = 5
     ws.cell(row=row, column=1, value="BY STATUS").font = SUBHEADER_FONT
@@ -1115,6 +1126,28 @@ def _write_workorders_summary_sheet(ws_wb, work_orders, vendors_by_id, period):
         _write_row(ws, row, cols, [priority, count])
 
     row += 3
+    ws.cell(row=row, column=1, value="BY LOCATION TYPE").font = SUBHEADER_FONT
+    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
+    row += 1
+    _write_header(ws, row, cols)
+    for loc_type, count in sorted(by_location_type.items(), key=lambda kv: kv[1], reverse=True):
+        row += 1
+        _write_row(ws, row, cols, [loc_type, count])
+
+    row += 3
+    ws.cell(row=row, column=1, value="BY CLIENT").font = SUBHEADER_FONT
+    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
+    row += 1
+    ccols = [("Client", 30, None), ("WO Count", 12, "#,##0")]
+    _apply_widths(ws, ccols)
+    _write_header(ws, row, ccols)
+    for cid, count in sorted(by_client.items(), key=lambda kv: kv[1], reverse=True):
+        c = clients_by_id.get(cid)
+        client_name = (getattr(c, "client_name", None) or cid[:8]) if c else (cid[:8] if cid else "Unknown")
+        row += 1
+        _write_row(ws, row, ccols, [client_name, count])
+
+    row += 3
     ws.cell(row=row, column=1, value="BY VENDOR").font = SUBHEADER_FONT
     ws.cell(row=row, column=1).fill = SUBHEADER_FILL
     row += 1
@@ -1125,6 +1158,18 @@ def _write_workorders_summary_sheet(ws_wb, work_orders, vendors_by_id, period):
         v = vendors_by_id.get(vid)
         row += 1
         _write_row(ws, row, vcols, [_vendor_name(v), slot["count"], slot["value"]])
+
+    row += 3
+    ws.cell(row=row, column=1, value="TOTALS").font = SUBHEADER_FONT
+    ws.cell(row=row, column=1).fill = SUBHEADER_FILL
+    row += 1
+    tcols = [("Metric", 30, None), ("Value", 18, None)]
+    _apply_widths(ws, tcols)
+    _write_header(ws, row, tcols)
+    row += 1
+    _write_row(ws, row, tcols, ["Total work orders", len(work_orders)])
+    row += 1
+    _write_row(ws, row, [("Metric", 30, None), ("Value", 18, "$#,##0.00")], ["Total estimated cost", total_cost])
 
 
 def _write_workorders_by_vendor_sheet(ws_wb, work_orders, vendors_by_id):
@@ -1147,7 +1192,7 @@ def _write_workorders_by_vendor_sheet(ws_wb, work_orders, vendors_by_id):
 
     by_vendor = defaultdict(list)
     for w in work_orders:
-        by_vendor[w.vendor_id or "unknown"].append(w)
+        by_vendor[w.assigned_vendor or "unknown"].append(w)
 
     row = 5
     for vid in sorted(by_vendor.keys(), key=lambda x: _vendor_name(vendors_by_id.get(x))):
@@ -1164,7 +1209,7 @@ def _write_workorders_by_vendor_sheet(ws_wb, work_orders, vendors_by_id):
         row += 1
 
         for w in wos:
-            service = getattr(w.service_type, "service", None) if hasattr(w, "service_type") and w.service_type else None
+            service = (w.service.service if getattr(w, "service", None) else None)
             location_str = getattr(w, "location", None) or (
                 f"{w.latitude}, {w.longitude}"
                 if getattr(w, "latitude", None) is not None and getattr(w, "longitude", None) is not None
@@ -1175,9 +1220,9 @@ def _write_workorders_by_vendor_sheet(ws_wb, work_orders, vendors_by_id):
                 row,
                 cols,
                 [
-                    getattr(w, "work_order_id", None),
+                    getattr(w, "work_order_code", None),
                     w.description or "",
-                    _enum_value(getattr(w, "status", None)),
+                    _enum_value(getattr(w, "current_status", None)),
                     _enum_value(getattr(w, "priority", None)),
                     service or "",
                     location_str,
@@ -1200,26 +1245,40 @@ def _write_workorders_by_vendor_sheet(ws_wb, work_orders, vendors_by_id):
     ws.freeze_panes = ws["A5"]
 
 
-def _write_workorders_flat_sheet(ws_wb, work_orders, vendors_by_id):
+def _write_workorders_flat_sheet(ws_wb, work_orders, vendors_by_id, clients_by_id):
     ws = ws_wb.create_sheet("All Work Orders (flat)")
     _write_title(ws, "All Work Orders", "Sortable, filterable list.")
 
     header_row = 5
     cols = [
+        ("Client", 28, None),
         ("Vendor", 30, None),
         ("WO #", 10, "#,##0"),
         ("Description", 40, None),
         ("Status", 16, None),
         ("Priority", 12, None),
         ("Service", 18, None),
-        ("Location", 22, None),
+        ("Location Type", 14, None),
+        ("Location", 28, None),
+        ("Latitude", 12, "#,##0.000000"),
+        ("Longitude", 12, "#,##0.000000"),
+        ("Well ID", 36, None),
         ("Est Cost", 14, "$#,##0.00"),
         ("Est Quantity", 14, "#,##0.00"),
         ("Units", 10, None),
+        ("Recurring?", 10, None),
+        ("Recurrence", 12, None),
         ("Estimated Start", 16, "yyyy-mm-dd"),
         ("Estimated End", 16, "yyyy-mm-dd"),
+        ("Assigned At", 18, "yyyy-mm-dd hh:mm"),
+        ("Completed At", 18, "yyyy-mm-dd hh:mm"),
+        ("Closed At", 18, "yyyy-mm-dd hh:mm"),
+        ("Halted At", 18, "yyyy-mm-dd hh:mm"),
+        ("Rejected At", 18, "yyyy-mm-dd hh:mm"),
         ("Created", 18, "yyyy-mm-dd hh:mm"),
-        ("Cancelled", 18, "yyyy-mm-dd hh:mm"),
+        ("Updated", 18, "yyyy-mm-dd hh:mm"),
+        ("Cancelled At", 18, "yyyy-mm-dd hh:mm"),
+        ("Cancellation Reason", 32, None),
     ]
     _apply_widths(ws, cols)
     _write_header(ws, header_row, cols)
@@ -1227,39 +1286,57 @@ def _write_workorders_flat_sheet(ws_wb, work_orders, vendors_by_id):
     sorted_wos = sorted(
         work_orders,
         key=lambda w: (
-            _vendor_name(vendors_by_id.get(w.vendor_id)),
+            _vendor_name(vendors_by_id.get(w.assigned_vendor)),
             -(w.created_at.timestamp() if w.created_at else 0),
         ),
     )
     for i, w in enumerate(sorted_wos, start=header_row + 1):
-        v = vendors_by_id.get(w.vendor_id)
-        service = getattr(w.service_type, "service", None) if hasattr(w, "service_type") and w.service_type else None
+        v = vendors_by_id.get(w.assigned_vendor)
+        c = clients_by_id.get(w.client_id) if w.client_id else None
+        client_name = getattr(c, "client_name", None) if c else None
+        service = (w.service.service if getattr(w, "service", None) else None)
         location_str = getattr(w, "location", None) or (
             f"{w.latitude}, {w.longitude}"
             if getattr(w, "latitude", None) is not None and getattr(w, "longitude", None) is not None
             else ""
         )
+        lat = getattr(w, "latitude", None)
+        lng = getattr(w, "longitude", None)
         _write_row(
             ws,
             i,
             cols,
             [
+                client_name or "",
                 _vendor_name(v),
-                getattr(w, "work_order_id", None),
+                getattr(w, "work_order_code", None),
                 w.description or "",
-                _enum_value(getattr(w, "status", None)),
+                _enum_value(getattr(w, "current_status", None)),
                 _enum_value(getattr(w, "priority", None)),
                 service or "",
+                _enum_value(getattr(w, "location_type", None)) or "",
                 location_str,
+                float(lat) if lat is not None else None,
+                float(lng) if lng is not None else None,
+                getattr(w, "well_id", None) or "",
                 float(getattr(w, "estimated_cost", 0) or 0),
                 float(getattr(w, "estimated_quantity", 0) or 0),
                 getattr(w, "units", None) or "",
+                "Yes" if getattr(w, "is_recurring", False) else "No",
+                _enum_value(getattr(w, "recurrence_type", None)) or "",
                 _naive(getattr(w, "estimated_start_date", None)),
                 _naive(getattr(w, "estimated_end_date", None)),
+                _naive(getattr(w, "assigned_at", None)),
+                _naive(getattr(w, "completed_at", None)),
+                _naive(getattr(w, "closed_at", None)),
+                _naive(getattr(w, "halted_at", None)),
+                _naive(getattr(w, "rejected_at", None)),
                 _naive(w.created_at),
+                _naive(getattr(w, "updated_at", None)),
                 _naive(getattr(w, "cancelled_at", None)),
+                getattr(w, "cancellation_reason", None) or "",
             ],
-            status_col=3,
+            status_col=4,
         )
     _finalize_data_sheet(ws, header_row, cols, len(sorted_wos))
 
