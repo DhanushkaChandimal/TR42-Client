@@ -29,12 +29,12 @@ def login():
     except ValidationError as e:
         return jsonify(e.messages), 400
 
-    email = credentials["email"]
+    identifier = credentials["identifier"]
     password = credentials["password"]
 
-    logger.info(f"Login attempt for email")
+    logger.info(f"Login attempt for identifier")
 
-    response, status_code = LoginService.login_user(email, password)
+    response, status_code = LoginService.login_user(identifier, password)
 
     return jsonify(response), status_code
 

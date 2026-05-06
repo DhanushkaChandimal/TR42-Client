@@ -6,26 +6,26 @@ from app.blueprints.enum.enums import UserStatus, UserType
 from app.utils.email_util import send_verification_email
 from flask import current_app
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from app.utils.util import encode_token
+from app.utils.util import encode_token, JWT_SECRET
 from app.blueprints.repository.auth_repository import LoginRepository
 from app.utils.token_blacklist import blacklist
-import os
 from flask import request
 import jwt
 import logging
 
 
-# Load secret from environment
-SECRET_KEY = os.environ.get("SECRET_KEY") or "custom key"
 logger = logging.getLogger()
 
 
 class LoginService:
     @staticmethod
-    def login_user(email, password):
-        user = LoginRepository.get_user_by_email(email)
+    def login_user(identifier, password):
+        user = LoginRepository.get_user_by_identifier(identifier)
 
         if not user or not user.check_password(password):
+            return {"message": "Invalid email or password"}, 401
+
+        if user.user_type != UserType.CLIENT:
             return {"message": "Invalid email or password"}, 401
 
         match user.status:
@@ -71,7 +71,7 @@ class LoginService:
             return ({"message": "Token is missing!"}), 401
 
         try:
-            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         except Exception:
             return {"message": "Invalid token!"}, 401
 

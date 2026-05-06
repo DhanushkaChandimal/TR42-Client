@@ -8,7 +8,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-SECRET_KEY = os.environ.get("SECRET_KEY") or "custom key"
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable is not set")
 
 # Tokens are signed with JWT_SECRET so they validate against Supabase Realtime
 # / RLS (set JWT_SECRET to the project's Supabase JWT secret in any env that

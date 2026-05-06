@@ -32,12 +32,12 @@ async function handleResponse(res) {
 }
 
 export const authService = {
-    login: async ({ email, password }) => {
+    login: async ({ identifier, password }) => {
         try {
             const res = await fetch(LOGIN_ENDPOINT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ identifier, password }),
             });
             return await handleResponse(res);
         } catch (err) {

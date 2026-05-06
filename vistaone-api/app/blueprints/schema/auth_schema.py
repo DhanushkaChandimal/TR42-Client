@@ -15,7 +15,19 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
         if 'email' in data:
             data['email'] = data['email'].strip()
         return data
-    
-user_schema =UserSchema()
+
+user_schema = UserSchema()
 users_schema = UserSchema(many=True)
-login_schema = UserSchema(only=['email', 'password'])
+
+
+class LoginSchema(ma.Schema):
+    identifier = fields.String(required=True)
+    password = fields.String(required=True, load_only=True)
+
+    @pre_load
+    def strip_identifier(self, data, **kwargs):
+        if 'identifier' in data:
+            data['identifier'] = data['identifier'].strip()
+        return data
+
+login_schema = LoginSchema()

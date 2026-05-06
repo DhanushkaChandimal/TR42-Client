@@ -170,6 +170,8 @@ function RegisterClient() {
         if (!username.trim()) newErrors.username = "Username is required";
         else if (username.trim().length < 3)
             newErrors.username = "Username must be at least 3 characters";
+        else if (username.includes("@"))
+            newErrors.username = "Username must not contain '@'";
 
         if (!email.trim()) newErrors.email = "Email is required";
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))

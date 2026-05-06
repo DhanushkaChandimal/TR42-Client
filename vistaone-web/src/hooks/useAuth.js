@@ -7,12 +7,12 @@ export const useAuth = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const login = useCallback(async ({ email, password }) => {
+    const login = useCallback(async ({ identifier, password }) => {
         setIsLoading(true);
         setError('');
 
         try {
-            const response = await authService.login({ email, password });
+            const response = await authService.login({ identifier, password });
 
             if (response?.token) {
                 localStorage.setItem('authToken', response.token);

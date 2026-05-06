@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, Fuel } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, UserCircle, Fuel } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import "../styles/login.css";
@@ -7,7 +7,7 @@ import "../styles/login.css";
 const Login = () => {
     const navigate = useNavigate();
     const { login, isLoading, error, clearError } = useAuth();
-    const [email, setEmail] = useState("");
+    const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [formError, setFormError] = useState("");
@@ -24,15 +24,15 @@ const Login = () => {
     const handleSubmit = async (event) => {
         event.preventDefault();
 
-        if (!email.trim() || !password.trim()) {
-            setFormError("Please enter your email and password.");
+        if (!identifier.trim() || !password.trim()) {
+            setFormError("Please enter your email or username and password.");
             return;
         }
 
         setFormError("");
         clearError();
 
-        const result = await login({ email, password });
+        const result = await login({ identifier, password });
 
         if (result) {
             navigate("/dashboard", { replace: true });
@@ -115,23 +115,24 @@ const Login = () => {
                             <form onSubmit={handleSubmit}>
                                 <div className="mb-4">
                                     <label className="form-label login-label">
-                                        Email
+                                        Email or Username
                                     </label>
                                     <div className="input-group login-input-group">
                                         <span className="input-group-text">
-                                            <Mail size={18} />
+                                            <UserCircle size={18} />
                                         </span>
                                         <input
-                                            type="email"
-                                            value={email}
+                                            type="text"
+                                            value={identifier}
                                             onChange={(event) => {
-                                                setEmail(event.target.value);
+                                                setIdentifier(event.target.value);
                                                 if (formError) {
                                                     setFormError("");
                                                 }
                                             }}
                                             className="form-control"
-                                            placeholder="name@company.com"
+                                            placeholder="name@company.com or username"
+                                            autoComplete="username"
                                         />
                                     </div>
                                 </div>
