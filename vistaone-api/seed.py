@@ -14,6 +14,9 @@ ALL_RESOURCES = [
     "invoices",
     "users",
     "promote_admin",
+    "analytics",
+    "fraud",
+    "messages",
 ]
 
 BUILT_IN_ROLE_NAMES = {"MASTER", "ADMIN", "USER"}
@@ -32,7 +35,7 @@ _BUILT_IN_ROLES = [
         "permissions": [
             {"resource": r, "can_read": True, "can_write": True, "can_delete": False}
             for r in ALL_RESOURCES
-            if r != "promote_admin"
+            if r not in ("promote_admin",)
         ],
     },
     {

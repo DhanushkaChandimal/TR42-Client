@@ -59,7 +59,7 @@ function PermissionMatrix({ roleId, roleName, initialPermissions, onSaved }) {
         }
     };
 
-    const isMasterRole = roleName === 'MASTER';
+    const isMasterRole = roleName?.toUpperCase() === 'MASTER';
 
     return (
         <div className="mt-3">
@@ -181,20 +181,20 @@ export default function RoleManagement() {
 
     const openDeletePanel = (role) => {
         setDeleteTarget(role);
-        setMigrateToRoleId('');
+        setMigrateToRoleId(null);
         setEditId(null);
     };
 
     const cancelDelete = () => {
         setDeleteTarget(null);
-        setMigrateToRoleId('');
+        setMigrateToRoleId(null);
     };
 
     const confirmDelete = async (roleId) => {
         setDeleting(true);
         setError('');
         try {
-            await authService.deleteRole(roleId, migrateToRoleId || null);
+            await authService.deleteRole(roleId, migrateToRoleId);
             setRoles((prev) => prev.filter((r) => r.id !== roleId));
             setDeleteTarget(null);
             setMigrateToRoleId('');
@@ -322,7 +322,7 @@ export default function RoleManagement() {
                                 </div>
 
                                 <div className="d-flex gap-1">
-                                    {!BUILT_IN_ROLES.has(role.name) && editId !== role.id && deleteTarget?.id !== role.id && (
+                                    {!BUILT_IN_ROLES.has(role.name?.toUpperCase()) && editId !== role.id && deleteTarget?.id !== role.id && (
                                         <>
                                             <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" onClick={() => startEdit(role)}>
                                                 <Edit2 size={13} /> Edit
@@ -351,19 +351,19 @@ export default function RoleManagement() {
                                         <select
                                             className="form-select form-select-sm"
                                             style={{ maxWidth: 240 }}
-                                            value={migrateToRoleId}
+                                            value={migrateToRoleId ?? ''}
                                             onChange={(e) => setMigrateToRoleId(e.target.value)}
                                             disabled={deleting}
                                         >
-                                            <option value="">— Remove role only (no migration) —</option>
-                                            {roles.filter((r) => r.id !== role.id && r.name !== 'MASTER').map((r) => (
+                                            <option value="" disabled>— Select a role to migrate users to —</option>
+                                            {roles.filter((r) => r.id !== role.id && r.name?.toUpperCase() !== 'MASTER').map((r) => (
                                                 <option key={r.id} value={r.id}>{r.name}</option>
                                             ))}
                                         </select>
                                         <button
                                             className="btn btn-sm btn-danger d-inline-flex align-items-center gap-1"
                                             onClick={() => confirmDelete(role.id)}
-                                            disabled={deleting}
+                                            disabled={deleting || migrateToRoleId === null}
                                         >
                                             <Trash2 size={13} />
                                             {deleting ? 'Deleting…' : 'Confirm Delete'}

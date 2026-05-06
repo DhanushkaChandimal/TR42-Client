@@ -6,8 +6,8 @@ export default function RoleProtectedRoute({ children, roles = [] }) {
 
     if (!token) return <Navigate to="/login" replace />;
 
-    const userRoles = user?.roles || [];
-    const hasAccess = roles.length === 0 || roles.some((r) => userRoles.includes(r));
+    const userRoles = (user?.roles || []).map((r) => r.toUpperCase());
+    const hasAccess = roles.length === 0 || roles.some((r) => userRoles.includes(r.toUpperCase()));
 
     if (!hasAccess) return <Navigate to="/access-denied" replace />;
 

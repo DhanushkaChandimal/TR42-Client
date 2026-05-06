@@ -83,15 +83,16 @@ def set_user_roles(user_id, target_user_id):
     data = request.get_json() or {}
     role_names = data.get("roles", [])
 
-    current_role_names = {r.name for r in current_user.roles}
+    current_role_names = {r.name.upper() for r in current_user.roles}
+    role_names_upper = [n.upper() for n in role_names]
     is_master = "MASTER" in current_role_names
 
     # Only MASTER can assign MASTER role
-    if "MASTER" in role_names and not is_master:
+    if "MASTER" in role_names_upper and not is_master:
         return jsonify({"message": "Only MASTER can assign the MASTER role"}), 403
 
     # Check if ADMIN is in requested roles — only MASTER or ADMIN-with-promote_admin can assign it
-    if "ADMIN" in role_names and not is_master:
+    if "ADMIN" in role_names_upper and not is_master:
         current_role_ids = [r.id for r in current_user.roles]
         can_promote = Permission.query.filter(
             Permission.role_id.in_(current_role_ids),
@@ -102,7 +103,7 @@ def set_user_roles(user_id, target_user_id):
             return jsonify({"message": "You do not have permission to assign the ADMIN role"}), 403
 
     # Prevent removing MASTER's own MASTER role via this endpoint (use transfer instead)
-    if is_master and target.id == user_id and "MASTER" not in role_names:
+    if is_master and target.id == user_id and "MASTER" not in role_names_upper:
         return jsonify({"message": "Use the transfer endpoint to relinquish your MASTER role"}), 400
 
     UserRepository.set_user_roles(target, role_names, current_user.client_id)
