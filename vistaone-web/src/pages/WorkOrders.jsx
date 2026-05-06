@@ -1,11 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
-import { useWorkOrder } from "../hooks/useWorkOrder";
+import Pagination from "../components/Pagination";
+import { usePaginatedList } from "../hooks/usePaginatedList";
+import { workOrderService } from "../services/workOrderService";
 import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
 import WorkOrderDetailModal from "../components/WorkOrderDetailModal";
 import { exportService } from "../services/exportService";
 import "../styles/workorder.css";
+
+// Map UI column keys to actual WorkOrder attribute names the backend can sort by.
+const SORT_COLUMN_MAP = {
+  order_id: "work_order_code",
+  vendor: "assigned_vendor",
+  job_type: "service_type",
+  location_type: "location_type",
+  date: "created_at",
+  status: "current_status",
+};
 
 const statusOptions = [
   { value: "ALL", label: "All" },
@@ -18,16 +30,6 @@ const statusOptions = [
   { value: "CLOSED", label: "Closed" },
 ];
 
-const STATUS_RANK = {
-  IN_PROGRESS: 0,
-  ASSIGNED: 1,
-  UNASSIGNED: 2,
-  APPROVED: 3,
-  COMPLETED: 4,
-  CLOSED: 5,
-  CANCELLED: 6,
-};
-
 const HEADER_SORT_DEFAULTS = {
   order_id: "asc",
   vendor: "asc",
@@ -36,33 +38,6 @@ const HEADER_SORT_DEFAULTS = {
   date: "desc",
   status: "asc",
 };
-
-function dateValue(value) {
-  if (!value) return 0;
-  const t = new Date(value).getTime();
-  return Number.isNaN(t) ? 0 : t;
-}
-
-function vendorLabel(o) {
-  return (o.vendor?.company_name || o.vendor?.name || "").toLowerCase();
-}
-
-function jobTypeLabel(o) {
-  return (o.service_type?.service || "").toLowerCase();
-}
-
-function locationTypeLabel(o) {
-  return (o.location_type || "").toLowerCase();
-}
-
-function orderIdValue(o) {
-  const n = Number(o.work_order_code);
-  return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
-}
-
-function effectiveStatus(o) {
-  return o.display_status || o.current_status || "";
-}
 
 function parseSort(sortBy) {
   const m = sortBy?.match(/^(.*)_(asc|desc)$/);
@@ -77,96 +52,39 @@ function nextSortFor(column, sortBy) {
   return current.direction === "asc" ? `${column}_desc` : `${column}_asc`;
 }
 
-function sortOrders(list, sortBy) {
-  const sorted = [...list];
-  switch (sortBy) {
-    case "order_id_asc":
-      sorted.sort((a, b) => orderIdValue(a) - orderIdValue(b));
-      break;
-    case "order_id_desc":
-      sorted.sort((a, b) => orderIdValue(b) - orderIdValue(a));
-      break;
-    case "vendor_asc":
-      sorted.sort((a, b) => vendorLabel(a).localeCompare(vendorLabel(b)));
-      break;
-    case "vendor_desc":
-      sorted.sort((a, b) => vendorLabel(b).localeCompare(vendorLabel(a)));
-      break;
-    case "job_type_asc":
-      sorted.sort((a, b) => jobTypeLabel(a).localeCompare(jobTypeLabel(b)));
-      break;
-    case "job_type_desc":
-      sorted.sort((a, b) => jobTypeLabel(b).localeCompare(jobTypeLabel(a)));
-      break;
-    case "location_type_asc":
-      sorted.sort((a, b) =>
-        locationTypeLabel(a).localeCompare(locationTypeLabel(b)),
-      );
-      break;
-    case "location_type_desc":
-      sorted.sort((a, b) =>
-        locationTypeLabel(b).localeCompare(locationTypeLabel(a)),
-      );
-      break;
-    case "date_asc":
-      sorted.sort((a, b) => dateValue(a.created_at) - dateValue(b.created_at));
-      break;
-    case "date_desc":
-      sorted.sort((a, b) => dateValue(b.created_at) - dateValue(a.created_at));
-      break;
-    case "status_asc":
-      sorted.sort(
-        (a, b) =>
-          (STATUS_RANK[effectiveStatus(a)] ?? 99) -
-          (STATUS_RANK[effectiveStatus(b)] ?? 99),
-      );
-      break;
-    case "status_desc":
-      sorted.sort(
-        (a, b) =>
-          (STATUS_RANK[effectiveStatus(b)] ?? 99) -
-          (STATUS_RANK[effectiveStatus(a)] ?? 99),
-      );
-      break;
-    default:
-      break;
-  }
-  return sorted;
-}
-
 export default function WorkOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("date_desc");
   const [showModal, setShowModal] = useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
+
+  const fetcher = useCallback(
+    (page, perPage) => {
+      const { column, direction } = parseSort(sortBy);
+      return workOrderService.search({
+        q: searchTerm.trim(),
+        status: statusFilter === "ALL" ? "" : statusFilter,
+        sort_by: SORT_COLUMN_MAP[column] || "created_at",
+        order: direction || "desc",
+        page,
+        per_page: perPage,
+      });
+    },
+    [searchTerm, statusFilter, sortBy],
+  );
+
   const {
-    workOrders,
+    items: filteredOrders,
+    total,
+    pages,
+    page,
+    perPage,
     loading,
-    fetchWorkOrders,
-    // createWorkOrder,
-    // updateWorkOrder,
-    // removeWorkOrder
-  } = useWorkOrder();
-
-  useEffect(() => {
-    fetchWorkOrders();
-  }, [fetchWorkOrders]);
-
-  const filteredOrders = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    const matched = workOrders.filter((order) => {
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        (order.current_status && order.current_status === statusFilter);
-      const matchesSearch =
-        order.description?.toLowerCase().includes(normalizedSearch) ||
-        order.location_type?.toLowerCase().includes(normalizedSearch) ||
-        String(order.work_order_code ?? "").toLowerCase().includes(normalizedSearch);
-      return matchesStatus && matchesSearch;
-    });
-    return sortOrders(matched, sortBy);
-  }, [workOrders, searchTerm, statusFilter, sortBy]);
+    setPage,
+    setPerPage,
+    refresh,
+  } = usePaginatedList(fetcher);
 
   const activeSort = parseSort(sortBy);
   const handleHeaderSort = (column) => setSortBy(nextSortFor(column, sortBy));
@@ -257,7 +175,7 @@ export default function WorkOrders() {
       </section>
 
       <section className="workorders-table-wrap">
-        {loading ? (
+        {loading && filteredOrders.length === 0 ? (
           <div className="workorders-state">Loading work orders...</div>
         ) : filteredOrders.length === 0 ? (
           <div className="workorders-state">No work orders found</div>
@@ -331,12 +249,24 @@ export default function WorkOrders() {
             </tbody>
           </table>
         )}
+        <Pagination
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={(n) => {
+            setPerPage(n);
+            setPage(1);
+          }}
+          disabled={loading}
+        />
       </section>
 
       {showModal && (
         <CreateWorkOrderModal
           setShowModal={setShowModal}
-          fetchWorkOrders={fetchWorkOrders}
+          fetchWorkOrders={refresh}
         />
       )}
 
@@ -344,7 +274,7 @@ export default function WorkOrders() {
         <WorkOrderDetailModal
           workOrder={detailOrder}
           onClose={() => setDetailOrder(null)}
-          onSaved={fetchWorkOrders}
+          onSaved={refresh}
         />
       )}
     </AppShell>

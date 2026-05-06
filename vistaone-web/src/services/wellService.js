@@ -13,6 +13,19 @@ export async function getWells() {
   return await res.json();
 }
 
+export async function searchWells({ q = '', status = '', page = 1, per_page = 10, sort_by = 'created_at', order = 'desc' } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (status) params.set('status', status);
+  params.set('page', String(page));
+  params.set('per_page', String(per_page));
+  params.set('sort_by', sort_by);
+  params.set('order', order);
+  const res = await authFetch(`${WELL_ENDPOINT}/search?${params.toString()}`, { method: 'GET' });
+  if (!res.ok) await parseError(res, 'Failed to search wells');
+  return await res.json();
+}
+
 export async function createWell(data) {
   const res = await authFetch(WELL_ENDPOINT + '/', {
     method: 'POST',

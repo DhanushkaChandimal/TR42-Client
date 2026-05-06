@@ -26,6 +26,19 @@ class TicketService:
         return TicketRepository.get_by_work_order(work_order_id)
 
     @staticmethod
+    def search_tickets(search_text, status, page, per_page, sort_by, order, client_id=None, work_order_id=None):
+        return TicketRepository.search(
+            search_text=search_text,
+            status=status,
+            page=page,
+            per_page=per_page,
+            sort_by=sort_by,
+            order=order,
+            client_id=client_id,
+            work_order_id=work_order_id,
+        )
+
+    @staticmethod
     def create_ticket(validated_data, current_user_id):
         ticket = Ticket(**validated_data)
         ticket.created_by = current_user_id

@@ -28,6 +28,19 @@ class InvoiceService:
         return invoice
 
     @staticmethod
+    def search_invoices(search_text, status, page, per_page, sort_by, order, client_id=None, work_order_id=None):
+        return InvoiceRepository.search(
+            search_text=search_text,
+            status=status,
+            page=page,
+            per_page=per_page,
+            sort_by=sort_by,
+            order=order,
+            client_id=client_id,
+            work_order_id=work_order_id,
+        )
+
+    @staticmethod
     def create_invoice(validated_data, current_user_id):
         try:
             line_items_data = validated_data.pop("line_items", [])

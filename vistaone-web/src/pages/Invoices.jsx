@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import InvoiceDetailModal from "../components/InvoiceDetailModal";
+import Pagination from "../components/Pagination";
 import { exportService } from "../services/exportService";
-import { useInvoice } from "../hooks/useInvoice";
+import { invoiceService } from "../services/invoiceService";
+import { usePaginatedList } from "../hooks/usePaginatedList";
 import "../styles/invoices.css";
 
 const statusOptions = [
@@ -102,18 +104,32 @@ export default function Invoices() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("invoice_date_desc");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const {
-    invoices,
-    loading,
-    fetchInvoices,
-    approveInvoice,
-    rejectInvoice,
-    setInvoicePending,
-  } = useInvoice();
 
-  useEffect(() => {
-    fetchInvoices();
-  }, [fetchInvoices]);
+  const fetcher = useCallback(
+    (page, perPage) => invoiceService.search({
+      q: searchTerm.trim(),
+      status: statusFilter === "ALL" ? "" : statusFilter,
+      page,
+      per_page: perPage,
+    }),
+    [searchTerm, statusFilter],
+  );
+
+  const {
+    items: invoices,
+    total,
+    pages,
+    page,
+    perPage,
+    loading,
+    setPage,
+    setPerPage,
+    refresh,
+  } = usePaginatedList(fetcher);
+
+  const approveInvoice = async (id) => { const u = await invoiceService.approve(id); refresh(); return u; };
+  const rejectInvoice = async (id) => { const u = await invoiceService.reject(id); refresh(); return u; };
+  const setInvoicePending = async (id) => { const u = await invoiceService.setPending(id); refresh(); return u; };
 
   const filteredInvoices = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
@@ -311,6 +327,18 @@ export default function Invoices() {
               </tbody>
             </table>
           )}
+          <Pagination
+            page={page}
+            pages={pages}
+            total={total}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={(n) => {
+              setPerPage(n);
+              setPage(1);
+            }}
+            disabled={loading}
+          />
         </section>
 
         {selectedInvoice && (

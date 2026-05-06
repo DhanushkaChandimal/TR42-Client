@@ -13,18 +13,10 @@ export default function InvoicesRecentWidget() {
     useEffect(() => {
         let cancelled = false;
         invoiceService
-            .getAll()
-            .then((rows) => {
+            .search({ per_page: 6, sort_by: "invoice_date", order: "desc" })
+            .then((res) => {
                 if (cancelled) return;
-                const recent = (rows || [])
-                    .slice()
-                    .sort(
-                        (a, b) =>
-                            new Date(b.invoice_date || 0) -
-                            new Date(a.invoice_date || 0),
-                    )
-                    .slice(0, 6);
-                setState({ loading: false, error: null, items: recent });
+                setState({ loading: false, error: null, items: res?.data || [] });
             })
             .catch((err) => {
                 if (cancelled) return;
@@ -51,7 +43,7 @@ export default function InvoicesRecentWidget() {
                     <li key={inv.id} className="widget-list__row">
                         <div className="widget-list__primary">
                             <span className="widget-list__name">
-                                {inv.vendor?.name || "Vendor"}
+                                {inv.vendor?.company_name || inv.vendor?.name || "Vendor"}
                             </span>
                             <span className="widget-list__meta">
                                 {formatDate(inv.invoice_date)}

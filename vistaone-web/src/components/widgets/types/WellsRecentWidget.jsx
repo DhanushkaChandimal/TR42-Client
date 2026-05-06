@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getWells } from "../../../services/wellService";
+import { searchWells } from "../../../services/wellService";
 import { statusClass } from "../widgetUtils";
 
 export default function WellsRecentWidget() {
@@ -12,13 +12,13 @@ export default function WellsRecentWidget() {
 
     useEffect(() => {
         let cancelled = false;
-        getWells()
-            .then((rows) => {
+        searchWells({ per_page: 6, sort_by: "created_at", order: "desc" })
+            .then((res) => {
                 if (cancelled) return;
                 setState({
                     loading: false,
                     error: null,
-                    items: (rows || []).slice(0, 6),
+                    items: res?.data || [],
                 });
             })
             .catch((err) => {

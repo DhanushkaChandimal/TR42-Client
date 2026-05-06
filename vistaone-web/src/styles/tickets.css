@@ -165,12 +165,21 @@
   border: 1px solid #e5e8ee;
   border-radius: 12px;
   background: #ffffff;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
 }
 
 .tickets-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+}
+
+.tickets-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fafbfd;
 }
 
 .tickets-table th,
@@ -356,8 +365,9 @@
 .tickets-table-wrap {
   border: 1px solid #e5e8ee;
   border-radius: 12px;
-  overflow: hidden;
   background: #ffffff;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
 }
 
 .tickets-table-flat th {

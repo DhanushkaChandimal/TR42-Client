@@ -9,6 +9,18 @@ logger = logging.getLogger(__name__)
 
 class WellService:
     @staticmethod
+    def search_wells(search_text, status, page, per_page, sort_by, order, client_id=None):
+        return WellRepository.search(
+            search_text=search_text,
+            status=status,
+            page=page,
+            per_page=per_page,
+            sort_by=sort_by,
+            order=order,
+            client_id=client_id,
+        )
+
+    @staticmethod
     def create_well(well: Well, current_user_id: str):
         try:
             user = User.query.get(current_user_id)

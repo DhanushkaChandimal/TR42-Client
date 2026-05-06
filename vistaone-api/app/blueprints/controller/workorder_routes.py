@@ -111,7 +111,10 @@ def search_workorders(current_user_id):
         raise Exception("current_user_id not provided!")
     try:
         search_text = request.args.get("q", "")
-        status = request.args.get("status", "UNASSIGNED")
+        # Empty/missing status means "all" — defaulting to UNASSIGNED hid every other state.
+        status = request.args.get("status") or None
+        if status == "ALL":
+            status = None
 
         page = int(request.args.get("page", 1))
         per_page = int(request.args.get("per_page", 10))

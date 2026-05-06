@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { invoiceService } from "../../../services/invoiceService";
+import { dashboardService } from "../../../services/dashboardService";
 import { formatCurrency } from "../widgetUtils";
-
-const OUTSTANDING_STATUSES = ["pending", "submitted", "in_review", "approved"];
 
 export default function InvoiceOutstandingKpiWidget() {
     const [state, setState] = useState({
@@ -15,23 +13,16 @@ export default function InvoiceOutstandingKpiWidget() {
 
     useEffect(() => {
         let cancelled = false;
-        invoiceService
-            .getAll()
-            .then((rows) => {
+        dashboardService
+            .getSummary()
+            .then((s) => {
                 if (cancelled) return;
-                const open = (rows || []).filter((r) => {
-                    const s = String(r.invoice_status || "").toLowerCase();
-                    return OUTSTANDING_STATUSES.includes(s);
-                });
-                const total = open.reduce(
-                    (sum, r) => sum + Number(r.total_amount || 0),
-                    0,
-                );
+                const inv = s?.invoices || {};
                 setState({
                     loading: false,
                     error: null,
-                    total,
-                    count: open.length,
+                    total: inv.outstanding_total || 0,
+                    count: inv.outstanding_count || 0,
                 });
             })
             .catch((err) => {
