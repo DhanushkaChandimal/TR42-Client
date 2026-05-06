@@ -265,6 +265,8 @@ function RegisterUser() {
             newErrors.username = "Username is required";
         } else if (username.length < 3) {
             newErrors.username = "Username must be at least 3 characters";
+        } else if (username.includes("@")) {
+            newErrors.username = "Username must not contain '@'";
         }
 
         if (!email) {
