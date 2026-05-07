@@ -109,6 +109,27 @@ class InvoiceRepository:
             raise Exception(f"Error during invoice search: {str(e)}")
 
     @staticmethod
+    def status_counts(client_id=None, search_text=None):
+        """Group-by-status count over the entire client dataset (not paged)."""
+        from sqlalchemy import func
+        query = db.session.query(Invoice.invoice_status, func.count(Invoice.id))
+        if client_id:
+            query = query.filter(Invoice.client_id == client_id)
+        if search_text:
+            for word in search_text.lower().split():
+                pattern = f"%{word}%"
+                query = query.filter(
+                    or_(
+                        cast(Invoice.invoice_status, String).ilike(pattern),
+                        cast(Invoice.total_amount, String).ilike(pattern),
+                        Invoice.id.ilike(pattern),
+                        Invoice.vendor_id.ilike(pattern),
+                        Invoice.work_order_id.ilike(pattern),
+                    )
+                )
+        return query.group_by(Invoice.invoice_status).all()
+
+    @staticmethod
     def create_line_item(line_item):
         try:
             db.session.add(line_item)

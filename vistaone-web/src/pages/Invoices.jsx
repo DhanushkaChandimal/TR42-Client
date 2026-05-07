@@ -3,6 +3,7 @@ import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import InvoiceDetailModal from "../components/InvoiceDetailModal";
 import Pagination from "../components/Pagination";
+import StatusSummaryCards from "../components/StatusSummaryCards";
 import { exportService } from "../services/exportService";
 import { invoiceService } from "../services/invoiceService";
 import { usePaginatedList } from "../hooks/usePaginatedList";
@@ -11,10 +12,14 @@ import "../styles/dataTable.css";
 
 const statusOptions = [
   { value: "ALL", label: "All" },
-  { value: "PENDING", label: "Pending" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "SUBMITTED", label: "Submitted" },
   { value: "APPROVED", label: "Approved" },
   { value: "REJECTED", label: "Rejected" },
+  { value: "PAID", label: "Paid" },
 ];
+
+const SUMMARY_STATUSES = statusOptions.slice(1);
 
 const SORT_COLUMN_MAP = {
   vendor: "vendor",
@@ -149,15 +154,12 @@ export default function Invoices() {
     return updated;
   };
 
-  const statusCounts = useMemo(() => {
-    const counts = { PENDING: 0, APPROVED: 0, REJECTED: 0 };
-    invoices.forEach((inv) => {
-      if (counts[inv.invoice_status] !== undefined) {
-        counts[inv.invoice_status]++;
-      }
-    });
-    return counts;
-  }, [invoices]);
+  // Bumping this counter forces the StatusSummaryCards to refetch when an
+  // invoice changes status (approve/reject/undo).
+  const summaryRefreshKey = useMemo(
+    () => invoices.map((i) => `${i.id}:${i.invoice_status}`).join(","),
+    [invoices],
+  );
 
   return (
     <AppShell
@@ -167,23 +169,14 @@ export default function Invoices() {
       loadingText="Loading invoices..."
       controls={<ExportButton withDateRange onExport={exportService.invoices} />}
     >
-      {/* Status summary cards */}
-      <section className="inv-summary">
-        {statusOptions.slice(1).map((opt) => (
-          <div
-            key={opt.value}
-            className={`inv-summary-card inv-summary-${opt.value.toLowerCase()} ${
-              statusFilter === opt.value ? "inv-summary-active" : ""
-            }`}
-            onClick={() =>
-              setStatusFilter(statusFilter === opt.value ? "ALL" : opt.value)
-            }
-          >
-            <p className="inv-summary-count">{statusCounts[opt.value] || 0}</p>
-            <p className="inv-summary-label">{opt.label}</p>
-          </div>
-        ))}
-      </section>
+      <StatusSummaryCards
+        fetchSummary={invoiceService.summary}
+        q={searchTerm.trim()}
+        statuses={SUMMARY_STATUSES}
+        activeStatus={statusFilter === "ALL" ? "" : statusFilter}
+        onSelect={(value) => setStatusFilter(value || "ALL")}
+        refreshKey={summaryRefreshKey}
+      />
 
       <section className="inv-controls">
         <input

@@ -9,7 +9,22 @@ from app.blueprints.enum.enums import LocationTypeEnum, StatusEnum, FrequencyEnu
 logger = logging.getLogger(__name__)
 
 
+def _bucket_counts(rows, all_keys):
+    out = {k: 0 for k in all_keys}
+    for status, count in rows:
+        key = status.value if hasattr(status, "value") else str(status)
+        out[key] = int(count)
+    return out
+
+
 class WorkOrderService:
+
+    @staticmethod
+    def status_counts(client_id=None, search_text=None):
+        return _bucket_counts(
+            WorkOrderRepository.status_counts(client_id=client_id, search_text=search_text),
+            [s.value for s in StatusEnum],
+        )
 
     @staticmethod
     def create_workorder(validated_workorder_data, current_user_id):

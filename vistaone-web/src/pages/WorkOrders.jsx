@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import Pagination from "../components/Pagination";
+import StatusSummaryCards from "../components/StatusSummaryCards";
 import { usePaginatedList } from "../hooks/usePaginatedList";
 import { workOrderService } from "../services/workOrderService";
 import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
@@ -9,6 +10,18 @@ import WorkOrderDetailModal from "../components/WorkOrderDetailModal";
 import { exportService } from "../services/exportService";
 import "../styles/workorder.css";
 import "../styles/dataTable.css";
+
+const SUMMARY_STATUSES = [
+  { value: "UNASSIGNED", label: "Unassigned" },
+  { value: "PENDING", label: "Pending" },
+  { value: "ASSIGNED", label: "Assigned" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "HALTED", label: "Halted" },
+  { value: "CANCELLED", label: "Cancelled" },
+  { value: "REJECTED", label: "Rejected" },
+  { value: "CLOSED", label: "Closed" },
+];
 
 // Map UI column keys to actual WorkOrder attribute names the backend can sort by.
 const SORT_COLUMN_MAP = {
@@ -154,6 +167,17 @@ export default function WorkOrders() {
         </>
       }
     >
+      <StatusSummaryCards
+        fetchSummary={workOrderService.summary}
+        q={searchTerm.trim()}
+        statuses={SUMMARY_STATUSES}
+        activeStatus={statusFilter === "ALL" ? "" : statusFilter}
+        onSelect={(value) => setStatusFilter(value || "ALL")}
+        refreshKey={filteredOrders
+          .map((o) => `${o.id}:${o.current_status}`)
+          .join(",")}
+      />
+
       <section className="workorders-controls">
         <input
           type="search"

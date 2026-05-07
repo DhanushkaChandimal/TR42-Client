@@ -108,3 +108,26 @@ class WorkOrderRepository:
 
         except Exception as e:
             raise Exception(f"Error during search: {str(e)}")
+
+    @staticmethod
+    def status_counts(client_id=None, search_text=None):
+        """Group-by-status count over the entire client dataset (not paged)."""
+        from sqlalchemy import func
+        query = db.session.query(WorkOrder.current_status, func.count(WorkOrder.id))
+        if client_id:
+            query = query.filter(WorkOrder.client_id == client_id)
+        if search_text:
+            for word in search_text.lower().split():
+                pattern = f"%{word}%"
+                query = query.filter(
+                    or_(
+                        cast(WorkOrder.work_order_code, String).ilike(pattern),
+                        WorkOrder.description.ilike(pattern),
+                        cast(WorkOrder.current_status, String).ilike(pattern),
+                        cast(WorkOrder.priority, String).ilike(pattern),
+                        WorkOrder.assigned_vendor.ilike(pattern),
+                        WorkOrder.service_type.ilike(pattern),
+                        WorkOrder.location.ilike(pattern),
+                    )
+                )
+        return query.group_by(WorkOrder.current_status).all()

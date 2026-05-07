@@ -9,6 +9,16 @@ async function parseError(res, fallback) {
 
 export const workOrderService = {
 
+  summary: async ({ q = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    const qs = params.toString();
+    const url = qs ? `${WORKORDER_ENDPOINT}/summary?${qs}` : `${WORKORDER_ENDPOINT}/summary`;
+    const response = await authFetch(url, { method: 'GET' });
+    if (!response.ok) await parseError(response, 'Failed to fetch work order summary');
+    return await response.json();
+  },
+
   getAll: async () => {
     const response = await authFetch(WORKORDER_ENDPOINT, { method: 'GET' });
     if (!response.ok) await parseError(response, 'Failed to fetch work orders');

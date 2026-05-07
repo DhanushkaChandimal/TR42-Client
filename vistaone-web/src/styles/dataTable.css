@@ -111,3 +111,103 @@
     max-height: 70vh;
   }
 }
+
+/* Status summary cards row that sits between the page title controls and
+   the table on Invoices / Tickets / Work Orders. The cards report counts
+   over the entire client dataset, not just the visible page. */
+
+.list-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px 0;
+}
+
+.list-summary-card {
+  flex: 1 1 120px;
+  min-width: 110px;
+  background: #ffffff;
+  border: 1px solid #e5e8ee;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease,
+    background 0.12s ease;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1f2937;
+  text-align: left;
+}
+
+.list-summary-card:hover {
+  border-color: #2b6cb0;
+  background: #f5f8fc;
+}
+
+.list-summary-card:focus-visible {
+  outline: 2px solid #2b6cb0;
+  outline-offset: 2px;
+}
+
+.list-summary-active {
+  border-color: #2b6cb0;
+  box-shadow: inset 3px 0 0 #2b6cb0;
+  background: #e6f0fa;
+}
+
+.list-summary-count {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.list-summary-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5f6b80;
+  font-weight: 600;
+}
+
+/* Status accent strip on the left of each card. Keeps the visual language
+   consistent with the table's status badges. */
+.list-summary-card {
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: #cbd5e1;
+}
+
+.list-summary-pending,
+.list-summary-submitted,
+.list-summary-pending-approval,
+.list-summary-unassigned {
+  border-left-color: #f59e0b;
+}
+
+.list-summary-approved,
+.list-summary-completed,
+.list-summary-paid,
+.list-summary-closed {
+  border-left-color: #10b981;
+}
+
+.list-summary-rejected,
+.list-summary-cancelled {
+  border-left-color: #ef4444;
+}
+
+.list-summary-in-progress,
+.list-summary-assigned {
+  border-left-color: #3b82f6;
+}
+
+.list-summary-halted,
+.list-summary-draft {
+  border-left-color: #6b7280;
+}
+

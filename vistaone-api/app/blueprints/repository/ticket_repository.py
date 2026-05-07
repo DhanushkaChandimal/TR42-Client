@@ -155,3 +155,25 @@ class TicketRepository:
             return query.paginate(page=page, per_page=per_page, error_out=False)
         except Exception as e:
             raise Exception(f"Error during ticket search: {str(e)}")
+
+    @staticmethod
+    def status_counts(client_id=None, search_text=None):
+        """Group-by-status count over the entire client dataset (not paged)."""
+        from sqlalchemy import func
+        query = db.session.query(Ticket.status, func.count(Ticket.id))
+        if client_id:
+            query = query.join(WorkOrder, Ticket.work_order_id == WorkOrder.id).filter(
+                WorkOrder.client_id == client_id
+            )
+        if search_text:
+            for word in search_text.lower().split():
+                pattern = f"%{word}%"
+                query = query.filter(
+                    or_(
+                        Ticket.description.ilike(pattern),
+                        cast(Ticket.status, String).ilike(pattern),
+                        cast(Ticket.priority, String).ilike(pattern),
+                        Ticket.assigned_contractor.ilike(pattern),
+                    )
+                )
+        return query.group_by(Ticket.status).all()

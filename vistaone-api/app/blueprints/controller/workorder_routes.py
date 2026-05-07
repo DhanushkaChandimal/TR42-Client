@@ -45,6 +45,16 @@ def get_all_workorders(current_user_id):
     return workorders_schema.jsonify(workorders), 200
 
 
+@workorder_bp.route("/summary", methods=["GET"])
+@permission_required("workorders", "read")
+def workorder_summary(current_user_id):
+    """Whole-dataset status counts for the work order list summary cards."""
+    client_id = get_current_user_client_id()
+    search_text = request.args.get("q", "")
+    counts = WorkOrderService.status_counts(client_id=client_id, search_text=search_text)
+    return jsonify({"counts": counts}), 200
+
+
 @workorder_bp.route("/<string:work_order_id>", methods=["GET"])
 @permission_required("workorders", "read")
 def get_workorder(current_user_id, work_order_id):

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import Pagination from "../components/Pagination";
+import StatusSummaryCards from "../components/StatusSummaryCards";
 import TicketDetailModal from "../components/TicketDetailModal";
 import { exportService } from "../services/exportService";
 import { ticketService } from "../services/ticketService";
@@ -9,6 +10,16 @@ import { workOrderService } from "../services/workOrderService";
 import { usePaginatedList } from "../hooks/usePaginatedList";
 import "../styles/tickets.css";
 import "../styles/dataTable.css";
+
+const SUMMARY_STATUSES = [
+  { value: "UNASSIGNED", label: "Unassigned" },
+  { value: "ASSIGNED", label: "Assigned" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "PENDING_APPROVAL", label: "Pending" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
+  { value: "COMPLETED", label: "Completed" },
+];
 
 const STATUS_OPTIONS = [
   { value: "ALL", label: "All Statuses" },
@@ -189,6 +200,15 @@ export default function Tickets() {
       loadingText="Loading tickets..."
       controls={<ExportButton withDateRange onExport={exportService.tickets} />}
     >
+      <StatusSummaryCards
+        fetchSummary={ticketService.summary}
+        q={searchTerm.trim()}
+        statuses={SUMMARY_STATUSES}
+        activeStatus={statusFilter === "ALL" ? "" : statusFilter}
+        onSelect={(value) => setStatusFilter(value || "ALL")}
+        refreshKey={tickets.map((t) => `${t.id}:${t.status}`).join(",")}
+      />
+
       <section className="tickets-controls">
         <input
           type="search"
