@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -15,21 +15,7 @@ import {
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import { exportService } from "../services/exportService";
-import { ticketService } from "../services/ticketService";
-import { vendorService } from "../services/vendorService";
-import { invoiceService } from "../services/invoiceService";
-import { workOrderService } from "../services/workOrderService";
-import { msaService } from "../services/msaService";
-import {
-  vendorTicketStats,
-  vendorsBySharedService,
-  invoicesOutstandingByVendor,
-  invoicePipelineStats,
-  invoiceApprovalByVendor,
-  costByService,
-  workOrdersByStatus,
-  msasExpiringSoon,
-} from "../services/analyticsHelpers";
+import { analyticsService } from "../services/analyticsService";
 import "../styles/analytics.css";
 
 const STATUS_COLORS = {
@@ -52,104 +38,73 @@ function formatCurrency(value) {
   }).format(value);
 }
 
+const EMPTY_SUMMARY = {
+  kpis: {
+    total_tickets: 0,
+    approved: 0,
+    rejected: 0,
+    approval_rate: 0,
+    vendor_count: 0,
+    active_wo: 0,
+  },
+  invoice_pipeline: {
+    pending: { count: 0, amount: 0 },
+    approved: { count: 0, amount: 0 },
+    rejected: { count: 0, amount: 0 },
+    paid: { count: 0, amount: 0 },
+    draft: { count: 0, amount: 0 },
+    submitted: { count: 0, amount: 0 },
+  },
+  vendor_ticket_stats: [],
+  invoice_by_vendor: [],
+  invoice_outstanding: [],
+  cost_by_service: [],
+  wo_by_status: [],
+  msas_expiring: [],
+  vendors_by_shared_service: [],
+};
+
 export default function Analytics() {
-  const [data, setData] = useState({
-    tickets: [],
-    vendors: [],
-    invoices: [],
-    workOrders: [],
-    msas: [],
-  });
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      try {
-        const [tickets, vendors, invoices, workOrders, msas] = await Promise.all([
-          ticketService.getAll().catch(() => []),
-          vendorService.getAll().catch(() => []),
-          invoiceService.getAll().catch(() => []),
-          workOrderService.getAll().catch(() => []),
-          msaService.getAll().catch(() => []),
-        ]);
+    analyticsService
+      .getSummary()
+      .then((data) => {
         if (cancelled) return;
-        setData({
-          tickets: Array.isArray(tickets) ? tickets : [],
-          vendors: Array.isArray(vendors) ? vendors : [],
-          invoices: Array.isArray(invoices) ? invoices : [],
-          workOrders: Array.isArray(workOrders) ? workOrders : [],
-          msas: Array.isArray(msas) ? msas : [],
-        });
-      } catch (err) {
-        if (!cancelled) setError(err.message || "Failed to load analytics");
-      } finally {
+        setSummary({ ...EMPTY_SUMMARY, ...data });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message || "Failed to load analytics");
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false);
-      }
-    };
-    load();
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const stats = useMemo(
-    () => vendorTicketStats(data.tickets, data.vendors),
-    [data.tickets, data.vendors],
-  );
-
-  const sharedServices = useMemo(
-    () => vendorsBySharedService(data.vendors),
-    [data.vendors],
-  );
-
-  const outstanding = useMemo(
-    () => invoicesOutstandingByVendor(data.invoices, data.vendors),
-    [data.invoices, data.vendors],
-  );
-
-  const invoicePipeline = useMemo(
-    () => invoicePipelineStats(data.invoices),
-    [data.invoices],
-  );
-
-  const invoiceByVendor = useMemo(
-    () => invoiceApprovalByVendor(data.invoices, data.vendors),
-    [data.invoices, data.vendors],
-  );
-
-  const serviceCosts = useMemo(
-    () => costByService(data.invoices, data.workOrders),
-    [data.invoices, data.workOrders],
-  );
-
-  const woStatus = useMemo(
-    () => workOrdersByStatus(data.workOrders),
-    [data.workOrders],
-  );
-
-  const expiring = useMemo(
-    () => msasExpiringSoon(data.msas, 90),
-    [data.msas],
-  );
-
-  const totals = useMemo(() => {
-    const totalTickets = data.tickets.length;
-    const approved = data.tickets.filter((t) => t.status === "APPROVED").length;
-    const rejected = data.tickets.filter((t) => t.status === "REJECTED").length;
-    const reviewed = approved + rejected;
-    return {
-      totalTickets,
-      approved,
-      rejected,
-      approvalRate: reviewed > 0 ? approved / reviewed : 0,
-      vendors: data.vendors.length,
-      activeWO: data.workOrders.filter(
-        (w) => w.status !== "CANCELLED" && w.status !== "CLOSED",
-      ).length,
-    };
-  }, [data]);
+  const stats = summary.vendor_ticket_stats;
+  const sharedServices = summary.vendors_by_shared_service;
+  const outstanding = summary.invoice_outstanding;
+  const invoicePipeline = summary.invoice_pipeline;
+  const invoiceByVendor = summary.invoice_by_vendor;
+  const serviceCosts = summary.cost_by_service;
+  const woStatus = summary.wo_by_status;
+  const expiring = summary.msas_expiring;
+  const totals = {
+    totalTickets: summary.kpis.total_tickets,
+    approved: summary.kpis.approved,
+    rejected: summary.kpis.rejected,
+    approvalRate: summary.kpis.approval_rate,
+    vendors: summary.kpis.vendor_count,
+    activeWO: summary.kpis.active_wo,
+  };
 
   return (
     <AppShell
@@ -231,7 +186,7 @@ export default function Analytics() {
               <BarChart data={stats}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef1f5" />
                 <XAxis
-                  dataKey="vendorName"
+                  dataKey="vendor_name"
                   tick={{ fontSize: 11 }}
                   angle={-15}
                   textAnchor="end"
@@ -295,29 +250,29 @@ export default function Analytics() {
               </thead>
               <tbody>
                 {stats.map((s) => (
-                  <tr key={s.vendorId}>
-                    <td>{s.vendorName}</td>
+                  <tr key={s.vendor_id}>
+                    <td>{s.vendor_name}</td>
                     <td>{s.approved}</td>
                     <td>{s.rejected}</td>
                     <td>{s.pending}</td>
                     <td>
                       <span
                         className={`analytics-rate ${
-                          s.rejectionRate >= 0.5
+                          s.rejection_rate >= 0.5
                             ? "rate-high"
-                            : s.rejectionRate >= 0.3
+                            : s.rejection_rate >= 0.3
                             ? "rate-mid"
                             : "rate-low"
                         }`}
                       >
                         {s.approved + s.rejected > 0
-                          ? `${(s.rejectionRate * 100).toFixed(0)}%`
+                          ? `${(s.rejection_rate * 100).toFixed(0)}%`
                           : "—"}
                       </span>
                     </td>
                     <td>
-                      {s.avgApprovalHours != null
-                        ? `${s.avgApprovalHours.toFixed(1)} h`
+                      {s.avg_approval_hours != null
+                        ? `${s.avg_approval_hours.toFixed(1)} h`
                         : "—"}
                     </td>
                   </tr>
@@ -347,7 +302,7 @@ export default function Analytics() {
                 {serviceCosts.map((s) => (
                   <tr key={s.service}>
                     <td>{s.service}</td>
-                    <td>{s.invoiceCount}</td>
+                    <td>{s.invoice_count}</td>
                     <td>{formatCurrency(s.approved)}</td>
                     <td>{formatCurrency(s.pending)}</td>
                     <td>{formatCurrency(s.rejected)}</td>
@@ -370,7 +325,7 @@ export default function Analytics() {
               <BarChart data={invoiceByVendor}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef1f5" />
                 <XAxis
-                  dataKey="vendorName"
+                  dataKey="vendor_name"
                   tick={{ fontSize: 11 }}
                   angle={-15}
                   textAnchor="end"
@@ -402,8 +357,8 @@ export default function Analytics() {
               </thead>
               <tbody>
                 {outstanding.map((o) => (
-                  <tr key={o.vendorId}>
-                    <td>{o.vendorName}</td>
+                  <tr key={o.vendor_id}>
+                    <td>{o.vendor_name}</td>
                     <td>{o.count}</td>
                     <td>{formatCurrency(o.amount)}</td>
                   </tr>
@@ -429,12 +384,7 @@ export default function Analytics() {
               <tbody>
                 {expiring.map((m) => (
                   <tr key={m.id}>
-                    <td>
-                      {m.vendor_name ||
-                        data.vendors.find((v) => v.id === m.vendor_id)
-                          ?.company_name ||
-                        m.vendor_id?.slice(0, 8)}
-                    </td>
+                    <td>{m.vendor_name || m.vendor_id?.slice(0, 8) || "—"}</td>
                     <td>v{m.version || "—"}</td>
                     <td>
                       {new Date(m.expiration_date).toLocaleDateString()}

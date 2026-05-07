@@ -16,6 +16,7 @@ from app.blueprints.controller import (
     chat_bp,
     export_bp,
     dashboard_bp,
+    analytics_bp,
 )
 from app.utils.logging_util import logging_setup
 from flask_swagger_ui import get_swaggerui_blueprint
@@ -95,6 +96,7 @@ def create_app(config_name="DevelopmentConfig"):
     app.register_blueprint(chat_bp, url_prefix="/api")
     app.register_blueprint(export_bp, url_prefix="/api/export")
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
+    app.register_blueprint(analytics_bp, url_prefix="/api/analytics")
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     CORS(
