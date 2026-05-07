@@ -216,6 +216,13 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  /* Without min-width:0 + box-sizing:border-box flowing through here,
+     the textarea's intrinsic min width pushes the thread pane wider
+     than its center column and the composer bleeds into the details
+     pane on the right. */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .messages-thread-header {
@@ -306,10 +313,15 @@
   padding: 10px;
   border-top: 1px solid #e2e6ea;
   background: #fafbfc;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .messages-input {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   resize: vertical;
   font-family: inherit;
   font-size: 14px;
@@ -323,6 +335,8 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .messages-send-btn {
@@ -333,6 +347,7 @@
   border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .messages-send-btn:disabled {
