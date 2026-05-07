@@ -44,6 +44,57 @@ export default function MsaAnalysisModal({ msa, onClose }) {
         return () => clearInterval(id);
     }, [analyzing, analyzeStartedAt]);
 
+    // Team notes (per-MSA, shared across the client's users)
+    const [notes, setNotes] = useState([]);
+    const [draftNote, setDraftNote] = useState("");
+    const [postingNote, setPostingNote] = useState(false);
+    const [noteError, setNoteError] = useState("");
+
+    useEffect(() => {
+        if (!msa?.id) return;
+        let cancelled = false;
+        aiService
+            .listNotes(msa.id)
+            .then((d) => {
+                if (!cancelled) setNotes(d.notes || []);
+            })
+            .catch(() => {
+                if (!cancelled) setNotes([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [msa?.id]);
+
+    const handleAddNote = async () => {
+        const body = draftNote.trim();
+        if (!body || !msa?.id) return;
+        setNoteError("");
+        setPostingNote(true);
+        try {
+            const created = await aiService.addNote(msa.id, body);
+            setNotes((prev) => [created, ...prev]);
+            setDraftNote("");
+        } catch (err) {
+            setNoteError(err.message || "Failed to add note");
+        } finally {
+            setPostingNote(false);
+        }
+    };
+
+    const formatNoteDate = (s) => {
+        if (!s) return "";
+        const d = new Date(s);
+        if (Number.isNaN(d.getTime())) return "";
+        return d.toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    };
+
     const ext = fileExt(msa?.file_name);
     const isPdf = ext === "pdf";
     const isWord = ext === "doc" || ext === "docx";
@@ -422,6 +473,64 @@ export default function MsaAnalysisModal({ msa, onClose }) {
                                 ))}
                             </Section>
                         )}
+
+                        <section className="ai-modal-section ai-modal-notes">
+                            <h3>Team notes</h3>
+                            <p className="ai-modal-notes-hint">
+                                Visible to everyone in your organization. Each
+                                note is stamped with the author and the time it
+                                was posted.
+                            </p>
+                            <div className="ai-modal-note-composer">
+                                <textarea
+                                    className="ai-modal-note-input"
+                                    placeholder="Add a note for the team..."
+                                    value={draftNote}
+                                    onChange={(e) => setDraftNote(e.target.value)}
+                                    rows={3}
+                                    maxLength={4000}
+                                    disabled={postingNote}
+                                />
+                                <div className="ai-modal-note-composer-actions">
+                                    {noteError && (
+                                        <span className="ai-modal-note-error">
+                                            {noteError}
+                                        </span>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="ai-modal-note-post"
+                                        onClick={handleAddNote}
+                                        disabled={postingNote || !draftNote.trim()}
+                                    >
+                                        {postingNote ? "Posting..." : "Add note"}
+                                    </button>
+                                </div>
+                            </div>
+                            {notes.length === 0 ? (
+                                <div className="ai-modal-notes-empty">
+                                    No notes yet. Be the first to add one.
+                                </div>
+                            ) : (
+                                <ul className="ai-modal-notes-list">
+                                    {notes.map((n) => (
+                                        <li key={n.id} className="ai-modal-note">
+                                            <header className="ai-modal-note-meta">
+                                                <span className="ai-modal-note-author">
+                                                    {n.author_name || "Unknown user"}
+                                                </span>
+                                                <span className="ai-modal-note-time">
+                                                    {formatNoteDate(n.created_at)}
+                                                </span>
+                                            </header>
+                                            <div className="ai-modal-note-body">
+                                                {n.body}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </section>
 
                         <footer className="ai-modal-disclaimer">
                             {analysis?.disclaimer || DISCLAIMER}

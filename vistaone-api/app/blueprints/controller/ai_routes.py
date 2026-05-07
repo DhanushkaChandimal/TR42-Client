@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from app.blueprints.services.ai_service import (
     AiService,
     TextExtractionError,
@@ -57,6 +57,28 @@ def get_pricing(user_id, msa_id):
         return err
     result, code = AiService.get_pricing(msa_id)
     return jsonify(result), code
+
+
+@ai_bp.route("/msa/<msa_id>/notes", methods=["GET"])
+@permission_required("contracts", "read")
+def list_notes(user_id, msa_id):
+    """Per-MSA team notes, shared across the client's users."""
+    _, err = _scope_or_error(user_id, msa_id)
+    if err:
+        return err
+    notes, code = AiService.get_notes(msa_id)
+    return jsonify({"notes": notes}), code
+
+
+@ai_bp.route("/msa/<msa_id>/notes", methods=["POST"])
+@permission_required("contracts", "write")
+def add_note(user_id, msa_id):
+    _, err = _scope_or_error(user_id, msa_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    note, code = AiService.add_note(msa_id, payload.get("body"), user_id)
+    return jsonify(note), code
 
 
 @ai_bp.route("/msa/<msa_id>/text", methods=["GET"])
