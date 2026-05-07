@@ -198,10 +198,10 @@ def build_analytics_workbook(start=None, end=None):
     for ws in wb.worksheets:
         if ws.title == "Executive Summary":
             ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-            _wo_print_setup(ws, period, ws.title, gridlines=False, report_title=A_REPORT_TITLE)
+            _wo_print_setup(ws, period, ws.title, report_title=A_REPORT_TITLE)
         else:
             ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-            _wo_print_setup(ws, period, ws.title, gridlines=True, report_title=A_REPORT_TITLE)
+            _wo_print_setup(ws, period, ws.title, report_title=A_REPORT_TITLE)
 
     return _to_workbook_bytes(wb)
 
@@ -884,10 +884,10 @@ def build_invoices_workbook(start=None, end=None):
     for ws in wb.worksheets:
         if ws.title == "Executive Summary":
             ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-            _wo_print_setup(ws, period, ws.title, gridlines=False, report_title=I_REPORT_TITLE)
+            _wo_print_setup(ws, period, ws.title, report_title=I_REPORT_TITLE)
         else:
             ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-            _wo_print_setup(ws, period, ws.title, gridlines=True, report_title=I_REPORT_TITLE)
+            _wo_print_setup(ws, period, ws.title, report_title=I_REPORT_TITLE)
 
     return _to_workbook_bytes(wb)
 
@@ -1548,10 +1548,10 @@ def build_tickets_workbook(start=None, end=None):
     for ws in wb.worksheets:
         if ws.title == "Executive Summary":
             ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-            _wo_print_setup(ws, period, ws.title, gridlines=False, report_title=T_REPORT_TITLE)
+            _wo_print_setup(ws, period, ws.title, report_title=T_REPORT_TITLE)
         else:
             ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-            _wo_print_setup(ws, period, ws.title, gridlines=True, report_title=T_REPORT_TITLE)
+            _wo_print_setup(ws, period, ws.title, report_title=T_REPORT_TITLE)
 
     return _to_workbook_bytes(wb)
 
@@ -2282,10 +2282,13 @@ def _wo_quoted(name):
     return f"'{name}'"
 
 
-def _wo_print_setup(ws, period, tab_name, gridlines=True, report_title=None):
-    """Apply the workbook-wide print spec to a single tab."""
-    # Letter size + landscape if wide tab; orientation set by caller via
-    # ws.page_setup.orientation before calling. Default landscape.
+def _wo_print_setup(ws, period, tab_name, gridlines=False, report_title=None):
+    """Apply the workbook-wide print spec to a single tab.
+
+    Gridlines are off everywhere on screen and in print, so the sheet
+    reads as a clean board instead of stark white grid. Visual structure
+    comes from cell borders + alternating row banding.
+    """
     ws.page_setup.paperSize = ws.PAPERSIZE_LETTER
     if not ws.page_setup.orientation:
         ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
@@ -2295,9 +2298,11 @@ def _wo_print_setup(ws, period, tab_name, gridlines=True, report_title=None):
     ws.page_margins = PageMargins(
         left=0.5, right=0.5, top=0.75, bottom=0.75, header=0.3, footer=0.3
     )
-    ws.print_options.gridLines = gridlines
-    ws.print_options.gridLinesSet = gridlines
+    # Force gridlines off both on screen and on print regardless of caller
+    ws.print_options.gridLines = False
+    ws.print_options.gridLinesSet = False
     ws.print_options.horizontalCentered = True
+    ws.sheet_view.showGridLines = False
     ws.oddHeader.left.text = report_title or WO_REPORT_TITLE
     ws.oddHeader.left.size = 9
     ws.oddHeader.center.text = tab_name
@@ -2312,6 +2317,45 @@ def _wo_print_setup(ws, period, tab_name, gridlines=True, report_title=None):
     ws.oddFooter.center.size = 9
     ws.oddFooter.right.text = "Page &P of &N"
     ws.oddFooter.right.size = 9
+    # Off-gray alternating row banding on data tabs to make the sheet
+    # feel professional. We use freeze_panes (set by every data writer
+    # at "A<header_row + 1>") to find the first data row, then paint
+    # every other row with the soft slate band fill, leaving status /
+    # header / KPI fills untouched.
+    _wo_apply_off_gray_banding(ws)
+
+
+def _wo_apply_off_gray_banding(ws):
+    """Paint every other data row with WO_BAND_FILL.
+
+    Skips tabs that don't have freeze_panes set (e.g. Executive Summary
+    layouts that aren't tabular). Cells that already carry an explicit
+    fill are left alone so headers, KPI cards, section banners, and
+    status colors stay visible.
+    """
+    fp = ws.freeze_panes
+    if not fp:
+        return
+    import re
+    m = re.match(r"^[A-Z]+(\d+)$", str(fp))
+    if not m:
+        return
+    data_start = int(m.group(1))
+    if ws.max_row < data_start or ws.max_column < 1:
+        return
+    for r in range(data_start, ws.max_row + 1):
+        if (r - data_start) % 2 != 1:
+            continue
+        for c in range(1, ws.max_column + 1):
+            cell = ws.cell(row=r, column=c)
+            f = cell.fill
+            if (
+                f is not None
+                and f.fgColor is not None
+                and f.fgColor.value not in (None, "00000000")
+            ):
+                continue
+            cell.fill = WO_BAND_FILL
 
 
 def _wo_set_print_area(ws, last_col_letter, last_row):
@@ -2421,10 +2465,10 @@ def build_workorders_workbook(start=None, end=None):
     for ws in wb.worksheets:
         if ws.title == "Executive Summary":
             ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-            _wo_print_setup(ws, period, ws.title, gridlines=False)
+            _wo_print_setup(ws, period, ws.title)
         else:
             ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-            _wo_print_setup(ws, period, ws.title, gridlines=True)
+            _wo_print_setup(ws, period, ws.title)
 
     return _to_workbook_bytes(wb)
 
