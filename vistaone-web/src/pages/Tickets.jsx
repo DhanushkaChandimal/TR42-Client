@@ -8,6 +8,7 @@ import { ticketService } from "../services/ticketService";
 import { workOrderService } from "../services/workOrderService";
 import { usePaginatedList } from "../hooks/usePaginatedList";
 import "../styles/tickets.css";
+import "../styles/dataTable.css";
 
 const STATUS_OPTIONS = [
   { value: "ALL", label: "All Statuses" },
@@ -27,25 +28,19 @@ const PRIORITY_OPTIONS = [
   { value: "LOW", label: "Low" },
 ];
 
-const SORT_OPTIONS = [
-  { value: "due_asc", label: "Due date (soonest first)" },
-  { value: "due_desc", label: "Due date (latest first)" },
-  { value: "created_desc", label: "Created (newest first)" },
-  { value: "created_asc", label: "Created (oldest first)" },
-  { value: "wo_asc", label: "Work order (low to high)" },
-  { value: "wo_desc", label: "Work order (high to low)" },
-  { value: "description_asc", label: "Description (A → Z)" },
-  { value: "description_desc", label: "Description (Z → A)" },
-  { value: "vendor_asc", label: "Vendor (A → Z)" },
-  { value: "vendor_desc", label: "Vendor (Z → A)" },
-  { value: "contractor_asc", label: "Contractor (A → Z)" },
-  { value: "contractor_desc", label: "Contractor (Z → A)" },
-  { value: "priority_asc", label: "Priority (high first)" },
-  { value: "priority_desc", label: "Priority (low first)" },
-  { value: "status_asc", label: "Status" },
-  { value: "cost_desc", label: "Cost (high to low)" },
-  { value: "cost_asc", label: "Cost (low to high)" },
-];
+// UI sort key -> backend sort_by token. The backend whitelists these and
+// joins where needed so sort applies across the entire dataset, not just
+// the visible page.
+const SORT_COLUMN_MAP = {
+  wo: "work_order",
+  description: "description",
+  vendor: "vendor",
+  contractor: "assigned_contractor",
+  priority: "priority",
+  due: "due_date",
+  status: "status",
+  cost: "cost",
+};
 
 const HEADER_SORT_DEFAULTS = {
   wo: "asc",
@@ -57,141 +52,6 @@ const HEADER_SORT_DEFAULTS = {
   status: "asc",
   cost: "desc",
 };
-
-const PRIORITY_RANK = { HIGH: 0, MEDIUM: 1, LOW: 2 };
-const STATUS_RANK = {
-  PENDING_APPROVAL: 0,
-  IN_PROGRESS: 1,
-  ASSIGNED: 2,
-  UNASSIGNED: 3,
-  APPROVED: 4,
-  REJECTED: 5,
-  COMPLETED: 6,
-};
-
-function dateValue(value) {
-  if (!value) return 0;
-  const t = new Date(value).getTime();
-  return Number.isNaN(t) ? 0 : t;
-}
-
-function vendorLabel(t) {
-  return (t.vendor?.company_name || t.vendor?.name || "").toLowerCase();
-}
-
-function descriptionLabel(t) {
-  return (t.description || "").toLowerCase();
-}
-
-function contractorLabel(t) {
-  return (t.assigned_contractor || "").toLowerCase();
-}
-
-function woNumberValue(t, lookup) {
-  const wo = lookup.get(t.work_order_id);
-  const n = Number(wo?.work_order_code);
-  return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
-}
-
-function ticketCost(t) {
-  const total = t.invoice?.total_amount;
-  if (total == null) return null;
-  const n = Number(total);
-  return Number.isFinite(n) ? n : null;
-}
-
-function sortTickets(list, sortBy, lookup) {
-  const sorted = [...list];
-  switch (sortBy) {
-    case "due_asc":
-      sorted.sort((a, b) => dateValue(a.due_date) - dateValue(b.due_date));
-      break;
-    case "due_desc":
-      sorted.sort((a, b) => dateValue(b.due_date) - dateValue(a.due_date));
-      break;
-    case "created_asc":
-      sorted.sort((a, b) => dateValue(a.created_at) - dateValue(b.created_at));
-      break;
-    case "wo_asc":
-      sorted.sort(
-        (a, b) => woNumberValue(a, lookup) - woNumberValue(b, lookup),
-      );
-      break;
-    case "wo_desc":
-      sorted.sort(
-        (a, b) => woNumberValue(b, lookup) - woNumberValue(a, lookup),
-      );
-      break;
-    case "description_asc":
-      sorted.sort((a, b) =>
-        descriptionLabel(a).localeCompare(descriptionLabel(b)),
-      );
-      break;
-    case "description_desc":
-      sorted.sort((a, b) =>
-        descriptionLabel(b).localeCompare(descriptionLabel(a)),
-      );
-      break;
-    case "vendor_asc":
-      sorted.sort((a, b) => vendorLabel(a).localeCompare(vendorLabel(b)));
-      break;
-    case "vendor_desc":
-      sorted.sort((a, b) => vendorLabel(b).localeCompare(vendorLabel(a)));
-      break;
-    case "contractor_asc":
-      sorted.sort((a, b) =>
-        contractorLabel(a).localeCompare(contractorLabel(b)),
-      );
-      break;
-    case "contractor_desc":
-      sorted.sort((a, b) =>
-        contractorLabel(b).localeCompare(contractorLabel(a)),
-      );
-      break;
-    case "priority_asc":
-      sorted.sort(
-        (a, b) =>
-          (PRIORITY_RANK[a.priority] ?? 99) -
-          (PRIORITY_RANK[b.priority] ?? 99),
-      );
-      break;
-    case "priority_desc":
-      sorted.sort(
-        (a, b) =>
-          (PRIORITY_RANK[b.priority] ?? 99) -
-          (PRIORITY_RANK[a.priority] ?? 99),
-      );
-      break;
-    case "status_asc":
-    case "status":
-      sorted.sort(
-        (a, b) =>
-          (STATUS_RANK[a.status] ?? 99) - (STATUS_RANK[b.status] ?? 99),
-      );
-      break;
-    case "status_desc":
-      sorted.sort(
-        (a, b) =>
-          (STATUS_RANK[b.status] ?? 99) - (STATUS_RANK[a.status] ?? 99),
-      );
-      break;
-    case "cost_desc":
-      sorted.sort((a, b) => (ticketCost(b) ?? -1) - (ticketCost(a) ?? -1));
-      break;
-    case "cost_asc":
-      sorted.sort(
-        (a, b) =>
-          (ticketCost(a) ?? Number.POSITIVE_INFINITY) -
-          (ticketCost(b) ?? Number.POSITIVE_INFINITY),
-      );
-      break;
-    case "created_desc":
-    default:
-      sorted.sort((a, b) => dateValue(b.created_at) - dateValue(a.created_at));
-      break;
-  }
-  return sorted;
-}
 
 function parseSort(sortBy) {
   const m = sortBy?.match(/^(.*)_(asc|desc)$/);
@@ -221,6 +81,13 @@ function formatCurrency(n) {
   })}`;
 }
 
+function ticketCost(t) {
+  const total = t.invoice?.total_amount;
+  if (total == null) return null;
+  const n = Number(total);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function Tickets() {
   const [workOrders, setWorkOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -230,13 +97,18 @@ export default function Tickets() {
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
   const fetcher = useCallback(
-    (page, perPage) => ticketService.search({
-      q: searchTerm.trim(),
-      status: statusFilter === "ALL" ? "" : statusFilter,
-      page,
-      per_page: perPage,
-    }),
-    [searchTerm, statusFilter],
+    (page, perPage) => {
+      const { column, direction } = parseSort(sortBy);
+      return ticketService.search({
+        q: searchTerm.trim(),
+        status: statusFilter === "ALL" ? "" : statusFilter,
+        page,
+        per_page: perPage,
+        sort_by: SORT_COLUMN_MAP[column] || "created_at",
+        order: direction || "desc",
+      });
+    },
+    [searchTerm, statusFilter, sortBy],
   );
 
   const {
@@ -270,39 +142,19 @@ export default function Tickets() {
     return map;
   }, [workOrders]);
 
+  // Priority is the only client-only filter (status + search go through the
+  // backend). Don't re-sort here — the backend already returned the right slice.
   const filtered = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    const matched = tickets.filter((t) => {
-      const matchesStatus = statusFilter === "ALL" || t.status === statusFilter;
-      if (!matchesStatus) return false;
-      const matchesPriority =
-        priorityFilter === "ALL" || t.priority === priorityFilter;
-      if (!matchesPriority) return false;
-      if (!term) return true;
-      const wo = workOrderLookup.get(t.work_order_id);
-      const woNumber = wo?.work_order_code != null ? `#${wo.work_order_code}` : "";
-      const haystack = [
-        t.description,
-        t.assigned_contractor,
-        t.vendor?.company_name,
-        t.vendor?.name,
-        woNumber,
-        t.id,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(term);
-    });
-    return sortTickets(matched, sortBy, workOrderLookup);
-  }, [tickets, workOrderLookup, searchTerm, statusFilter, priorityFilter, sortBy]);
+    if (priorityFilter === "ALL") return tickets;
+    return tickets.filter((t) => t.priority === priorityFilter);
+  }, [tickets, priorityFilter]);
 
   const activeSort = parseSort(sortBy);
   const handleHeaderSort = (column) => setSortBy(nextSortFor(column, sortBy));
   const sortIndicator = (column) => {
     if (activeSort.column !== column) return null;
     return (
-      <span className="tickets-sort-arrow" aria-hidden="true">
+      <span className="data-table-sort-arrow" aria-hidden="true">
         {activeSort.direction === "asc" ? "▲" : "▼"}
       </span>
     );
@@ -317,7 +169,7 @@ export default function Tickets() {
     },
     tabIndex: 0,
     role: "button",
-    className: `tickets-th-sortable ${
+    className: `data-table-th-sortable ${
       activeSort.column === column ? "is-active" : ""
     }`,
     "aria-sort":
@@ -337,7 +189,6 @@ export default function Tickets() {
       loadingText="Loading tickets..."
       controls={<ExportButton withDateRange onExport={exportService.tickets} />}
     >
-
       <section className="tickets-controls">
         <input
           type="search"
@@ -368,25 +219,13 @@ export default function Tickets() {
             </option>
           ))}
         </select>
-        <select
-          className="tickets-filter"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          aria-label="Sort tickets"
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
       </section>
 
-      <section className="tickets-table-wrap">
+      <section className="data-table-wrap">
         {!loading && filtered.length === 0 ? (
-          <div className="tickets-empty">No tickets match your filters.</div>
+          <div className="data-table-state">No tickets match your filters.</div>
         ) : (
-          <table className="tickets-table tickets-table-flat">
+          <table className="data-table">
             <thead>
               <tr>
                 <th {...headerProps("wo", "work order")}>
@@ -426,8 +265,8 @@ export default function Tickets() {
                 return (
                   <tr
                     key={t.id}
-                    className={`tickets-row tickets-row-clickable ${
-                      selectedTicketId === t.id ? "tickets-row-selected" : ""
+                    className={`data-table-row-clickable ${
+                      selectedTicketId === t.id ? "data-table-row-selected" : ""
                     }`}
                     onClick={() => setSelectedTicketId(t.id)}
                     onKeyDown={(e) => {
@@ -464,7 +303,9 @@ export default function Tickets() {
                         {t.status?.replace(/_/g, " ") || "—"}
                       </span>
                     </td>
-                    <td className="tickets-cell-cost">{formatCurrency(cost)}</td>
+                    <td className="data-table-cell-numeric tickets-cell-cost">
+                      {formatCurrency(cost)}
+                    </td>
                     <td>
                       {t.anomaly_flag ? (
                         <span

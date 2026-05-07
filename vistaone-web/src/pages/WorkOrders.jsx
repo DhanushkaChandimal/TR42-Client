@@ -8,6 +8,7 @@ import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
 import WorkOrderDetailModal from "../components/WorkOrderDetailModal";
 import { exportService } from "../services/exportService";
 import "../styles/workorder.css";
+import "../styles/dataTable.css";
 
 // Map UI column keys to actual WorkOrder attribute names the backend can sort by.
 const SORT_COLUMN_MAP = {
@@ -91,7 +92,7 @@ export default function WorkOrders() {
   const sortIndicator = (column) => {
     if (activeSort.column !== column) return null;
     return (
-      <span className="workorders-sort-arrow" aria-hidden="true">
+      <span className="data-table-sort-arrow" aria-hidden="true">
         {activeSort.direction === "asc" ? "▲" : "▼"}
       </span>
     );
@@ -106,7 +107,7 @@ export default function WorkOrders() {
     },
     tabIndex: 0,
     role: "button",
-    className: `workorders-th-sortable ${
+    className: `data-table-th-sortable ${
       activeSort.column === column ? "is-active" : ""
     }`,
     "aria-sort":
@@ -174,13 +175,13 @@ export default function WorkOrders() {
         </select>
       </section>
 
-      <section className="workorders-table-wrap">
+      <section className="data-table-wrap">
         {loading && filteredOrders.length === 0 ? (
-          <div className="workorders-state">Loading work orders...</div>
+          <div className="data-table-state">Loading work orders...</div>
         ) : filteredOrders.length === 0 ? (
-          <div className="workorders-state">No work orders found</div>
+          <div className="data-table-state">No work orders found</div>
         ) : (
-          <table className="workorders-table workorders-table-flat">
+          <table className="data-table">
             <thead>
               <tr>
                 <th {...headerProps("order_id", "order id")}>
@@ -208,7 +209,7 @@ export default function WorkOrders() {
               {filteredOrders.map((order) => (
                 <tr
                   key={order.work_order_code}
-                  className="workorders-row-clickable"
+                  className="data-table-row-clickable"
                   onClick={() => setDetailOrder(order)}
                   tabIndex={0}
                   role="button"

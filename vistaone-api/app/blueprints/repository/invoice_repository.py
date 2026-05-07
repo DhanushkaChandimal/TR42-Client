@@ -2,7 +2,20 @@ from sqlalchemy import select, or_, cast, String, desc, asc
 from app.extensions import db
 from app.models.invoice import Invoice
 from app.models.line_item import LineItem
+from app.models.vendor import Vendor
 import logging
+
+# Whitelist of sort_by tokens the search endpoint accepts. Anything outside
+# this map falls back to created_at, so the frontend can't trigger ORDER BY
+# on arbitrary attributes.
+INVOICE_SORT_FIELDS = {
+    "created_at": Invoice.created_at,
+    "invoice_date": Invoice.invoice_date,
+    "due_date": Invoice.due_date,
+    "total_amount": Invoice.total_amount,
+    "invoice_status": Invoice.invoice_status,
+    "vendor": "_vendor",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +96,14 @@ class InvoiceRepository:
                             Invoice.work_order_id.ilike(pattern),
                         )
                     )
-            sort_column = getattr(Invoice, sort_by, Invoice.created_at)
-            query = query.order_by(desc(sort_column) if order.lower() == "desc" else asc(sort_column))
+            spec = INVOICE_SORT_FIELDS.get(sort_by, Invoice.created_at)
+            direction = desc if order.lower() == "desc" else asc
+            if spec == "_vendor":
+                query = query.outerjoin(Vendor, Invoice.vendor_id == Vendor.id)
+                sort_column = Vendor.company_name
+            else:
+                sort_column = spec
+            query = query.order_by(direction(sort_column).nullslast())
             return query.paginate(page=page, per_page=per_page, error_out=False)
         except Exception as e:
             raise Exception(f"Error during invoice search: {str(e)}")

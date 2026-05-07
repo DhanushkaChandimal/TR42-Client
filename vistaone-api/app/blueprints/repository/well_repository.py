@@ -4,6 +4,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.models.well import Well
 from app.extensions import db
 
+WELL_SORT_FIELDS = {
+    "created_at": Well.created_at,
+    "api_number": Well.api_number,
+    "well_name": Well.well_name,
+    "status": Well.status,
+}
+
 
 class WellRepository:
     @staticmethod
@@ -71,8 +78,9 @@ class WellRepository:
                             cast(Well.type, String).ilike(pattern),
                         )
                     )
-            sort_column = getattr(Well, sort_by, Well.created_at)
-            query = query.order_by(desc(sort_column) if order.lower() == "desc" else asc(sort_column))
+            sort_column = WELL_SORT_FIELDS.get(sort_by, Well.created_at)
+            direction = desc if order.lower() == "desc" else asc
+            query = query.order_by(direction(sort_column).nullslast())
             return query.paginate(page=page, per_page=per_page, error_out=False)
         except Exception as e:
             raise Exception(f"Error during well search: {str(e)}")
