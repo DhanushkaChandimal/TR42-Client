@@ -38,6 +38,7 @@ from app.blueprints.schema.msa_requirement_schema import (
 )
 from app.extensions import db
 from app.models.client_vendor import ClientVendor
+from app.models.client_user import ClientUser
 from app.models.msa_requirement import MsaRequirement
 from app.models.user import User
 
@@ -500,9 +501,16 @@ class AiService:
         """Tenant-scope check. Returns (msa_or_None, has_access).
 
         - MASTER role: full access.
-        - CLIENT users: only MSAs whose vendor is linked to the user's client
-          via client_vendor. Prevents client A from seeing client B's contracts.
-        - VENDOR / CONTRACTOR / unscoped users: denied for now (no model yet).
+        - CLIENT users: an MSA is visible if EITHER
+            (a) its vendor is linked to the user's client via client_vendor
+                (the original rule, kept for forward compatibility), OR
+            (b) it was uploaded by someone in the user's client (matches
+                the list endpoint's scope so anything visible in
+                Contracts is also analyzable/notable/previewable).
+          Prevents client A from seeing client B's contracts while no
+          longer 403'ing on rows the same user can already see in the
+          list and download from the storage bucket.
+        - VENDOR / CONTRACTOR / unscoped users: denied (no model yet).
         """
         user = User.query.get(user_id)
         if not user:
@@ -516,17 +524,33 @@ class AiService:
             return msa, True
 
         if user.user_type == UserType.CLIENT and user.client_id:
-            link = (
+            client_id = user.client_id
+            # (a) vendor linked to client
+            vendor_link = (
                 db.session.execute(
                     select(ClientVendor).where(
-                        ClientVendor.client_id == user.client_id,
+                        ClientVendor.client_id == client_id,
                         ClientVendor.vendor_id == msa.vendor_id,
                     )
                 )
                 .scalars()
                 .first()
             )
-            return msa, link is not None
+            if vendor_link is not None:
+                return msa, True
+            # (b) uploaded by someone in the same client (mirrors the
+            # list endpoint, keeps the two scopes from disagreeing)
+            uploader_in_client = (
+                db.session.execute(
+                    select(ClientUser).where(
+                        ClientUser.client_id == client_id,
+                        ClientUser.user_id == msa.uploaded_by,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            return msa, uploader_in_client is not None
 
         return msa, False
 
