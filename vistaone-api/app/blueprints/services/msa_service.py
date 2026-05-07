@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 from app.models.msa import Msa
 from app.blueprints.repository.msa_repository import MsaRepository
 from app.blueprints.schema.msa_schema import msa_schema, msas_schema
+from app.blueprints.services import storage_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -55,8 +56,28 @@ class MsaService:
         ensure_upload_dir()
         safe_name = secure_filename(file.filename)
         unique_name = f"{str(uuid.uuid4())}_{safe_name}"
-        save_path = os.path.join(UPLOAD_DIR, unique_name)
-        file.save(save_path)
+
+        # Push to Supabase Storage so every backend instance can read
+        # the file, falling through to local-disk-only when storage
+        # isn't configured. The DB column 'file_name' doubles as the
+        # bucket object key.
+        file.stream.seek(0)
+        data = file.stream.read()
+        if storage_service.is_configured():
+            uploaded = storage_service.upload_bytes(
+                unique_name, data, content_type=file.mimetype
+            )
+            if not uploaded:
+                logger.warning(
+                    f"Bucket upload failed for {unique_name}; "
+                    "file is on local disk only and won't be visible to "
+                    "teammates running their own backend."
+                )
+        else:
+            # Storage not configured at all — write to local disk only.
+            save_path = os.path.join(UPLOAD_DIR, unique_name)
+            with open(save_path, "wb") as fh:
+                fh.write(data)
 
         msa = Msa(
             vendor_id=vendor_id,

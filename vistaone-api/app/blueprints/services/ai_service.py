@@ -737,11 +737,13 @@ class AiService:
         if not msa.file_name:
             return {"message": "MSA has no file attached"}, 400
 
-        from app.blueprints.services.msa_service import UPLOAD_DIR
+        from app.blueprints.services import storage_service
 
-        file_path = os.path.join(UPLOAD_DIR, msa.file_name)
-        if not os.path.exists(file_path):
-            return {"message": f"MSA file missing on disk: {msa.file_name}"}, 404
+        try:
+            local_path = storage_service.ensure_local(msa.file_name)
+        except FileNotFoundError as e:
+            return {"message": f"MSA file unavailable: {e}"}, 404
+        file_path = str(local_path)
 
         try:
             pages = extract_text(file_path)

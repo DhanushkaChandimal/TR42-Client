@@ -1,5 +1,3 @@
-import os
-
 from flask import Blueprint, jsonify, request
 from app.blueprints.services.ai_service import (
     AiService,
@@ -96,15 +94,16 @@ def get_text(user_id, msa_id):
     if not msa.file_name:
         return jsonify({"pages": []}), 200
 
-    from app.blueprints.services.msa_service import UPLOAD_DIR
-
-    path = os.path.join(UPLOAD_DIR, msa.file_name)
-    if not os.path.exists(path):
-        return jsonify({"message": f"File missing on disk: {msa.file_name}"}), 404
+    from app.blueprints.services import storage_service
 
     try:
-        pages = extract_text(path)
-        tables = extract_tables(path)
+        local_path = storage_service.ensure_local(msa.file_name)
+    except FileNotFoundError as e:
+        return jsonify({"message": str(e)}), 404
+
+    try:
+        pages = extract_text(str(local_path))
+        tables = extract_tables(str(local_path))
     except TextExtractionError as e:
         return jsonify({"message": str(e)}), 422
 

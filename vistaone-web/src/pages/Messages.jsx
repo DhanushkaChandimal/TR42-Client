@@ -458,6 +458,7 @@ function ThreadPane({
   error,
   onSend,
 }) {
+  const formRef = useRef(null);
   if (!activeContact) {
     return (
       <section className="messages-thread-pane">
@@ -512,12 +513,25 @@ function ThreadPane({
               })
             )}
           </div>
-          <form className="messages-composer" onSubmit={onSend}>
+          <form className="messages-composer" onSubmit={onSend} ref={formRef}>
             <textarea
               className="messages-input"
-              placeholder="Type a message…"
+              placeholder="Type a message… (Enter to send, Shift+Enter for a new line)"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter sends; Shift+Enter inserts a newline. Skip while
+                // an IME composition is open so Asian-language candidate
+                // selection doesn't fire the send.
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing
+                ) {
+                  e.preventDefault();
+                  formRef.current?.requestSubmit();
+                }
+              }}
               disabled={sending}
               rows={2}
             />
