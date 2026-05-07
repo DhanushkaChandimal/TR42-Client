@@ -124,13 +124,13 @@ export const sidebarNav = {
     { to: "/tickets", label: "Tickets", icon: "clipboard", permission: "workorders" },
     { to: "/invoices", label: "Invoices", icon: "file", permission: "invoices" },
     { to: "/vendor-favorites", label: "Vendors", icon: "users", permission: "vendors" },
-    { to: "/messages", label: "Messages", icon: "message", permission: "workorders" },
+    { to: "/messages", label: "Messages", icon: "message", permission: "messages" },
   ],
   account: [
     { to: "/vendor-marketplace", label: "Vendor Marketplace", icon: "users", permission: "vendor_marketplace" },
     { to: "/contracts", label: "Contracts / MSA", icon: "folder", permission: "contracts" },
-    { to: "/analytics", label: "Analytics", icon: "grid" },
-    { to: "/fraud", label: "Fraud & Anomalies", icon: "file" },
+    { to: "/analytics", label: "Analytics", icon: "grid", permission: "analytics" },
+    { to: "/fraud", label: "Fraud & Anomalies", icon: "file", permission: "fraud" },
   ],
 };
 
