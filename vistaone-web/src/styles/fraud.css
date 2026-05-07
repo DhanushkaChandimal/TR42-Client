@@ -387,3 +387,41 @@
   color: #1f2937;
   margin-top: 2px;
 }
+
+/* ---------- Sections (Active vs Acknowledged) ---------- */
+.fraud-section {
+  margin-bottom: 24px;
+}
+.fraud-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+.fraud-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1f2937;
+}
+.fraud-section-count {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 600;
+}
+.fraud-section-empty {
+  text-align: center;
+  padding: 24px 16px;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.fraud-section-acked .fraud-section-title {
+  color: #6b7280;
+}
+.fraud-section-acked .fraud-wo-card {
+  opacity: 0.72;
+}

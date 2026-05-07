@@ -11,12 +11,19 @@ const SEVERITY_OPTIONS = [
   { value: "LOW", label: "Low" },
 ];
 
-const SOURCE_OPTIONS = [
-  { value: "ALL", label: "All sources" },
-  { value: "contractor", label: "Contractor app" },
-  { value: "vendor", label: "Vendor" },
-  { value: "system", label: "System (derived)" },
+// Work order status groupings the user wants to filter by.
+const STATUS_GROUP_OPTIONS = [
+  { value: "ALL", label: "All work orders" },
+  { value: "OPEN", label: "Open" },
+  { value: "PENDING", label: "Pending" },
+  { value: "COMPLETED", label: "Completed" },
 ];
+
+const STATUS_GROUP_MEMBERS = {
+  OPEN: new Set(["UNASSIGNED", "ASSIGNED", "IN_PROGRESS"]),
+  PENDING: new Set(["PENDING", "PENDING_APPROVAL"]),
+  COMPLETED: new Set(["COMPLETED", "CLOSED"]),
+};
 
 const SEVERITY_RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
@@ -48,7 +55,7 @@ export default function Fraud() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [severityFilter, setSeverityFilter] = useState("ALL");
-  const [sourceFilter, setSourceFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(() => new Set());
   const [acknowledged, setAcknowledged] = useState(() => new Set());
@@ -73,14 +80,17 @@ export default function Fraud() {
     };
   }, []);
 
-  // Apply filters per WO group: a group is shown if at least one alert
-  // matches severity + source + search. Within a shown group, we still
-  // render every alert under it so the WO context isn't broken.
+  // Apply filters per WO group: a group is shown if its status matches
+  // the selected status group AND at least one alert matches severity +
+  // search. Within a shown group, we still render every alert under it
+  // so the WO context isn't broken.
   const visibleGroups = useMemo(() => {
     const term = search.trim().toLowerCase();
+    const statusSet = STATUS_GROUP_MEMBERS[statusFilter];
     const groups = data.work_order_groups || [];
     return groups
       .filter((g) => {
+        if (statusSet && !statusSet.has(g.current_status)) return false;
         const haystack = [
           g.vendor_name || "",
           g.description || "",
@@ -89,7 +99,6 @@ export default function Fraud() {
         const groupMatchesSearch = !term || haystack.includes(term);
         const matchingAlerts = g.alerts.filter((a) => {
           if (severityFilter !== "ALL" && a.severity !== severityFilter) return false;
-          if (sourceFilter !== "ALL" && a.source !== sourceFilter) return false;
           if (!term) return true;
           if (groupMatchesSearch) return true;
           const alertHaystack = [
@@ -107,7 +116,21 @@ export default function Fraud() {
           (SEVERITY_RANK[b.max_severity] ?? 9) ||
           b.alert_count - a.alert_count,
       );
-  }, [data.work_order_groups, severityFilter, sourceFilter, search]);
+  }, [data.work_order_groups, severityFilter, statusFilter, search]);
+
+  // Split into Active (any unacknowledged alert under the WO) vs.
+  // Fully acknowledged. New alerts default to unacknowledged so they
+  // land in the Active section at the top.
+  const { activeGroups, ackedGroups } = useMemo(() => {
+    const active = [];
+    const acked = [];
+    visibleGroups.forEach((g) => {
+      const allAcked = g.alerts.every((a) => acknowledged.has(a.id));
+      if (allAcked) acked.push(g);
+      else active.push(g);
+    });
+    return { activeGroups: active, ackedGroups: acked };
+  }, [visibleGroups, acknowledged]);
 
   const toggleExpand = (id) => {
     setExpanded((prev) => {
@@ -122,6 +145,92 @@ export default function Fraud() {
     setExpanded(new Set(visibleGroups.map((g) => g.work_order_id)));
   };
   const collapseAll = () => setExpanded(new Set());
+
+  const renderGroup = (g) => {
+    const isOpen = expanded.has(g.work_order_id);
+    const visibleAlerts = g.alerts.filter((a) => {
+      if (severityFilter !== "ALL" && a.severity !== severityFilter) return false;
+      return true;
+    });
+    return (
+      <li
+        key={g.work_order_id}
+        className={`fraud-wo-card max-${g.max_severity}`}
+      >
+        <button
+          type="button"
+          className="fraud-wo-header"
+          onClick={() => toggleExpand(g.work_order_id)}
+          aria-expanded={isOpen}
+        >
+          <span className={`fraud-severity-badge severity-${g.max_severity}`}>
+            {g.max_severity}
+          </span>
+          <span className="fraud-wo-code">
+            WO #{g.work_order_code ?? g.work_order_id.slice(0, 8)}
+          </span>
+          <span className="fraud-wo-vendor">{g.vendor_name || "—"}</span>
+          <span className="fraud-wo-status">{g.current_status || "—"}</span>
+          <span className="fraud-wo-count">
+            {visibleAlerts.length} alert{visibleAlerts.length === 1 ? "" : "s"}
+          </span>
+          <span className="fraud-wo-chevron" aria-hidden="true">
+            {isOpen ? "▾" : "▸"}
+          </span>
+        </button>
+        {g.description && (
+          <div className="fraud-wo-description">{g.description}</div>
+        )}
+        {isOpen && (
+          <ul className="fraud-alert-list">
+            {visibleAlerts.map((a) => {
+              const isAck = acknowledged.has(a.id);
+              return (
+                <li
+                  key={a.id}
+                  className={`fraud-alert severity-${a.severity} source-${a.source} ${
+                    isAck ? "acknowledged" : ""
+                  }`}
+                >
+                  <div className={`fraud-severity-badge severity-${a.severity}`}>
+                    {a.severity}
+                  </div>
+                  <div className="fraud-alert-body">
+                    <div className="fraud-alert-meta">
+                      <span className={`fraud-source-tag source-${a.source}`}>
+                        {a.source}
+                      </span>
+                      <span className="fraud-alert-category">{a.category}</span>
+                      {a.contractor && (
+                        <span className="fraud-alert-contractor">
+                          Contractor: {a.contractor}
+                        </span>
+                      )}
+                      {a.created_at && (
+                        <span className="fraud-alert-time">
+                          {formatDate(a.created_at)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="fraud-alert-description">
+                      {a.description}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="fraud-ack-btn"
+                    onClick={() => toggleAck(a.id)}
+                  >
+                    {isAck ? "Unacknowledge" : "Acknowledge"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </li>
+    );
+  };
 
   const toggleAck = (alertId) => {
     setAcknowledged((prev) => {
@@ -205,10 +314,11 @@ export default function Fraud() {
         </select>
         <select
           className="fraud-filter"
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value)}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Filter by work order status"
         >
-          {SOURCE_OPTIONS.map((o) => (
+          {STATUS_GROUP_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
@@ -233,94 +343,35 @@ export default function Fraud() {
         <div className="fraud-empty">No work orders match your filters.</div>
       )}
 
-      <ul className="fraud-wo-list">
-        {visibleGroups.map((g) => {
-          const isOpen = expanded.has(g.work_order_id);
-          const visibleAlerts = g.alerts.filter((a) => {
-            if (severityFilter !== "ALL" && a.severity !== severityFilter) return false;
-            if (sourceFilter !== "ALL" && a.source !== sourceFilter) return false;
-            return true;
-          });
-          return (
-            <li
-              key={g.work_order_id}
-              className={`fraud-wo-card max-${g.max_severity}`}
-            >
-              <button
-                type="button"
-                className="fraud-wo-header"
-                onClick={() => toggleExpand(g.work_order_id)}
-                aria-expanded={isOpen}
-              >
-                <span className={`fraud-severity-badge severity-${g.max_severity}`}>
-                  {g.max_severity}
-                </span>
-                <span className="fraud-wo-code">
-                  WO #{g.work_order_code ?? g.work_order_id.slice(0, 8)}
-                </span>
-                <span className="fraud-wo-vendor">{g.vendor_name || "—"}</span>
-                <span className="fraud-wo-status">{g.current_status || "—"}</span>
-                <span className="fraud-wo-count">
-                  {visibleAlerts.length} alert{visibleAlerts.length === 1 ? "" : "s"}
-                </span>
-                <span className="fraud-wo-chevron" aria-hidden="true">
-                  {isOpen ? "▾" : "▸"}
-                </span>
-              </button>
-              {g.description && (
-                <div className="fraud-wo-description">{g.description}</div>
-              )}
-              {isOpen && (
-                <ul className="fraud-alert-list">
-                  {visibleAlerts.map((a) => {
-                    const isAck = acknowledged.has(a.id);
-                    return (
-                      <li
-                        key={a.id}
-                        className={`fraud-alert severity-${a.severity} source-${a.source} ${
-                          isAck ? "acknowledged" : ""
-                        }`}
-                      >
-                        <div className={`fraud-severity-badge severity-${a.severity}`}>
-                          {a.severity}
-                        </div>
-                        <div className="fraud-alert-body">
-                          <div className="fraud-alert-meta">
-                            <span className={`fraud-source-tag source-${a.source}`}>
-                              {a.source}
-                            </span>
-                            <span className="fraud-alert-category">{a.category}</span>
-                            {a.contractor && (
-                              <span className="fraud-alert-contractor">
-                                Contractor: {a.contractor}
-                              </span>
-                            )}
-                            {a.created_at && (
-                              <span className="fraud-alert-time">
-                                {formatDate(a.created_at)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="fraud-alert-description">
-                            {a.description}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          className="fraud-ack-btn"
-                          onClick={() => toggleAck(a.id)}
-                        >
-                          {isAck ? "Unacknowledge" : "Acknowledge"}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {(activeGroups.length > 0 || ackedGroups.length === 0) && (
+        <section className="fraud-section">
+          <header className="fraud-section-header">
+            <span className="fraud-section-title">Active alerts</span>
+            <span className="fraud-section-count">
+              {activeGroups.length} work order{activeGroups.length === 1 ? "" : "s"}
+            </span>
+          </header>
+          {activeGroups.length === 0 ? (
+            <div className="fraud-section-empty">
+              No active alerts in this view.
+            </div>
+          ) : (
+            <ul className="fraud-wo-list">{activeGroups.map(renderGroup)}</ul>
+          )}
+        </section>
+      )}
+
+      {ackedGroups.length > 0 && (
+        <section className="fraud-section fraud-section-acked">
+          <header className="fraud-section-header">
+            <span className="fraud-section-title">Acknowledged</span>
+            <span className="fraud-section-count">
+              {ackedGroups.length} work order{ackedGroups.length === 1 ? "" : "s"}
+            </span>
+          </header>
+          <ul className="fraud-wo-list">{ackedGroups.map(renderGroup)}</ul>
+        </section>
+      )}
     </AppShell>
   );
 }
