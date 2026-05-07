@@ -214,6 +214,29 @@
     border: 1px solid #bfdbfe;
 }
 
+.ai-modal-banner-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.ai-modal-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #92400e;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: ai-modal-spin 0.9s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes ai-modal-spin {
+    to { transform: rotate(360deg); }
+}
+
 .ai-modal-state {
     padding: 60px 16px;
     text-align: center;

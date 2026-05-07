@@ -17,6 +17,8 @@ export default function MsaAnalysisModal({ msa, onClose }) {
     const [analysis, setAnalysis] = useState(null);
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
     const [analyzing, setAnalyzing] = useState(false);
+    const [analyzeStartedAt, setAnalyzeStartedAt] = useState(null);
+    const [elapsedSec, setElapsedSec] = useState(0);
     const [error, setError] = useState("");
     const [info, setInfo] = useState("");
     const [pdfUrl, setPdfUrl] = useState("");
@@ -28,6 +30,19 @@ export default function MsaAnalysisModal({ msa, onClose }) {
     const bodyRef = useRef(null);
     const draggingRef = useRef(false);
     const textPaneRef = useRef(null);
+
+    // Tick a 1s elapsed counter while an analysis is in flight so the user
+    // sees activity instead of a static "Analyzing..." button.
+    useEffect(() => {
+        if (!analyzing || !analyzeStartedAt) {
+            setElapsedSec(0);
+            return undefined;
+        }
+        const id = setInterval(() => {
+            setElapsedSec(Math.floor((Date.now() - analyzeStartedAt) / 1000));
+        }, 1000);
+        return () => clearInterval(id);
+    }, [analyzing, analyzeStartedAt]);
 
     const ext = fileExt(msa?.file_name);
     const isPdf = ext === "pdf";
@@ -167,10 +182,11 @@ export default function MsaAnalysisModal({ msa, onClose }) {
         setError("");
         setInfo("");
         setAnalyzing(true);
+        setAnalyzeStartedAt(Date.now());
         try {
             const result = await aiService.analyze(msa.id);
             setInfo(
-                `Analysis complete: ${result.row_count} extracted facts (run ${result.run_id?.slice(0, 8) || ""}).`,
+                `Analysis complete in ${elapsedSec}s: ${result.row_count} extracted facts (run ${result.run_id?.slice(0, 8) || ""}).`,
             );
             const data = await aiService.getAnalysis(msa.id);
             setAnalysis(data);
@@ -178,6 +194,7 @@ export default function MsaAnalysisModal({ msa, onClose }) {
             setError(err.message || "Analysis failed");
         } finally {
             setAnalyzing(false);
+            setAnalyzeStartedAt(null);
         }
     };
 
@@ -221,11 +238,13 @@ export default function MsaAnalysisModal({ msa, onClose }) {
                             disabled={analyzing || !msa.file_name}
                             title={
                                 msa.file_name
-                                    ? "Run AI analysis on this MSA"
+                                    ? "Run AI analysis on this MSA (60-90 seconds)"
                                     : "Upload a document first"
                             }
                         >
-                            {analyzing ? "Analyzing..." : "Run AI Analysis"}
+                            {analyzing
+                                ? `Analyzing... ${elapsedSec}s`
+                                : "Run AI Analysis"}
                         </button>
                         <button
                             className="ai-modal-close"
@@ -319,7 +338,15 @@ export default function MsaAnalysisModal({ msa, onClose }) {
                                 {error}
                             </div>
                         )}
-                        {info && (
+                        {analyzing && (
+                            <div className="ai-modal-banner ai-modal-banner-progress">
+                                <span className="ai-modal-spinner" aria-hidden="true" />
+                                Analyzing contract... {elapsedSec}s elapsed.
+                                Local model usually takes 60-90 seconds. Don't close
+                                the tab; results will appear here when done.
+                            </div>
+                        )}
+                        {info && !analyzing && (
                             <div className="ai-modal-banner ai-modal-banner-info">
                                 {info}
                             </div>
@@ -330,7 +357,7 @@ export default function MsaAnalysisModal({ msa, onClose }) {
                         ) : isEmpty ? (
                             <div className="ai-modal-state">
                                 No analysis yet. Click <b>Run AI Analysis</b> at the top
-                                to generate one. Expect 30 to 90 seconds on a local model.
+                                to generate one. Expect 60 to 90 seconds on a local model.
                             </div>
                         ) : (
                             <div className="ai-modal-sections">
