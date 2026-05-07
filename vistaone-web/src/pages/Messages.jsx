@@ -5,6 +5,7 @@ import { messagingService } from "../services/messagingService";
 import { getUserIdFromToken } from "../services/currentUser";
 import { useRealtimeMessages } from "../hooks/useRealtimeMessages";
 import "../styles/messagesPage.css";
+import { markRead, getReadMap, UNREAD_UPDATED } from "../utils/unreadMessages";
 
 const formatTime = (s) =>
   s
@@ -41,11 +42,18 @@ export default function Messages() {
   const [draft, setDraft] = useState("");
   const [file, setFile] = useState(null);
   const [sending, setSending] = useState(false);
+  const [readMap, setReadMap] = useState(() => getReadMap());
   const lastSeenRef = useRef(null);
   const threadRef = useRef(null);
   const activeChatIdRef = useRef(null);
   const currentUserId = getUserIdFromToken();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handler = () => setReadMap(getReadMap());
+    window.addEventListener(UNREAD_UPDATED, handler);
+    return () => window.removeEventListener(UNREAD_UPDATED, handler);
+  }, []);
 
   const loadContacts = useCallback(async () => {
     try {
@@ -87,7 +95,12 @@ export default function Messages() {
         ]);
         setMessages(msgs);
         setContactContext(ctx);
-        if (msgs.length) lastSeenRef.current = msgs[msgs.length - 1].created_at;
+        if (msgs.length) {
+          lastSeenRef.current = msgs[msgs.length - 1].created_at;
+          markRead(contact.chat_id, msgs[msgs.length - 1].created_at);
+        } else {
+          markRead(contact.chat_id, contact.last_message?.created_at);
+        }
       } catch (err) {
         setError(err.message || "Failed to open conversation");
       } finally {
@@ -115,6 +128,7 @@ export default function Messages() {
         return [...prev, row];
       });
       lastSeenRef.current = row.created_at;
+      markRead(row.chat_id, row.created_at);
     }
     loadContacts();
   }, [loadContacts]);
@@ -140,6 +154,7 @@ export default function Messages() {
       const msg = await messagingService.postMessage(activeChatId, draft, file);
       setMessages((prev) => [...prev, msg]);
       lastSeenRef.current = msg.created_at;
+      markRead(activeChatId, msg.created_at);
       setDraft("");
       setFile(null);
       await loadContacts();
@@ -162,6 +177,7 @@ export default function Messages() {
             loading={loadingContacts}
             activeId={activeContact?.id}
             onSelect={selectContact}
+            readMap={readMap}
           />
           <ThreadPane
             activeContact={activeContact}
@@ -189,7 +205,7 @@ export default function Messages() {
   );
 }
 
-function ContactsList({ contacts, loading, activeId, onSelect }) {
+function ContactsList({ contacts, loading, activeId, onSelect, readMap }) {
   return (
     <aside className="messages-contacts">
       <header className="messages-contacts-header">Contacts</header>
@@ -200,32 +216,41 @@ function ContactsList({ contacts, loading, activeId, onSelect }) {
           No contacts yet. Open a work order and pick someone to start a conversation.
         </div>
       ) : (
-        contacts.map((c) => (
-          <button
-            key={c.id}
-            className={`messages-contact ${
-              activeId === c.id ? "messages-contact-active" : ""
-            }`}
-            onClick={() => onSelect(c)}
-          >
-            <div className="messages-contact-row">
-              <span className="messages-contact-name">{c.name}</span>
-            </div>
-            <div className="messages-contact-role">{c.role}</div>
-            {c.last_message && (
-              <div className="messages-contact-preview">
-                {c.last_message.body
-                  ? c.last_message.body.slice(0, 60)
-                  : "(attachment)"}
+        contacts.map((c) => {
+          const lastRead = readMap[c.chat_id];
+          const unread =
+            !!c.last_message?.created_at &&
+            (!lastRead || new Date(c.last_message.created_at) > new Date(lastRead));
+          return (
+            <button
+              key={c.id}
+              className={`messages-contact ${
+                activeId === c.id ? "messages-contact-active" : ""
+              }`}
+              onClick={() => onSelect(c)}
+            >
+              <div className="messages-contact-row">
+                <span className={`messages-contact-name${unread ? " messages-contact-name-unread" : ""}`}>
+                  {c.name}
+                </span>
+                {unread && <span className="messages-unread-dot" />}
               </div>
-            )}
-            {c.last_message?.created_at && (
-              <div className="messages-contact-time">
-                {formatDay(c.last_message.created_at)}
-              </div>
-            )}
-          </button>
-        ))
+              <div className="messages-contact-role">{c.role}</div>
+              {c.last_message && (
+                <div className="messages-contact-preview">
+                  {c.last_message.body
+                    ? c.last_message.body.slice(0, 60)
+                    : "(attachment)"}
+                </div>
+              )}
+              {c.last_message?.created_at && (
+                <div className="messages-contact-time">
+                  {formatDay(c.last_message.created_at)}
+                </div>
+              )}
+            </button>
+          );
+        })
       )}
     </aside>
   );
