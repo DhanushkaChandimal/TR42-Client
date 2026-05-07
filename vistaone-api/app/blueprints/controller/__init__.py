@@ -14,6 +14,7 @@ from .chat_routes import chat_bp
 from .export_routes import export_bp
 from .dashboard_routes import dashboard_bp
 from .analytics_routes import analytics_bp
+from .fraud_routes import fraud_bp
 
 
 __all__ = [
@@ -33,4 +34,5 @@ __all__ = [
     "export_bp",
     "dashboard_bp",
     "analytics_bp",
+    "fraud_bp",
 ]
