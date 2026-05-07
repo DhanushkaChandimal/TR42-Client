@@ -76,6 +76,19 @@
   color: #1a2640;
 }
 
+.messages-contact-name-unread {
+  color: #1a2640;
+  font-weight: 700;
+}
+
+.messages-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+}
+
 .messages-contact-role {
   font-size: 11px;
   color: #5f6b80;

@@ -67,6 +67,8 @@ class MessageRepository:
             sender_id=sender_id,
             recipient_id=recipient_id,
             body=body,
+            created_by=sender_id,
+            updated_by=sender_id,
         )
         db.session.add(msg)
         db.session.commit()
