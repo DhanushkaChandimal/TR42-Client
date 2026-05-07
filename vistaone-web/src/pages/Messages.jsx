@@ -3,9 +3,8 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
 import { messagingService } from "../services/messagingService";
 import { getUserIdFromToken } from "../services/currentUser";
+import { useRealtimeMessages } from "../hooks/useRealtimeMessages";
 import "../styles/messagesPage.css";
-
-const POLL_MS = 5000;
 
 const formatTime = (s) =>
   s
@@ -44,6 +43,7 @@ export default function Messages() {
   const [sending, setSending] = useState(false);
   const lastSeenRef = useRef(null);
   const threadRef = useRef(null);
+  const activeChatIdRef = useRef(null);
   const currentUserId = getUserIdFromToken();
   const navigate = useNavigate();
 
@@ -65,7 +65,7 @@ export default function Messages() {
   useEffect(() => {
     const id = setInterval(() => {
       if (document.visibilityState === "visible") loadContacts();
-    }, POLL_MS * 4);
+    }, 20_000);
     return () => clearInterval(id);
   }, [loadContacts]);
 
@@ -73,6 +73,7 @@ export default function Messages() {
     async (contact) => {
       setActiveContact(contact);
       setActiveChatId(contact.chat_id);
+      activeChatIdRef.current = contact.chat_id;
       setMessages([]);
       setContactContext(null);
       lastSeenRef.current = null;
@@ -107,29 +108,21 @@ export default function Messages() {
     setSearchParams({}, { replace: true });
   }, [deepUser, contacts, loadingContacts, selectContact, setSearchParams]);
 
-  useEffect(() => {
-    if (!activeChatId) return;
-    let cancelled = false;
-    const tick = async () => {
-      if (document.visibilityState === "hidden") return;
-      try {
-        const latest = await messagingService.listMessages(
-          activeChatId,
-          lastSeenRef.current
-        );
-        if (cancelled || !latest.length) return;
-        setMessages((prev) => [...prev, ...latest]);
-        lastSeenRef.current = latest[latest.length - 1].created_at;
-      } catch {
-        /* polling errors are non-fatal */
-      }
-    };
-    const id = setInterval(tick, POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [activeChatId]);
+  const handleIncomingMessage = useCallback((row) => {
+    if (row.chat_id === activeChatIdRef.current) {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === row.id)) return prev;
+        return [...prev, row];
+      });
+      lastSeenRef.current = row.created_at;
+    }
+    loadContacts();
+  }, [loadContacts]);
+
+  useRealtimeMessages({
+    userId: currentUserId,
+    onMessage: handleIncomingMessage,
+  });
 
   useEffect(() => {
     if (threadRef.current) {
