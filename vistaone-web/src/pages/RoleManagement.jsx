@@ -5,6 +5,10 @@ import AppShell from '../components/AppShell';
 
 const BUILT_IN_ROLES = new Set(['MASTER', 'ADMIN', 'USER']);
 
+// Every page the app routes to should appear here so admins can toggle
+// permissions per role. Keys must match the `permission` strings used on
+// the sidebar in dashboardData.js and on backend @permission_required
+// decorators.
 const RESOURCES = [
     { key: 'dashboard',          label: 'Dashboard' },
     { key: 'wells',              label: 'Oil Wells' },
@@ -13,6 +17,9 @@ const RESOURCES = [
     { key: 'vendor_marketplace', label: 'Vendor Marketplace' },
     { key: 'contracts',          label: 'Contracts / MSA' },
     { key: 'invoices',           label: 'Invoices' },
+    { key: 'analytics',          label: 'Analytics' },
+    { key: 'fraud',              label: 'Fraud & Anomalies' },
+    { key: 'messages',           label: 'Messages' },
     { key: 'users',              label: 'User Management' },
     { key: 'promote_admin',      label: 'Can Assign Admin Role', action: true },
 ];
