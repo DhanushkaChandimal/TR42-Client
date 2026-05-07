@@ -342,3 +342,132 @@
     max-height: 70vh;
   }
 }
+
+/* ---------- AI invoice review ---------- */
+.invoice-review-hint {
+  color: #6b7280;
+  font-size: 12px;
+  margin: 0 0 10px 0;
+}
+
+.invoice-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.invoice-review-btn {
+  background: #1f3a8a;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.invoice-review-btn:hover:not(:disabled) {
+  background: #1e3a78;
+}
+.invoice-review-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.invoice-review-error {
+  color: #b42318;
+  font-size: 12px;
+}
+
+.invoice-review-result {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+  border-left: 4px solid #94a3b8;
+}
+.invoice-review-result.verdict-looks_good {
+  border-left-color: #10b981;
+  background: #f0fdf4;
+}
+.invoice-review-result.verdict-needs_review {
+  border-left-color: #f59e0b;
+  background: #fef3c7;
+}
+.invoice-review-result.verdict-off_by_a_lot {
+  border-left-color: #ef4444;
+  background: #fee2e2;
+}
+.invoice-review-result.verdict-insufficient_data {
+  border-left-color: #94a3b8;
+}
+
+.invoice-review-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.invoice-review-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  color: #1f2937;
+}
+.invoice-review-badge.verdict-looks_good {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+}
+.invoice-review-badge.verdict-needs_review {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #f59e0b;
+}
+.invoice-review-badge.verdict-off_by_a_lot {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+}
+.invoice-review-source-tag {
+  font-size: 11px;
+  color: #6b7280;
+  font-style: italic;
+}
+.invoice-review-source-tag.invoice-review-source-ai {
+  color: #1f3a8a;
+  font-style: normal;
+  font-weight: 600;
+}
+.invoice-review-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 4px;
+  margin: 0 0 10px 0;
+  font-size: 13px;
+}
+.invoice-review-grid dt {
+  font-weight: 600;
+  color: #4b5563;
+}
+.invoice-review-grid dd {
+  margin: 0;
+  color: #1f2937;
+}
+.invoice-review-summary {
+  font-size: 13px;
+  color: #1f2937;
+  margin: 8px 0 0 0;
+}
+.invoice-review-concerns {
+  margin: 8px 0 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #6b7280;
+}

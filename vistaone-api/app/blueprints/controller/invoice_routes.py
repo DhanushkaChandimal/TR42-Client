@@ -1,6 +1,7 @@
 from flask import request, jsonify, Blueprint
 from app.blueprints.schema.invoice_schema import invoice_schema, invoices_schema
 from app.blueprints.services.invoice_service import InvoiceService
+from app.blueprints.services.invoice_review_service import InvoiceReviewService
 from marshmallow import ValidationError
 from app.utils.util import permission_required, get_current_user_client_id
 import logging
@@ -147,3 +148,12 @@ def set_pending_invoice(current_user_id, invoice_id):
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+@invoice_bp.route("/<string:invoice_id>/review", methods=["POST"])
+@permission_required("invoices", "read")
+def review_invoice(current_user_id, invoice_id):
+    """Run the AI-assisted invoice review against the vendor MSA pricing."""
+    client_id = get_current_user_client_id()
+    result, code = InvoiceReviewService.review_invoice(invoice_id, client_id)
+    return jsonify(result), code

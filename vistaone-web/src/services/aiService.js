@@ -51,4 +51,23 @@ export const aiService = {
     if (!res.ok) await parseError(res, "Failed to load document text");
     return await res.json();
   },
+
+  listNotes: async (msaId) => {
+    const res = await fetch(`${API_BASE}${AI_ENDPOINT}/msa/${msaId}/notes`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) await parseError(res, "Failed to load notes");
+    return await res.json();
+  },
+
+  addNote: async (msaId, body) => {
+    const res = await fetch(`${API_BASE}${AI_ENDPOINT}/msa/${msaId}/notes`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ body }),
+    });
+    if (!res.ok) await parseError(res, "Failed to add note");
+    return await res.json();
+  },
 };

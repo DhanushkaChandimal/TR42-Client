@@ -833,3 +833,58 @@ class AiService:
     def get_pricing(msa_id):
         rows = MsaRequirementRepository.get_by_msa(msa_id, category="pricing")
         return msa_requirements_schema.dump(rows), 200
+
+    # ------------------------------------------------------------------
+    # Team notes (per-MSA, shared across the client's users)
+    # ------------------------------------------------------------------
+
+    NOTE_MAX_LEN = 4000
+
+    @staticmethod
+    def _serialize_note(row, users_by_id=None):
+        author_id = row.created_by
+        author_name = None
+        if users_by_id and author_id in users_by_id:
+            u = users_by_id[author_id]
+            full = f"{(u.first_name or '').strip()} {(u.last_name or '').strip()}".strip()
+            author_name = full or getattr(u, "username", None) or None
+        return {
+            "id": row.id,
+            "body": row.description or "",
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "author_id": author_id,
+            "author_name": author_name,
+        }
+
+    @staticmethod
+    def add_note(msa_id, body, user_id):
+        text = (body or "").strip()
+        if not text:
+            return {"message": "Note body cannot be empty"}, 400
+        if len(text) > AiService.NOTE_MAX_LEN:
+            return (
+                {"message": f"Note too long (max {AiService.NOTE_MAX_LEN} chars)"},
+                400,
+            )
+        row = MsaRequirementRepository.add_note(msa_id, text, user_id)
+        # Resolve the author display name once so the client doesn't
+        # have to look it up separately.
+        users_by_id = {}
+        u = db.session.get(User, str(user_id))
+        if u:
+            users_by_id[u.id] = u
+        return AiService._serialize_note(row, users_by_id), 201
+
+    @staticmethod
+    def get_notes(msa_id):
+        rows = MsaRequirementRepository.get_notes(msa_id)
+        author_ids = {r.created_by for r in rows if r.created_by}
+        users_by_id = {}
+        if author_ids:
+            users = (
+                db.session.execute(select(User).where(User.id.in_(author_ids)))
+                .scalars()
+                .all()
+            )
+            users_by_id = {u.id: u for u in users}
+        return [AiService._serialize_note(r, users_by_id) for r in rows], 200

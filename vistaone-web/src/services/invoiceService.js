@@ -76,4 +76,12 @@ export const invoiceService = {
     if (!response.ok) await parseError(response, "Failed to set invoice to pending");
     return await response.json();
   },
+
+  review: async (invoiceId) => {
+    const response = await authFetch(`${INVOICE_ENDPOINT}/${invoiceId}/review`, {
+      method: "POST",
+    });
+    if (!response.ok) await parseError(response, "Failed to review invoice");
+    return await response.json();
+  },
 };

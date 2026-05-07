@@ -6,23 +6,105 @@
 }
 
 .messages-page-grid {
-  display: grid;
-  grid-template-columns: 280px 1fr 320px;
+  display: flex;
   flex: 1;
   border: 1px solid #e2e6ea;
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
+  min-height: 0;
 }
 
-@media (max-width: 1100px) {
-  .messages-page-grid {
-    grid-template-columns: 240px 1fr;
-  }
-  .messages-context {
-    display: none;
-  }
+.messages-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  position: relative;
 }
+.messages-pane-left,
+.messages-pane-right {
+  flex: 0 0 auto;
+}
+.messages-pane-center {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Drag handle between panes */
+.messages-splitter {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  background: transparent;
+  border-left: 1px solid #e2e6ea;
+  border-right: 1px solid #e2e6ea;
+  transition: background 0.12s ease;
+}
+.messages-splitter:hover,
+.messages-splitter.dragging {
+  background: #c7d2fe;
+}
+
+/* Collapsed-rail: a thin vertical strip with an expand chevron */
+.messages-rail {
+  flex: 0 0 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  background: #f1f5f9;
+  border-right: 1px solid #e2e6ea;
+  cursor: pointer;
+  user-select: none;
+}
+.messages-rail-right {
+  border-right: none;
+  border-left: 1px solid #e2e6ea;
+}
+.messages-rail-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #475569;
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-top: 12px;
+}
+.messages-rail-toggle {
+  background: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 700;
+}
+.messages-rail-toggle:hover {
+  background: #fff;
+}
+
+/* Collapse buttons inside the panes */
+.messages-pane-collapse-btn {
+  background: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 700;
+}
+.messages-pane-collapse-btn:hover {
+  background: #f1f5f9;
+}
+
+/* Visibility on narrow screens is now controlled by React state via the
+   collapse buttons; the media query that used to hide the right pane
+   here was removed when the layout switched to flex + state-driven
+   widths. */
 
 /* Left: contacts */
 .messages-contacts {
@@ -31,10 +113,30 @@
   background: #f7f8fa;
   border-right: 1px solid #e2e6ea;
   overflow-y: auto;
+  width: 100%;
+  height: 100%;
+}
+
+.messages-context-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e6ea;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5f6b80;
+  background: #fafbfc;
+  flex-shrink: 0;
 }
 
 .messages-contacts-header {
-  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -42,6 +144,7 @@
   font-weight: 600;
   border-bottom: 1px solid #e2e6ea;
   background: #eef0f3;
+  flex-shrink: 0;
 }
 
 .messages-contact {
@@ -239,12 +342,24 @@
 
 /* Right: context */
 .messages-context {
+  display: flex;
+  flex-direction: column;
   border-left: 1px solid #e2e6ea;
   background: #fafbfc;
-  padding: 14px;
   overflow-y: auto;
   font-size: 13px;
   color: #1a2640;
+  width: 100%;
+  height: 100%;
+}
+/* Sections inside need their own padding now that the aside doesn't pad */
+.messages-context > .messages-context-section,
+.messages-context > .messages-state {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.messages-context > .messages-context-section:first-of-type {
+  padding-top: 14px;
 }
 
 .messages-context-section {

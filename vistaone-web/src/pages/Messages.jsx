@@ -7,6 +7,26 @@ import { useRealtimeMessages } from "../hooks/useRealtimeMessages";
 import "../styles/messagesPage.css";
 import { markRead, getReadMap, UNREAD_UPDATED } from "../utils/unreadMessages";
 
+// Pane layout: bounds + persisted-state keys
+const LEFT_MIN = 200, LEFT_MAX = 480, LEFT_DEFAULT = 280;
+const RIGHT_MIN = 220, RIGHT_MAX = 540, RIGHT_DEFAULT = 320;
+const LS_LAYOUT_KEY = "messagesPageLayout:v1";
+
+function loadLayout() {
+  try {
+    const raw = localStorage.getItem(LS_LAYOUT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clamp(v, min, max) {
+  return Math.min(max, Math.max(min, v));
+}
+
 const formatTime = (s) =>
   s
     ? new Date(s).toLocaleString("en-GB", {
@@ -48,6 +68,75 @@ export default function Messages() {
   const activeChatIdRef = useRef(null);
   const currentUserId = getUserIdFromToken();
   const navigate = useNavigate();
+
+  // Resizable + collapsible pane state, persisted to localStorage
+  const [paneLayout, setPaneLayout] = useState(() => {
+    const saved = loadLayout();
+    return {
+      leftWidth: clamp(saved?.leftWidth ?? LEFT_DEFAULT, LEFT_MIN, LEFT_MAX),
+      rightWidth: clamp(saved?.rightWidth ?? RIGHT_DEFAULT, RIGHT_MIN, RIGHT_MAX),
+      leftCollapsed: !!saved?.leftCollapsed,
+      rightCollapsed: !!saved?.rightCollapsed,
+    };
+  });
+  const dragState = useRef(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_LAYOUT_KEY, JSON.stringify(paneLayout));
+    } catch {
+      /* localStorage may be unavailable; non-fatal */
+    }
+  }, [paneLayout]);
+
+  const beginDrag = (which) => (e) => {
+    e.preventDefault();
+    dragState.current = {
+      which,
+      startX: e.clientX,
+      startWidth:
+        which === "left" ? paneLayout.leftWidth : paneLayout.rightWidth,
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      const d = dragState.current;
+      if (!d) return;
+      const dx = e.clientX - d.startX;
+      if (d.which === "left") {
+        const next = clamp(d.startWidth + dx, LEFT_MIN, LEFT_MAX);
+        setPaneLayout((prev) =>
+          prev.leftWidth === next ? prev : { ...prev, leftWidth: next },
+        );
+      } else {
+        // Right pane shrinks when the mouse moves right (toward it).
+        const next = clamp(d.startWidth - dx, RIGHT_MIN, RIGHT_MAX);
+        setPaneLayout((prev) =>
+          prev.rightWidth === next ? prev : { ...prev, rightWidth: next },
+        );
+      }
+    };
+    const onUp = () => {
+      if (!dragState.current) return;
+      dragState.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const setLeftCollapsed = (v) =>
+    setPaneLayout((prev) => ({ ...prev, leftCollapsed: v }));
+  const setRightCollapsed = (v) =>
+    setPaneLayout((prev) => ({ ...prev, rightCollapsed: v }));
 
   useEffect(() => {
     const handler = () => setReadMap(getReadMap());
@@ -172,43 +261,142 @@ export default function Messages() {
     >
       <div className="messages-page">
         <div className="messages-page-grid">
-          <ContactsList
-            contacts={contacts}
-            loading={loadingContacts}
-            activeId={activeContact?.id}
-            onSelect={selectContact}
-            readMap={readMap}
-          />
-          <ThreadPane
-            activeContact={activeContact}
-            messages={messages}
-            loadingThread={loadingThread}
-            currentUserId={currentUserId}
-            threadRef={threadRef}
-            draft={draft}
-            setDraft={setDraft}
-            file={file}
-            setFile={setFile}
-            sending={sending}
-            error={error}
-            onSend={send}
-          />
-          <ContactContextPanel
-            context={contactContext}
-            loading={loadingContext}
-            visible={!!activeContact}
-            onOpenWorkOrder={(woId) => navigate(`/workorders?id=${woId}`)}
-          />
+          {paneLayout.leftCollapsed ? (
+            <div
+              className="messages-rail"
+              role="button"
+              tabIndex={0}
+              title="Expand contacts"
+              onClick={() => setLeftCollapsed(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setLeftCollapsed(false);
+              }}
+            >
+              <button
+                type="button"
+                className="messages-rail-toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLeftCollapsed(false);
+                }}
+                aria-label="Expand contacts"
+              >
+                ›
+              </button>
+              <div className="messages-rail-label">Contacts</div>
+            </div>
+          ) : (
+            <>
+              <div
+                className="messages-pane messages-pane-left"
+                style={{ width: paneLayout.leftWidth }}
+              >
+                <ContactsList
+                  contacts={contacts}
+                  loading={loadingContacts}
+                  activeId={activeContact?.id}
+                  onSelect={selectContact}
+                  readMap={readMap}
+                  onCollapse={() => setLeftCollapsed(true)}
+                />
+              </div>
+              <div
+                className={`messages-splitter${dragState.current?.which === "left" ? " dragging" : ""}`}
+                onMouseDown={beginDrag("left")}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize contacts pane"
+              />
+            </>
+          )}
+
+          <div className="messages-pane messages-pane-center">
+            <ThreadPane
+              activeContact={activeContact}
+              messages={messages}
+              loadingThread={loadingThread}
+              currentUserId={currentUserId}
+              threadRef={threadRef}
+              draft={draft}
+              setDraft={setDraft}
+              file={file}
+              setFile={setFile}
+              sending={sending}
+              error={error}
+              onSend={send}
+            />
+          </div>
+
+          {paneLayout.rightCollapsed ? (
+            <div
+              className="messages-rail messages-rail-right"
+              role="button"
+              tabIndex={0}
+              title="Expand details"
+              onClick={() => setRightCollapsed(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setRightCollapsed(false);
+              }}
+            >
+              <button
+                type="button"
+                className="messages-rail-toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRightCollapsed(false);
+                }}
+                aria-label="Expand details"
+              >
+                ‹
+              </button>
+              <div className="messages-rail-label">Details</div>
+            </div>
+          ) : (
+            <>
+              <div
+                className={`messages-splitter${dragState.current?.which === "right" ? " dragging" : ""}`}
+                onMouseDown={beginDrag("right")}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize details pane"
+              />
+              <div
+                className="messages-pane messages-pane-right"
+                style={{ width: paneLayout.rightWidth }}
+              >
+                <ContactContextPanel
+                  context={contactContext}
+                  loading={loadingContext}
+                  visible={!!activeContact}
+                  onOpenWorkOrder={(woId) => navigate(`/workorders?id=${woId}`)}
+                  onCollapse={() => setRightCollapsed(true)}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </AppShell>
   );
 }
 
-function ContactsList({ contacts, loading, activeId, onSelect, readMap }) {
+function ContactsList({ contacts, loading, activeId, onSelect, readMap, onCollapse }) {
   return (
     <aside className="messages-contacts">
-      <header className="messages-contacts-header">Contacts</header>
+      <header className="messages-contacts-header">
+        <span>Contacts</span>
+        {onCollapse && (
+          <button
+            type="button"
+            className="messages-pane-collapse-btn"
+            onClick={onCollapse}
+            aria-label="Collapse contacts"
+            title="Collapse"
+          >
+            ‹
+          </button>
+        )}
+      </header>
       {loading ? (
         <div className="messages-state">Loading…</div>
       ) : contacts.length === 0 ? (
@@ -355,11 +543,25 @@ function ThreadPane({
   );
 }
 
-function ContactContextPanel({ context, loading, visible, onOpenWorkOrder }) {
+function ContactContextPanel({ context, loading, visible, onOpenWorkOrder, onCollapse }) {
   if (!visible) return null;
   if (loading || !context) {
     return (
       <aside className="messages-context">
+        <header className="messages-context-header">
+          <span>Details</span>
+          {onCollapse && (
+            <button
+              type="button"
+              className="messages-pane-collapse-btn"
+              onClick={onCollapse}
+              aria-label="Collapse details"
+              title="Collapse"
+            >
+              ›
+            </button>
+          )}
+        </header>
         <div className="messages-state">Loading details…</div>
       </aside>
     );
@@ -367,6 +569,20 @@ function ContactContextPanel({ context, loading, visible, onOpenWorkOrder }) {
   const { contact, work_orders = [], tickets = [], invoices = [] } = context;
   return (
     <aside className="messages-context">
+      <header className="messages-context-header">
+        <span>Details</span>
+        {onCollapse && (
+          <button
+            type="button"
+            className="messages-pane-collapse-btn"
+            onClick={onCollapse}
+            aria-label="Collapse details"
+            title="Collapse"
+          >
+            ›
+          </button>
+        )}
+      </header>
       <section className="messages-context-section">
         <h3>Contact</h3>
         <dl>
