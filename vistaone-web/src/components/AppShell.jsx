@@ -5,6 +5,7 @@ import { sidebarNav } from "../data/dashboardData";
 import LoadingOverlay from "./LoadingOverlay";
 import { useAuthContext } from "../context/AuthContext";
 import { usePendingApprovalCount } from "../hooks/usePendingApprovalCount";
+import { useUnreadMessageCount } from "../hooks/useUnreadMessageCount";
 
 function AppShell({
     title,
@@ -17,6 +18,7 @@ function AppShell({
 }) {
     const { isMaster, isAdmin, user, hasPermission } = useAuthContext();
     const pendingApprovalCount = usePendingApprovalCount();
+    const unreadMessageCount = useUnreadMessageCount();
 
     const adminSection = [];
     if (isAdmin) {
@@ -40,6 +42,9 @@ function AppShell({
     const decorate = (item) => {
         if (item.to === "/tickets" && pendingApprovalCount > 0) {
             return { ...item, badge: pendingApprovalCount };
+        }
+        if (item.to === "/messages" && unreadMessageCount > 0) {
+            return { ...item, badge: unreadMessageCount };
         }
         return item;
     };
