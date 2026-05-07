@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuthContext } from "../context/AuthContext";
+import { invoiceService } from "../services/invoiceService";
 
 const formatDate = (s) => {
   if (!s) return "-";
@@ -32,6 +33,23 @@ export default function InvoiceDetailModal({
   const { isAdmin } = useAuthContext();
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [review, setReview] = useState(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+
+  const handleAiReview = async () => {
+    if (!invoice?.id) return;
+    setReviewError("");
+    setReviewing(true);
+    try {
+      const result = await invoiceService.review(invoice.id);
+      setReview(result);
+    } catch (err) {
+      setReviewError(err.message || "Review failed");
+    } finally {
+      setReviewing(false);
+    }
+  };
 
   useEffect(() => {
     const onKey = (e) => {
@@ -155,6 +173,84 @@ export default function InvoiceDetailModal({
               </table>
             </section>
           )}
+
+          <section className="workorder-detail-section">
+            <h3>AI Invoice Review</h3>
+            <p className="invoice-review-hint">
+              Compares the submitted total against the work performed
+              (ticket hours) and the vendor's MSA pricing schedule.
+            </p>
+            <div className="invoice-review-actions">
+              <button
+                type="button"
+                className="invoice-review-btn"
+                onClick={handleAiReview}
+                disabled={reviewing}
+              >
+                {reviewing
+                  ? "Analyzing..."
+                  : review
+                  ? "Re-run AI review"
+                  : "Run AI review"}
+              </button>
+              {reviewError && (
+                <span className="invoice-review-error">{reviewError}</span>
+              )}
+            </div>
+
+            {review && (
+              <div className={`invoice-review-result verdict-${review.verdict}`}>
+                <header className="invoice-review-header">
+                  <span className={`invoice-review-badge verdict-${review.verdict}`}>
+                    {review.verdict_label}
+                  </span>
+                  {review.pricing_source === "demo_estimate" && (
+                    <span className="invoice-review-source-tag">
+                      demo market rates (no MSA pricing extracted)
+                    </span>
+                  )}
+                  {review.pricing_source === "ai" && (
+                    <span className="invoice-review-source-tag invoice-review-source-ai">
+                      MSA pricing
+                    </span>
+                  )}
+                </header>
+                <dl className="invoice-review-grid">
+                  <dt>Submitted</dt>
+                  <dd>{formatCurrency(review.invoice_total)}</dd>
+                  <dt>Expected range</dt>
+                  <dd>
+                    {review.expected_low != null
+                      ? `${formatCurrency(review.expected_low)} - ${formatCurrency(review.expected_high)}`
+                      : "Could not be computed"}
+                  </dd>
+                  <dt>Service</dt>
+                  <dd>{review.service_name || "—"}</dd>
+                  <dt>Ticket hours</dt>
+                  <dd>
+                    {review.total_hours != null ? `${review.total_hours}h` : "—"}
+                    {review.ticket_count != null
+                      ? ` across ${review.ticket_count} ticket(s)`
+                      : ""}
+                  </dd>
+                  {review.rate_basis && (
+                    <>
+                      <dt>Basis</dt>
+                      <dd>{review.rate_basis}</dd>
+                    </>
+                  )}
+                </dl>
+                <p className="invoice-review-summary">{review.summary}</p>
+                {review.concerns?.length > 0 && (
+                  <ul className="invoice-review-concerns">
+                    {review.concerns.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </section>
 
           {actionMessage && (
             <div className="ticket-detail-action-message">{actionMessage}</div>
