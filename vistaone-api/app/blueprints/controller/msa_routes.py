@@ -46,10 +46,18 @@ def update_msa(user_id, msa_id):
 @msa_bp.route("/<msa_id>/download", methods=["GET"])
 @permission_required("contracts", "read")
 def download_msa(user_id, msa_id):
+    from app.blueprints.services import storage_service
+
     client_id = get_current_user_client_id()
     result, code = MsaService.get_by_id(msa_id, client_id=client_id)
     if code != 200:
         return jsonify(result), code
     if not result.get("file_name"):
         return jsonify({"message": "No file attached to this MSA"}), 404
-    return send_from_directory(UPLOAD_DIR, result["file_name"])
+    # Ensure the file is materialized locally (downloads from the
+    # bucket on first request from this backend instance).
+    try:
+        local_path = storage_service.ensure_local(result["file_name"])
+    except FileNotFoundError as e:
+        return jsonify({"message": str(e)}), 404
+    return send_from_directory(local_path.parent, local_path.name)

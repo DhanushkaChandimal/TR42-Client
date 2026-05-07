@@ -1,1 +1,20 @@
 .DS_Store
+
+# Secrets — backend env files. The frontend has its own .gitignore for the
+# Vite-side .env, but the api one was previously unprotected.
+vistaone-api/.env
+vistaone-api/.env.*
+
+# Local upload cache + log file. The bytes live in Supabase Storage;
+# the local copy is a read-through cache that doesn't belong in git.
+vistaone-api/uploads/
+vistaone-api/logs/
+
+# Python build artefacts
+vistaone-api/__pycache__/
+vistaone-api/**/__pycache__/
+vistaone-api/**/*.pyc
+vistaone-api/venv/
+
+# Local-only mock files
+mocks/
