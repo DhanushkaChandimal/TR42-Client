@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vendor Messaging Panel</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .header h1 {
+      font-size: 24px;
+      color: #1a1a2e;
+      margin-bottom: 20px;
+    }
+
+    /* Vendor Pills */
+    .vendors-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .vendor-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: #f8f9ff;
+      border: 2px solid #e8ebf5;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .vendor-pill:hover {
+      border-color: #667eea;
+      background: #f0f3ff;
+    }
+
+    .vendor-pill.active {
+      background: #667eea;
+      border-color: #667eea;
+      color: white;
+    }
+
+    .vendor-pill.active .vendor-name {
+      color: white;
+    }
+
+    .vendor-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+      position: relative;
+    }
+
+    .online-indicator {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 12px;
+      height: 12px;
+      background: #22c55e;
+      border: 2px solid white;
+      border-radius: 50%;
+    }
+
+    .vendor-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .vendor-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1a1a2e;
+    }
+
+    .vendor-status {
+      font-size: 12px;
+      color: #22c55e;
+    }
+
+    .vendor-pill.active .vendor-status {
+      color: rgba(255,255,255,0.8);
+    }
+
+    .unread-badge {
+      background: #ef4444;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: auto;
+    }
+
+    .vendor-pill.active .unread-badge {
+      background: white;
+      color: #ef4444;
+    }
+
+    /* Main Panel */
+    .main-panel {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      height: calc(100vh - 200px);
+      min-height: 500px;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e8ebf5;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 16px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 13px;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab:hover {
+      color: #667eea;
+    }
+
+    .tab.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab-icon {
+      margin-right: 6px;
+    }
+
+    .search-box {
+      padding: 16px;
+      border-bottom: 1px solid #e8ebf5;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #e8ebf5;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: #667eea;
+    }
+
+    .conversation-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .conversation-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+      border-left: 3px solid transparent;
+    }
+
+    .conversation-item:hover {
+      background: #f8f9ff;
+    }
+
+    .conversation-item.active {
+      background: #f0f3ff;
+      border-left-color: #667eea;
+    }
+
+    .conversation-item.unread {
+      background: #fef9f9;
+    }
+
+    .conversation-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .conversation-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .conversation-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .conversation-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1a1a2e;
+    }
+
+    .conversation-time {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .conversation-preview {
+      font-size: 13px;
+      color: #6b7280;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conversation-item.unread .conversation-preview {
+      color: #1a1a2e;
+      font-weight: 500;
+    }
+
+    .conversation-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+
+    .message-badge {
+      background: #667eea;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .favorite-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: #d1d5db;
+      transition: color 0.2s;
+    }
+
+    .favorite-btn.active {
+      color: #f59e0b;
+    }
+
+    /* Chat Area */
+    .chat-area {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e8ebf5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chat-header-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chat-header-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      position: relative;
+    }
+
+    .chat-header-details h3 {
+      font-size: 16px;
+      color: #1a1a2e;
+      margin-bottom: 2px;
+    }
+
+    .chat-header-details span {
+      font-size: 13px;
+      color: #22c55e;
+    }
+
+    .chat-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: #f8f9ff;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 18px;
+      color: #6b7280;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    .messages-container {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 70%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .message.sent {
+      align-self: flex-end;
+    }
+
+    .message.received {
+      align-self: flex-start;
+    }
+
+    .message-bubble {
+      padding: 14px 18px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .message.sent .message-bubble {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.received .message-bubble {
+      background: #f3f4f6;
+      color: #1a1a2e;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message-time {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+
+    .message.sent .message-time {
+      text-align: right;
+    }
+
+    .message-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .date-divider {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 12px;
+      margin: 8px 0;
+      position: relative;
+    }
+
+    .date-divider::before,
+    .date-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: calc(50% - 60px);
+      height: 1px;
+      background: #e8ebf5;
+    }
+
+    .date-divider::before { left: 0; }
+    .date-divider::after { right: 0; }
+
+    /* Message Input */
+    .message-input-area {
+      padding: 20px 24px;
+      border-top: 1px solid #e8ebf5;
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .input-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .input-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 20px;
+      color: #9ca3af;
+      border-radius: 10px;
+      transition: all 0.2s;
+    }
+
+    .input-btn:hover {
+      background: #f3f4f6;
+      color: #667eea;
+    }
+
+    .message-input-wrapper {
+      flex: 1;
+      background: #f8f9ff;
+      border-radius: 24px;
+      padding: 4px;
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .message-input {
+      flex: 1;
+      border: none;
+      background: none;
+      padding: 12px 16px;
+      font-size: 14px;
+      outline: none;
+      resize: none;
+      max-height: 120px;
+      line-height: 1.4;
+    }
+
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      border: none;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 50%;
+      cursor: pointer;
+      color: white;
+      font-size: 18px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .send-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    /* Typing Indicator */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      color: #9ca3af;
+      font-size: 13px;
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .typing-dots span {
+      width: 6px;
+      height: 6px;
+      background: #9ca3af;
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-4px); }
+    }
+
+    /* Empty State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #9ca3af;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .main-panel {
+        grid-template-columns: 1fr;
+      }
+      
+      .sidebar {
+        display: none;
+      }
+      
+      .sidebar.mobile-visible {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 100;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header with Approved Vendors -->
+    <div class="header">
+      <h1>📬 Approved Vendors</h1>
+      <div class="vendors-row" id="vendorPills"></div>
+    </div>
+
+    <!-- Main Panel -->
+    <div class="main-panel">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="tabs">
+          <div class="tab active" data-filter="all">
+            <span class="tab-icon">💬</span>All
+          </div>
+          <div class="tab" data-filter="unread">
+            <span class="tab-icon">🔴</span>Unread
+          </div>
+          <div class="tab" data-filter="favorites">
+            <span class="tab-icon">⭐</span>Favorites
+          </div>
+        </div>
+        <div class="search-box">
+          <input type="text" class="search-input" placeholder="Search conversations..." id="searchInput">
+        </div>
+        <div class="conversation-list" id="conversationList"></div>
+      </div>
+
+      <!-- Chat Area -->
+      <div class="chat-area">
+        <div class="chat-header" id="chatHeader" style="display: none;">
+          <div class="chat-header-info">
+            <div class="chat-header-avatar" id="chatAvatar">
+              <span id="chatAvatarText"></span>
+              <div class="online-indicator" id="chatOnlineIndicator" style="display: none;"></div>
+            </div>
+            <div class="chat-header-details">
+              <h3 id="chatName"></h3>
+              <span id="chatStatus"></span>
+            </div>
+          </div>
+          <div class="chat-actions">
+            <button class="action-btn" title="Voice Call">📞</button>
+            <button class="action-btn" title="Video Call">📹</button>
+            <button class="action-btn" title="More Options">⋯</button>
+          </div>
+        </div>
+
+        <div class="messages-container" id="messagesContainer">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-state-icon">💬</div>
+            <h3>Select a conversation</h3>
+            <p>Choose a vendor from the list to start messaging</p>
+          </div>
+        </div>
+
+        <div class="message-input-area" id="inputArea" style="display: none;">
+          <div class="input-actions">
+            <button class="input-btn" title="Attach File">📎</button>
+            <button class="input-btn" title="Send Image">🖼️</button>
+          </div>
+          <div class="message-input-wrapper">
+            <textarea class="message-input" id="messageInput" placeholder="Type a message..." rows="1"></textarea>
+            <button class="send-btn" id="sendBtn">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Sample Data
+    const vendors = [
+      { id: 1, name: "TechPro Solutions", initials: "TP", online: true, unread: 3 },
+      { id: 2, name: "GlobalShip Inc", initials: "GS", online: true, unread: 0 },
+      { id: 3, name: "Quality Parts Co", initials: "QP", online: false, unread: 1 },
+      { id: 4, name: "FastTrack Logistics", initials: "FT", online: true, unread: 0 },
+      { id: 5, name: "Prime Materials", initials: "PM", online: false, unread: 0 }
+    ];
+
+    const conversations = [
+      {
+        id: 1, vendorId: 1, name: "TechPro Solutions", initials: "TP", online: true,
+        lastMessage: "We can deliver the components by Friday", time: "2m ago",
+        unread: 3, favorite: true,
+        messages: [
+          { id: 1, text: "Hi, I wanted to check on the status of our order #4521", sent: false, time: "10:30 AM" },
+          { id: 2, text: "Hello! Let me check that for you right away.", sent: true, time: "10:32 AM" },
+          { id: 3, text: "The order is currently being processed. We expect to ship by Wednesday.", sent: true, time: "10:33 AM" },
+          { id: 4, text: "Is there any way to expedite the delivery?", sent: false, time: "10:35 AM" },
+          { id: 5, text: "We can deliver the components by Friday", sent: true, time: "10:36 AM" }
+        ]
+      },
+      {
+        id: 2, vendorId: 2, name: "GlobalShip Inc", initials: "GS", online: true,
+        lastMessage: "Tracking number has been sent to your email", time: "1h ago",
+        unread: 0, favorite: false,
+        messages: [
+          { id: 1, text: "Could you please provide the tracking number?", sent: false, time: "9:15 AM" },
+          { id: 2, text: "Tracking number has been sent to your email", sent: true, time: "9:45 AM" }
+        ]
+      },
+      {
+        id: 3, vendorId: 3, name: "Quality Parts Co", initials: "QP", online: false,
+        lastMessage: "Please review the attached quote for the bulk order", time: "3h ago",
+        unread: 1, favorite: true,
+        messages: [
+          { id: 1, text: "We're interested in placing a bulk order", sent: false, time: "7:00 AM" },
+          { id: 2, text: "Please review the attached quote for the bulk order", sent: true, time: "8:30 AM" }
+        ]
+      },
+      {
+        id: 4, vendorId: 4, name: "FastTrack Logistics", initials: "FT", online: true,
+        lastMessage: "Your shipment has arrived at the warehouse", time: "Yesterday",
+        unread: 0, favorite: false,
+        messages: [
+          { id: 1, text: "Your shipment has arrived at the warehouse", sent: true, time: "Yesterday" }
+        ]
+      },
+      {
+        id: 5, vendorId: 5, name: "Prime Materials", initials: "PM", online: false,
+        lastMessage: "Thank you for your business!", time: "2 days ago",
+        unread: 0, favorite: false,
+        messages: [
+          { id: 1, text: "Order completed successfully", sent: true, time: "2 days ago" },
+          { id: 2, text: "Thank you for your business!", sent: true, time: "2 days ago" }
+        ]
+      }
+    ];
+
+    let activeConversation = null;
+    let currentFilter = 'all';
+
+    // Render Vendor Pills
+    function renderVendorPills() {
+      const container = document.getElementById('vendorPills');
+      container.innerHTML = vendors.map(vendor => `
+        <div class="vendor-pill ${activeConversation?.vendorId === vendor.id ? 'active' : ''}" 
+             data-vendor-id="${vendor.id}" onclick="selectVendor(${vendor.id})">
+          <div class="vendor-avatar">
+            ${vendor.initials}
+            ${vendor.online ? '<div class="online-indicator"></div>' : ''}
+          </div>
+          <div class="vendor-info">
+            <span class="vendor-name">${vendor.name}</span>
+            <span class="vendor-status">${vendor.online ? '● Online' : ''}</span>
+          </div>
+          ${vendor.unread > 0 ? `<span class="unread-badge">${vendor.unread}</span>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // Render Conversation List
+    function renderConversations() {
+      const container = document.getElementById('conversationList');
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      
+      let filtered = conversations.filter(conv => {
+        const matchesSearch = conv.name.toLowerCase().includes(searchTerm);
+        if (currentFilter === 'unread') return matchesSearch && conv.unread > 0;
+        if (currentFilter === 'favorites') return matchesSearch && conv.favorite;
+        return matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <h3>No conversations found</h3>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(conv => `
+        <div class="conversation-item ${conv.unread > 0 ? 'unread' : ''} ${activeConversation?.id === conv.id ? 'active' : ''}"
+             onclick="selectConversation(${conv.id})">
+          <div class="conversation-avatar">
+            ${conv.initials}
+            ${conv.online ? '<div class="online-indicator"></div>' : ''}
+          </div>
+          <div class="conversation-content">
+            <div class="conversation-header">
+              <span class="conversation-name">${conv.name}</span>
+              <span class="conversation-time">${conv.time}</span>
+            </div>
+            <p class="conversation-preview">${conv.lastMessage}</p>
+          </div>
+          <div class="conversation-meta">
+            ${conv.unread > 0 ? `<span class="message-badge">${conv.unread}</span>` : ''}
+            <button class="favorite-btn ${conv.favorite ? 'active' : ''}" 
+                    onclick="toggleFavorite(event, ${conv.id})">
+              ${conv.favorite ? '★' : '☆'}
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Select Vendor
+    function selectVendor(vendorId) {
+      const conv = conversations.find(c => c.vendorId === vendorId);
+      if (conv) selectConversation(conv.id);
+    }
+
+    // Select Conversation
+    function selectConversation(conversationId) {
+      activeConversation = conversations.find(c => c.id === conversationId);
+      
+      // Mark as read
+      if (activeConversation) {
+        activeConversation.unread = 0;
+        const vendor = vendors.find(v => v.id === activeConversation.vendorId);
+        if (vendor) vendor.unread = 0;
+      }
+
+      renderVendorPills();
+      renderConversations();
+      renderChat();
+    }
+
+    // Render Chat
+    function renderChat() {
+      const header = document.getElementById('chatHeader');
+      const messages = document.getElementById('messagesContainer');
+      const input = document.getElementById('inputArea');
+      const empty = document.getElementById('emptyState');
+
+      if (!activeConversation) {
+        header.style.display = 'none';
+        input.style.display = 'none';
+        messages.innerHTML = '';
+        messages.appendChild(empty);
+        return;
+      }
+
+      header.style.display = 'flex';
+      input.style.display = 'flex';
+      empty.remove();
+
+      // Update header
+      document.getElementById('chatAvatarText').textContent = activeConversation.initials;
+      document.getElementById('chatName').textContent = activeConversation.name;
+      document.getElementById('chatStatus').textContent = activeConversation.online ? '● Online' : 'Offline';
+      document.getElementById('chatStatus').style.color = activeConversation.online ? '#22c55e' : '#9ca3af';
+      document.getElementById('chatOnlineIndicator').style.display = activeConversation.online ? 'block' : 'none';
+
+      // Render messages
+      messages.innerHTML = `
+        <div class="date-divider">Today</div>
+        ${activeConversation.messages.map(msg => `
+          <div class="message ${msg.sent ? 'sent' : 'received'}">
+            <div class="message-bubble">${msg.text}</div>
+            <span class="message-time">
+              ${msg.time}
+              ${msg.sent ? '<span class="message-status">✓✓</span>' : ''}
+            </span>
+          </div>
+        `).join('')}
+      `;
+
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    // Toggle Favorite
+    function toggleFavorite(event, conversationId) {
+      event.stopPropagation();
+      const conv = conversations.find(c => c.id === conversationId);
+      if (conv) {
+        conv.favorite = !conv.favorite;
+        renderConversations();
+      }
+    }
+
+    // Send Message
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      
+      if (!text || !activeConversation) return;
+
+      activeConversation.messages.push({
+        id: Date.now(),
+        text: text,
+        sent: false,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+
+      activeConversation.lastMessage = text;
+      activeConversation.time = 'Just now';
+
+      input.value = '';
+      input.style.height = 'auto';
+      
+      renderConversations();
+      renderChat();
+
+      // Simulate reply
+      setTimeout(() => {
+        if (activeConversation) {
+          activeConversation.messages.push({
+            id: Date.now(),
+            text: "Thanks for your message! We'll get back to you shortly.",
+            sent: true,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+          activeConversation.lastMessage = "Thanks for your message!";
+          renderConversations();
+          renderChat();
+        }
+      }, 1500);
+    }
+
+    // Event Listeners
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentFilter = tab.dataset.filter;
+        renderConversations();
+      });
+    });
+
+    document.getElementById('searchInput').addEventListener('input', renderConversations);
+
+    document.getElementById('sendBtn').addEventListener('click', sendMessage);
+
+    document.getElementById('messageInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Auto-resize textarea
+    document.getElementById('messageInput').addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+
+    // Initialize
+    renderVendorPills();
+    renderConversations();
+    renderChat();
+  </script>
+</body>
+</html>
