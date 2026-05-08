@@ -104,9 +104,15 @@ export const messagingService = {
     return await res.json();
   },
 
-  listMessages: async (chatId, after) => {
-    const qs = after ? `?after=${encodeURIComponent(after)}` : "";
-    const res = await fetch(`${API_BASE}/chats/${chatId}/messages${qs}`, {
+  listMessages: async (chatId, opts = {}) => {
+    // Back-compat: callers used to pass `after` as a positional string.
+    const params = typeof opts === "string" ? { after: opts } : opts;
+    const qs = new URLSearchParams();
+    if (params.after) qs.set("after", params.after);
+    if (params.before) qs.set("before", params.before);
+    if (params.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const res = await fetch(`${API_BASE}/chats/${chatId}/messages${suffix}`, {
       method: "GET",
       headers: authHeaders(),
     });

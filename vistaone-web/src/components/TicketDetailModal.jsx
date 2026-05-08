@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ticketService } from "../services/ticketService";
 import { useAuthContext } from "../context/AuthContext";
+import { notifyPendingApprovalChanged } from "../hooks/usePendingApprovalCount";
+import RejectionForm from "./RejectionForm";
 
 const formatDateTime = (s) => {
   if (!s) return "—";
@@ -64,7 +66,6 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [showRejectForm, setShowRejectForm] = useState(false);
-  const [rejectNote, setRejectNote] = useState("");
 
   const runAction = async (fn, successMessage) => {
     setActionLoading(true);
@@ -74,6 +75,7 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
       setTicket(updated);
       setActionMessage(successMessage);
       if (onStatusChange) onStatusChange(updated);
+      notifyPendingApprovalChanged();
     } catch (err) {
       setActionMessage(err.message || "Action failed");
     } finally {
@@ -88,30 +90,27 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
 
   const handleRejectClick = () => {
     setShowRejectForm(true);
-    setRejectNote("");
     setActionMessage("");
   };
 
   const handleRejectCancel = () => {
     setShowRejectForm(false);
-    setRejectNote("");
   };
 
-  const handleRejectConfirm = async () => {
-    const trimmed = rejectNote.trim();
-    if (!trimmed) {
-      setActionMessage("Please add a note explaining the rejection.");
-      return;
-    }
+  const handleRejectConfirm = async (note, recipientIds) => {
     setActionLoading(true);
     setActionMessage("");
     try {
-      const updated = await ticketService.reject(ticketId, trimmed);
+      const updated = await ticketService.reject(ticketId, note, recipientIds);
       setTicket(updated);
-      setActionMessage("Ticket rejected");
+      setActionMessage(
+        recipientIds.length
+          ? `Ticket rejected. Notified ${recipientIds.length} recipient(s).`
+          : "Ticket rejected."
+      );
       setShowRejectForm(false);
-      setRejectNote("");
       if (onStatusChange) onStatusChange(updated);
+      notifyPendingApprovalChanged();
     } catch (err) {
       setActionMessage(err.message || "Action failed");
     } finally {
@@ -413,40 +412,15 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
               )}
 
               {ticket.status === "PENDING_APPROVAL" && showRejectForm && (
-                <div className="ticket-detail-reject-form">
-                  <label
-                    htmlFor="ticket-reject-note"
-                    className="ticket-detail-reject-label"
-                  >
-                    Reason for rejection
-                  </label>
-                  <textarea
-                    id="ticket-reject-note"
-                    className="ticket-detail-reject-textarea"
-                    rows={3}
-                    value={rejectNote}
-                    onChange={(e) => setRejectNote(e.target.value)}
-                    placeholder="Explain what was wrong so the contractor and vendor can address it."
-                    disabled={actionLoading}
-                    autoFocus
-                  />
-                  <div className="ticket-detail-actions">
-                    <button
-                      className="ticket-btn-reject"
-                      onClick={handleRejectConfirm}
-                      disabled={actionLoading || !rejectNote.trim()}
-                    >
-                      {actionLoading ? "Rejecting..." : "Confirm Rejection"}
-                    </button>
-                    <button
-                      className="ticket-btn-undo"
-                      onClick={handleRejectCancel}
-                      disabled={actionLoading}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                <RejectionForm
+                  loadRecipients={() =>
+                    ticketService.getNotificationRecipients(ticketId)
+                  }
+                  onSubmit={handleRejectConfirm}
+                  onCancel={handleRejectCancel}
+                  submitting={actionLoading}
+                  submitLabel="Confirm Rejection"
+                />
               )}
 
               {ticket.status === "APPROVED" && (
