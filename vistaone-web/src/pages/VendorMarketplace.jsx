@@ -1,78 +1,193 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
 import { vendorService } from "../services/vendorService";
 import "../styles/vendor-marketplace.css";
 
+const PAGE_SIZE = 30;
+
+// Stable color picker so the same service shows the same pill colour on every
+// card. Pastel backgrounds with darker text for legibility.
+const SERVICE_PALETTE = [
+    { bg: "#dbeafe", fg: "#1e3a8a" },
+    { bg: "#dcfce7", fg: "#14532d" },
+    { bg: "#fef3c7", fg: "#78350f" },
+    { bg: "#fce7f3", fg: "#831843" },
+    { bg: "#ede9fe", fg: "#4c1d95" },
+    { bg: "#cffafe", fg: "#155e75" },
+    { bg: "#ffe4e6", fg: "#881337" },
+    { bg: "#e0f2fe", fg: "#0c4a6e" },
+];
+
+function colorForService(name) {
+    const s = String(name || "");
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) {
+        hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+    }
+    return SERVICE_PALETTE[hash % SERVICE_PALETTE.length];
+}
+
+function formatServiceLabel(name) {
+    return String(name || "")
+        .toLowerCase()
+        .split("_")
+        .filter(Boolean)
+        .map((w) => w[0].toUpperCase() + w.slice(1))
+        .join(" ");
+}
+
 const statusOptions = [
-    { value: "ALL", label: "All Statuses" },
+    { value: "", label: "All Statuses" },
     { value: "ACTIVE", label: "Active" },
     { value: "INACTIVE", label: "Inactive" },
 ];
 
 const complianceOptions = [
-    { value: "ALL", label: "All Compliance" },
+    { value: "", label: "All Compliance" },
     { value: "COMPLETE", label: "Complete" },
     { value: "INCOMPLETE", label: "Incomplete" },
     { value: "EXPIRED", label: "Expired" },
 ];
 
 const sortOptions = [
-    { value: "name-asc", label: "Name A-Z" },
-    { value: "name-desc", label: "Name Z-A" },
-    { value: "status", label: "Status" },
-    { value: "compliance", label: "Compliance" },
+    { value: "company_name|asc", label: "Name A-Z" },
+    { value: "company_name|desc", label: "Name Z-A" },
+    { value: "status|asc", label: "Status" },
+    { value: "compliance_status|asc", label: "Compliance" },
+    { value: "created_at|desc", label: "Newest" },
 ];
 
 export default function VendorMarketplace() {
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingPage, setLoadingPage] = useState(false);
+    const [appendingPage, setAppendingPage] = useState(false);
+
+    const [services, setServices] = useState([]);
     const [favoriteIds, setFavoriteIds] = useState(new Set());
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("ALL");
-    const [complianceFilter, setComplianceFilter] = useState("ALL");
-    const [sortBy, setSortBy] = useState("name-asc");
     const [clientId, setClientId] = useState(null);
+    const [error, setError] = useState("");
 
+    const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [serviceFilter, setServiceFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [complianceFilter, setComplianceFilter] = useState("");
+    const [sortValue, setSortValue] = useState("company_name|asc");
+
+    const sentinelRef = useRef(null);
+    const requestIdRef = useRef(0);
+
+    // Debounce the search box so we don't fire a request per keystroke.
     useEffect(() => {
-        fetchData();
-    }, []);
+        const id = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+        return () => clearTimeout(id);
+    }, [searchTerm]);
 
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const allVendors = await vendorService.getAll();
-            setVendors(allVendors);
-
-            // Get current user's company_id to load their client favorites
+    // Load static dropdown data + favourites once.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
             try {
-                const res = await fetch("/api/users/me", {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-                    },
-                });
-                if (res.ok) {
-                    const user = await res.json();
-                    if (user.company_id) {
-                        setClientId(user.company_id);
-                        const favs = await vendorService.getFavorites(
-                            user.company_id,
-                        );
-                        setFavoriteIds(new Set(favs.map((v) => v.id)));
+                const [serviceList, me] = await Promise.all([
+                    vendorService.listServices().catch(() => []),
+                    fetch("/api/users/me", {
+                        headers: {
+                            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                        },
+                    })
+                        .then((r) => (r.ok ? r.json() : null))
+                        .catch(() => null),
+                ]);
+                if (cancelled) return;
+                setServices(serviceList || []);
+                if (me?.company_id) {
+                    setClientId(me.company_id);
+                    try {
+                        const favs = await vendorService.getFavorites(me.company_id);
+                        if (!cancelled) setFavoriteIds(new Set(favs.map((v) => v.id)));
+                    } catch {
+                        // Favourites optional; surface nothing.
                     }
                 }
-            } catch {
-                // Favorites will be disabled if user profile fails
+            } catch (err) {
+                if (!cancelled) setError(err.message || "Failed to load filters");
             }
-            setError("");
-        } catch (err) {
-            setError(err.message || "Failed to load vendors");
-        } finally {
-            setLoading(false);
-        }
-    };
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const fetchPage = useCallback(
+        async (pageNum, mode) => {
+            const [sort_by, order] = sortValue.split("|");
+            const myRequest = ++requestIdRef.current;
+            if (mode === "replace") setLoadingPage(true);
+            else setAppendingPage(true);
+            try {
+                const res = await vendorService.search({
+                    q: debouncedSearch,
+                    service_id: serviceFilter,
+                    status: statusFilter,
+                    compliance: complianceFilter,
+                    sort_by,
+                    order,
+                    page: pageNum,
+                    per_page: PAGE_SIZE,
+                });
+                // Drop stale responses if the user kept typing/filtering.
+                if (myRequest !== requestIdRef.current) return;
+                setTotal(res.total || 0);
+                setHasMore(!!res.has_more);
+                setPage(pageNum);
+                setVendors((prev) =>
+                    mode === "append" ? [...prev, ...(res.items || [])] : res.items || []
+                );
+                setError("");
+            } catch (err) {
+                if (myRequest !== requestIdRef.current) return;
+                setError(err.message || "Failed to load vendors");
+            } finally {
+                if (myRequest === requestIdRef.current) {
+                    setLoadingPage(false);
+                    setAppendingPage(false);
+                }
+            }
+        },
+        [debouncedSearch, serviceFilter, statusFilter, complianceFilter, sortValue]
+    );
+
+    // Reset to page 1 whenever filters change.
+    useEffect(() => {
+        fetchPage(1, "replace");
+    }, [fetchPage]);
+
+    // Infinite scroll: fetch the next page when the sentinel enters the viewport.
+    useEffect(() => {
+        const node = sentinelRef.current;
+        if (!node) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const entry = entries[0];
+                if (
+                    entry.isIntersecting &&
+                    hasMore &&
+                    !loadingPage &&
+                    !appendingPage
+                ) {
+                    fetchPage(page + 1, "append");
+                }
+            },
+            { rootMargin: "200px 0px" }
+        );
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [hasMore, loadingPage, appendingPage, page, fetchPage]);
 
     const handleAddFavorite = async (vendorId) => {
         if (!clientId) return;
@@ -84,47 +199,11 @@ export default function VendorMarketplace() {
         }
     };
 
-    const processedVendors = useMemo(() => {
-        const search = searchTerm.trim().toLowerCase();
-        const filtered = vendors.filter((v) => {
-            const matchesStatus =
-                statusFilter === "ALL" || v.status === statusFilter;
-            const matchesCompliance =
-                complianceFilter === "ALL" ||
-                v.compliance_status === complianceFilter;
-            const matchesSearch =
-                (v.company_name || "").toLowerCase().includes(search) ||
-                (v.company_code || "").toLowerCase().includes(search) ||
-                (v.primary_contact_name || "").toLowerCase().includes(search) ||
-                (v.description || "").toLowerCase().includes(search) ||
-                (v.service_type || "").toLowerCase().includes(search);
-            return matchesStatus && matchesCompliance && matchesSearch;
-        });
-
-        return filtered.sort((a, b) => {
-            if (sortBy === "name-asc")
-                return (a.company_name || "").localeCompare(
-                    b.company_name || "",
-                );
-            if (sortBy === "name-desc")
-                return (b.company_name || "").localeCompare(
-                    a.company_name || "",
-                );
-            if (sortBy === "status")
-                return (a.status || "").localeCompare(b.status || "");
-            if (sortBy === "compliance")
-                return (a.compliance_status || "").localeCompare(
-                    b.compliance_status || "",
-                );
-            return 0;
-        });
-    }, [vendors, searchTerm, statusFilter, complianceFilter, sortBy]);
-
     return (
         <AppShell
             title="Vendor Marketplace"
             subtitle="Browse, search, and add vendors to your favorites"
-            loading={loading}
+            loading={loadingPage && vendors.length === 0}
             loadingText="Loading vendors..."
         >
             {error && <div className="vm-error">{error}</div>}
@@ -133,10 +212,22 @@ export default function VendorMarketplace() {
                 <input
                     type="search"
                     className="vm-search"
-                    placeholder="Search by name, code, service type..."
+                    placeholder="Search by name, code, contact, description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
+                <select
+                    className="vm-filter"
+                    value={serviceFilter}
+                    onChange={(e) => setServiceFilter(e.target.value)}
+                >
+                    <option value="">All Services</option>
+                    {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                            {s.service}
+                        </option>
+                    ))}
+                </select>
                 <select
                     className="vm-filter"
                     value={statusFilter}
@@ -161,8 +252,8 @@ export default function VendorMarketplace() {
                 </select>
                 <select
                     className="vm-filter"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
+                    value={sortValue}
+                    onChange={(e) => setSortValue(e.target.value)}
                 >
                     {sortOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -173,15 +264,15 @@ export default function VendorMarketplace() {
             </section>
 
             <p className="vm-count">
-                {processedVendors.length} vendor
-                {processedVendors.length !== 1 ? "s" : ""} found
+                Showing {vendors.length} of {total} vendor
+                {total !== 1 ? "s" : ""}
             </p>
 
             <section className="vm-grid">
-                {!loading && processedVendors.length === 0 ? (
+                {!loadingPage && vendors.length === 0 ? (
                     <div className="vm-empty">No vendors match your search</div>
                 ) : (
-                    processedVendors.map((vendor) => (
+                    vendors.map((vendor) => (
                         <div key={vendor.id} className="vm-card">
                             <div className="vm-card-header">
                                 <div>
@@ -215,6 +306,31 @@ export default function VendorMarketplace() {
                                 {vendor.description ||
                                     "No description available"}
                             </p>
+
+                            {vendor.services?.length > 0 && (
+                                <div className="vm-card-services">
+                                    {vendor.services.slice(0, 4).map((s) => {
+                                        const c = colorForService(s.service);
+                                        return (
+                                            <span
+                                                key={s.id}
+                                                className="vm-service-pill"
+                                                style={{
+                                                    background: c.bg,
+                                                    color: c.fg,
+                                                }}
+                                            >
+                                                {formatServiceLabel(s.service)}
+                                            </span>
+                                        );
+                                    })}
+                                    {vendor.services.length > 4 && (
+                                        <span className="vm-service-pill vm-service-pill-more">
+                                            +{vendor.services.length - 4}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="vm-card-contact">
                                 <p>{vendor.primary_contact_name || "-"}</p>
@@ -251,6 +367,14 @@ export default function VendorMarketplace() {
                     ))
                 )}
             </section>
+
+            <div ref={sentinelRef} className="vm-sentinel" aria-hidden="true" />
+            {appendingPage && (
+                <div className="vm-loading-more">Loading more vendors…</div>
+            )}
+            {!hasMore && vendors.length > 0 && (
+                <div className="vm-end">You've reached the end.</div>
+            )}
         </AppShell>
     );
 }
