@@ -1,4 +1,4 @@
-from app.extensions import ma
+from app.extensions import ma, db
 from marshmallow import EXCLUDE, fields, validates_schema, ValidationError
 from app.models import WorkOrder
 from app.blueprints.enum.enums import (
@@ -31,6 +31,14 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
     location_type = fields.Enum(LocationTypeEnum, by_value=True, allow_none=True)
     location = fields.String(allow_none=True)
 
+    street = fields.String(load_only=True, allow_none=True)
+    city = fields.String(load_only=True, allow_none=True)
+    state = fields.String(load_only=True, allow_none=True)
+    zip = fields.String(load_only=True, allow_none=True)
+    country = fields.String(load_only=True, allow_none=True)
+
+    address = fields.Method("get_address", dump_only=True)
+
     well_id = fields.String(allow_none=True)
     latitude = fields.Decimal(allow_none=True, as_string=True)
     longitude = fields.Decimal(allow_none=True, as_string=True)
@@ -58,6 +66,23 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
 
     vendor = fields.Nested("VendorSchema", dump_only=True)
     service = fields.Nested("ServiceSchema", dump_only=True)
+
+    def get_address(self, obj):
+        from app.models.address import Address
+
+        if obj.location_type != LocationTypeEnum.ADDRESS or not obj.location:
+            return None
+        addr = db.session.get(Address, obj.location)
+        if not addr:
+            return None
+        return {
+            "id": addr.id,
+            "street": addr.street,
+            "city": addr.city,
+            "state": addr.state,
+            "zip": addr.zip,
+            "country": addr.country,
+        }
 
     def compute_display_status(self, obj):
         from app.models.invoice import Invoice
@@ -91,8 +116,11 @@ class WorkOrderSchema(ma.SQLAlchemyAutoSchema):
         has_well = data.get("well_id") is not None
 
         if location_type == LocationTypeEnum.ADDRESS:
-            if not has_location:
-                raise ValidationError("location required for ADDRESS")
+            has_address_fields = bool(
+                data.get("street") and data.get("city") and data.get("zip")
+            )
+            if not has_address_fields and not has_location:
+                raise ValidationError("street, city, and zip required for ADDRESS")
             if has_gps or has_well:
                 raise ValidationError("Only ADDRESS allowed")
 

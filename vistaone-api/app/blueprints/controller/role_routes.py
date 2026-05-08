@@ -1,5 +1,5 @@
 from flask import request, jsonify, Blueprint
-from app.utils.util import role_required
+from app.utils.util import role_required, permission_required
 from app.blueprints.repository.role_repository import RoleRepository
 from app.models.user import User
 import logging
@@ -12,7 +12,7 @@ BUILT_IN_ROLE_NAMES = {"MASTER", "ADMIN", "USER"}
 
 
 @role_bp.route("", methods=["GET"])
-@role_required(MASTER)
+@permission_required("users", "read")
 def list_roles(user_id):
     user = User.query.get(user_id)
     roles = RoleRepository.get_roles_for_client(user.client_id)

@@ -137,14 +137,38 @@ def approve_invoice(current_user_id, invoice_id):
 @invoice_bp.route("/<string:invoice_id>/reject", methods=["PUT"])
 @permission_required("invoices", "write")
 def reject_invoice(current_user_id, invoice_id):
+    payload = request.get_json(silent=True) or {}
+    note = payload.get("note")
+    recipient_ids = payload.get("recipient_ids") or []
     try:
         client_id = get_current_user_client_id()
-        invoice = InvoiceService.reject_invoice(invoice_id, current_user_id, client_id=client_id)
+        invoice = InvoiceService.reject_invoice(
+            invoice_id,
+            current_user_id,
+            client_id=client_id,
+            note=note,
+            recipient_ids=recipient_ids,
+        )
         return invoice_schema.jsonify(invoice), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+@invoice_bp.route(
+    "/<string:invoice_id>/notification-recipients", methods=["GET"]
+)
+@permission_required("invoices", "read")
+def list_invoice_notification_recipients(current_user_id, invoice_id):
+    from app.blueprints.services.chat_service import ChatService
+
+    recipients = ChatService.get_invoice_notification_recipients(
+        invoice_id, exclude_user_id=current_user_id
+    )
+    if recipients is None:
+        return jsonify({"error": "Invoice not found"}), 404
+    return jsonify({"recipients": recipients}), 200
 
 
 @invoice_bp.route("/<string:invoice_id>/set-pending", methods=["PUT"])

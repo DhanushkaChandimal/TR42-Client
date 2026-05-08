@@ -75,10 +75,31 @@ export const invoiceService = {
     return await response.json();
   },
 
-  reject: async (invoiceId) => {
-    const response = await authFetch(`${INVOICE_ENDPOINT}/${invoiceId}/reject`, { method: "PUT" });
+  reject: async (invoiceId, note, recipientIds) => {
+    const payload = {};
+    if (note != null) payload.note = note;
+    if (Array.isArray(recipientIds) && recipientIds.length) {
+      payload.recipient_ids = recipientIds;
+    }
+    const hasBody = Object.keys(payload).length > 0;
+    const response = await authFetch(`${INVOICE_ENDPOINT}/${invoiceId}/reject`, {
+      method: "PUT",
+      headers: hasBody ? { "Content-Type": "application/json" } : undefined,
+      body: hasBody ? JSON.stringify(payload) : undefined,
+    });
     if (!response.ok) await parseError(response, "Failed to reject invoice");
     return await response.json();
+  },
+
+  getNotificationRecipients: async (invoiceId) => {
+    const response = await authFetch(
+      `${INVOICE_ENDPOINT}/${invoiceId}/notification-recipients`,
+      { method: "GET" }
+    );
+    if (!response.ok)
+      await parseError(response, "Failed to load recipients");
+    const data = await response.json();
+    return data.recipients || [];
   },
 
   setPending: async (invoiceId) => {

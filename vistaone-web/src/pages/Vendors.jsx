@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import AppShell from "../components/AppShell";
+import { useAuthContext } from "../context/AuthContext";
 import ExportButton from "../components/ExportButton";
 import VendorCard from "../components/VendorCard";
 import { exportService } from "../services/exportService";
@@ -31,6 +32,8 @@ const sortOptions = [
 ];
 
 export default function Vendors() {
+    const { hasPermission } = useAuthContext();
+    const canWrite = hasPermission("vendors", "write");
     const [vendors, setVendors] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -234,18 +237,20 @@ export default function Vendors() {
                 {total} vendor{total !== 1 ? "s" : ""} connected to your client
             </p>
 
-            <button
-                className="fab-create-vendor"
-                onClick={() => setShowCreateForm(!showCreateForm)}
-                title="Add Vendor"
-            >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="12" fill="#007bff" />
-                    <rect x="11" y="6" width="2" height="12" rx="1" fill="#fff" />
-                    <rect x="6" y="11" width="12" height="2" rx="1" fill="#fff" />
-                </svg>
-                <span className="fab-label">Add Vendor</span>
-            </button>
+            {canWrite && (
+                <button
+                    className="fab-create-vendor"
+                    onClick={() => setShowCreateForm(!showCreateForm)}
+                    title="Add Vendor"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="12" fill="#007bff" />
+                        <rect x="11" y="6" width="2" height="12" rx="1" fill="#fff" />
+                        <rect x="6" y="11" width="12" height="2" rx="1" fill="#fff" />
+                    </svg>
+                    <span className="fab-label">Add Vendor</span>
+                </button>
+            )}
 
             {showCreateForm && (
                 <section className="vendors-create-form">

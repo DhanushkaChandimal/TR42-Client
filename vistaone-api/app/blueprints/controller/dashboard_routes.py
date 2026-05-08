@@ -25,7 +25,7 @@ OUTSTANDING_INVOICE_STATUSES = (
 
 
 @dashboard_bp.route("/summary", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("dashboard", "read")
 def dashboard_summary(current_user_id):
     client_id = get_current_user_client_id()
 

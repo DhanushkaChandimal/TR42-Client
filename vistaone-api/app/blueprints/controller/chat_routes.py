@@ -23,25 +23,25 @@ chat_bp = Blueprint("chat", __name__)
 
 
 @chat_bp.route("/chats", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def list_inbox(user_id):
     return jsonify({"chats": ChatService.list_inbox(user_id)}), 200
 
 
 @chat_bp.route("/messages/tree", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def list_tree(user_id):
     return jsonify({"workorders": ChatService.list_workorder_tree(user_id)}), 200
 
 
 @chat_bp.route("/messages/contacts", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def list_contacts(user_id):
     return jsonify({"contacts": ChatService.list_contacts(user_id)}), 200
 
 
 @chat_bp.route("/messages/findable-contacts", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def get_findable_contacts(user_id):
     from flask import g
     client_id = g.current_client_id
@@ -50,7 +50,7 @@ def get_findable_contacts(user_id):
 
 
 @chat_bp.route("/chats/direct", methods=["POST"])
-@permission_required("workorders", "read")
+@permission_required("messages", "write")
 def open_direct_chat(user_id):
     payload = request.get_json(silent=True) or {}
     recipient_id = payload.get("recipient_id")
@@ -63,7 +63,7 @@ def open_direct_chat(user_id):
 
 
 @chat_bp.route("/users/<contact_id>/messaging-context", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def user_messaging_context(user_id, contact_id):
     data, err, code = ChatService.get_user_messaging_context(user_id, contact_id)
     if err:
@@ -72,7 +72,7 @@ def user_messaging_context(user_id, contact_id):
 
 
 @chat_bp.route("/workorders/<wo_id>/messaging-context", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def workorder_messaging_context(user_id, wo_id):
     data, err, code = ChatService.get_workorder_summary(wo_id)
     if err:
@@ -81,7 +81,7 @@ def workorder_messaging_context(user_id, wo_id):
 
 
 @chat_bp.route("/workorders/<wo_id>/recipients", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def list_recipients(user_id, wo_id):
     recipients = ChatService.get_recipients(wo_id, user_id)
     if recipients is None:
@@ -90,14 +90,14 @@ def list_recipients(user_id, wo_id):
 
 
 @chat_bp.route("/workorders/<wo_id>/chats", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def list_chats(user_id, wo_id):
     chats = ChatRepository.list_for_user_on_workorder(wo_id, user_id)
     return jsonify({"chats": chats_schema.dump(chats)}), 200
 
 
 @chat_bp.route("/workorders/<wo_id>/chats", methods=["POST"])
-@permission_required("workorders", "read")
+@permission_required("messages", "write")
 def open_chat(user_id, wo_id):
     payload = request.get_json(silent=True) or {}
     recipient_id = payload.get("recipient_id")
@@ -110,23 +110,37 @@ def open_chat(user_id, wo_id):
 
 
 @chat_bp.route("/chats/<chat_id>/messages", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def list_messages(user_id, chat_id):
-    after_raw = request.args.get("after")
-    after = None
-    if after_raw:
+    def _parse_ts(raw):
+        if not raw:
+            return None
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+
+    try:
+        after = _parse_ts(request.args.get("after"))
+        before = _parse_ts(request.args.get("before"))
+    except ValueError:
+        return jsonify({"message": "Invalid timestamp"}), 400
+
+    limit = None
+    limit_raw = request.args.get("limit")
+    if limit_raw:
         try:
-            after = datetime.fromisoformat(after_raw.replace("Z", "+00:00"))
+            limit = max(1, min(int(limit_raw), 200))
         except ValueError:
-            return jsonify({"message": "Invalid 'after' timestamp"}), 400
-    msgs, err, code = ChatService.list_messages(chat_id, user_id, after=after)
+            return jsonify({"message": "Invalid 'limit' value"}), 400
+
+    msgs, err, code = ChatService.list_messages(
+        chat_id, user_id, after=after, before=before, limit=limit
+    )
     if err:
         return jsonify({"message": err}), code
     return jsonify({"messages": messages_schema.dump(msgs)}), 200
 
 
 @chat_bp.route("/chats/<chat_id>/messages", methods=["POST"])
-@permission_required("workorders", "read")
+@permission_required("messages", "write")
 def post_message(user_id, chat_id):
     body = None
     attachment = None
@@ -146,7 +160,7 @@ def post_message(user_id, chat_id):
 
 
 @chat_bp.route("/chats/<chat_id>/context", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def chat_context(user_id, chat_id):
     work_order_id = request.args.get("work_order_id")
     data, err, code = ChatService.get_context(
@@ -158,7 +172,7 @@ def chat_context(user_id, chat_id):
 
 
 @chat_bp.route("/messages/<message_id>/attachments/<attachment_id>", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("messages", "read")
 def download_attachment(user_id, message_id, attachment_id):
     msg = MessageRepository.get_by_id(message_id)
     if not msg:

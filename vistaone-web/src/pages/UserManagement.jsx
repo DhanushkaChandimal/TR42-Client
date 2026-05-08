@@ -70,7 +70,8 @@ const STATUS_BADGE = {
 };
 
 export default function UserManagement() {
-    const { isMaster } = useAuthContext();
+    const { isMaster, hasPermission } = useAuthContext();
+    const canWrite = hasPermission("users", "write");
     const [users, setUsers] = useState([]);
     const [availableRoles, setAvailableRoles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -416,7 +417,7 @@ export default function UserManagement() {
                                         </td>
                                         <td className="px-3 py-3 align-middle">
                                             <div className="d-flex gap-1 flex-wrap">
-                                                {user.status === 'PENDING_APPROVAL' && (
+                                                {canWrite && user.status === 'PENDING_APPROVAL' && (
                                                     <>
                                                         <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1" onClick={() => handleApprove(user.id)}>
                                                             <CheckCircle size={13} /> Approve
@@ -426,21 +427,23 @@ export default function UserManagement() {
                                                         </button>
                                                     </>
                                                 )}
-                                                {editingId === user.id ? (
-                                                    <>
-                                                        <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" onClick={() => saveEdit(user.id)}>
-                                                            <Save size={13} /> Save
+                                                {canWrite && !user.roles.some((r) => r.toUpperCase() === 'MASTER') && (
+                                                    editingId === user.id ? (
+                                                        <>
+                                                            <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" onClick={() => saveEdit(user.id)}>
+                                                                <Save size={13} /> Save
+                                                            </button>
+                                                            <button className="btn btn-sm btn-outline-secondary" onClick={() => setEditingId(null)}>
+                                                                <X size={13} />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" onClick={() => startEdit(user)}>
+                                                            <Edit2 size={13} /> Edit
                                                         </button>
-                                                        <button className="btn btn-sm btn-outline-secondary" onClick={() => setEditingId(null)}>
-                                                            <X size={13} />
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" onClick={() => startEdit(user)}>
-                                                        <Edit2 size={13} /> Edit
-                                                    </button>
+                                                    )
                                                 )}
-                                                {!user.roles.some((r) => r.toUpperCase() === 'MASTER') && (
+                                                {canWrite && !user.roles.some((r) => r.toUpperCase() === 'MASTER') && (
                                                     roleEditId === user.id ? (
                                                         <>
                                                             <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" onClick={() => saveRoles(user.id)}>

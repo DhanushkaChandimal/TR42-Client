@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import { useAuthContext } from "../context/AuthContext";
 import MsaAnalysisModal from "../components/MsaAnalysisModal";
 import { msaService } from "../services/msaService";
 import { vendorService } from "../services/vendorService";
@@ -15,6 +16,8 @@ const ALLOWED_TYPES = [
 const MAX_FILE_SIZE_MB = 25;
 
 export default function Contracts() {
+    const { hasPermission } = useAuthContext();
+    const canWrite = hasPermission("contracts", "write");
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
 
@@ -188,15 +191,17 @@ export default function Contracts() {
                     <option value="incomplete">Incomplete</option>
                     <option value="expired">Expired</option>
                 </select>
-                <button
-                    className="contracts-upload-btn"
-                    onClick={() => {
-                        setShowUpload(!showUpload);
-                        resetUpload();
-                    }}
-                >
-                    {showUpload ? "Cancel" : "Upload MSA"}
-                </button>
+                {canWrite && (
+                    <button
+                        className="contracts-upload-btn"
+                        onClick={() => {
+                            setShowUpload(!showUpload);
+                            resetUpload();
+                        }}
+                    >
+                        {showUpload ? "Cancel" : "Upload MSA"}
+                    </button>
+                )}
             </section>
 
             {showUpload && (
