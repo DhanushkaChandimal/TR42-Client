@@ -33,11 +33,20 @@ def search_vendors(user_id):
     except ValueError:
         return jsonify({"error": "page and per_page must be integers"}), 400
 
+    # scope=engaged restricts the marketplace to vendors the caller's client
+    # has any relationship with (favourited, or named on a WO/ticket/invoice).
+    engaged_client = None
+    if (args.get("scope") or "").lower() == "engaged":
+        engaged_client = get_current_user_client_id()
+        if not engaged_client:
+            return jsonify({"error": "Caller has no client"}), 400
+
     result, code = VendorService.search_vendors(
         q=args.get("q") or None,
         service_id=args.get("service_id") or None,
         status=args.get("status") or None,
         compliance=args.get("compliance") or None,
+        engaged_with_client_id=engaged_client,
         sort_by=args.get("sort_by") or "company_name",
         order=args.get("order") or "asc",
         page=page,

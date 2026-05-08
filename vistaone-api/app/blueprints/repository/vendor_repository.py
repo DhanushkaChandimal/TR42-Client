@@ -31,6 +31,7 @@ class VendorRepository:
         service_id=None,
         status=None,
         compliance=None,
+        engaged_with_client_id=None,
         sort_by="company_name",
         order="asc",
         page=1,
@@ -78,6 +79,42 @@ class VendorRepository:
         if compliance:
             base = base.where(Vendor.compliance_status == compliance)
             count_base = count_base.where(Vendor.compliance_status == compliance)
+
+        if engaged_with_client_id:
+            # Vendors the client has any relationship with: favorited, or
+            # named on a WO, invoice, or ticket scoped to that client.
+            from sqlalchemy import text as _text
+
+            engaged_subq = _text(
+                """
+                SELECT vendor_id FROM client_vendor WHERE client_id = :cid
+                UNION
+                SELECT assigned_vendor FROM work_order
+                  WHERE client_id = :cid AND assigned_vendor IS NOT NULL
+                UNION
+                SELECT vendor_id FROM invoice
+                  WHERE client_id = :cid AND vendor_id IS NOT NULL
+                UNION
+                SELECT t.vendor_id FROM ticket t
+                  JOIN work_order w ON w.id = t.work_order_id
+                  WHERE w.client_id = :cid AND t.vendor_id IS NOT NULL
+                """
+            ).bindparams(cid=engaged_with_client_id)
+            engaged_ids = [
+                r[0]
+                for r in db.session.execute(engaged_subq).all()
+                if r[0]
+            ]
+            if not engaged_ids:
+                return {
+                    "items": [],
+                    "total": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "has_more": False,
+                }
+            base = base.where(Vendor.id.in_(engaged_ids))
+            count_base = count_base.where(Vendor.id.in_(engaged_ids))
 
         sort_columns = {
             "company_name": Vendor.company_name,

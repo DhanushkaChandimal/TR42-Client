@@ -1,32 +1,52 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
+import VendorCard from "../components/VendorCard";
 import { exportService } from "../services/exportService";
 import { vendorService } from "../services/vendorService";
 import "../styles/vendors.css";
+import "../styles/vendor-marketplace.css";
+
+const PAGE_SIZE = 30;
 
 const statusOptions = [
-    { value: "ALL", label: "All Statuses" },
+    { value: "", label: "All Statuses" },
     { value: "ACTIVE", label: "Active" },
     { value: "INACTIVE", label: "Inactive" },
 ];
 
 const complianceOptions = [
-    { value: "ALL", label: "All Compliance" },
+    { value: "", label: "All Compliance" },
     { value: "COMPLETE", label: "Complete" },
     { value: "INCOMPLETE", label: "Incomplete" },
     { value: "EXPIRED", label: "Expired" },
 ];
 
+const sortOptions = [
+    { value: "company_name|asc", label: "Name A-Z" },
+    { value: "company_name|desc", label: "Name Z-A" },
+    { value: "status|asc", label: "Status" },
+    { value: "compliance_status|asc", label: "Compliance" },
+    { value: "created_at|desc", label: "Newest" },
+];
+
 export default function Vendors() {
-    const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
+    const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    const [services, setServices] = useState([]);
+    const [favoriteIds, setFavoriteIds] = useState(new Set());
+    const [clientId, setClientId] = useState(null);
+
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("ALL");
-    const [complianceFilter, setComplianceFilter] = useState("ALL");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [serviceFilter, setServiceFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [complianceFilter, setComplianceFilter] = useState("");
+    const [sortValue, setSortValue] = useState("company_name|asc");
+
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [creating, setCreating] = useState(false);
     const [formData, setFormData] = useState({
@@ -39,38 +59,82 @@ export default function Vendors() {
     });
 
     useEffect(() => {
-        fetchVendors();
+        const id = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+        return () => clearTimeout(id);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const [serviceList, me] = await Promise.all([
+                    vendorService.listServices().catch(() => []),
+                    fetch("/api/users/me", {
+                        headers: {
+                            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                        },
+                    })
+                        .then((r) => (r.ok ? r.json() : null))
+                        .catch(() => null),
+                ]);
+                if (cancelled) return;
+                setServices(serviceList || []);
+                if (me?.company_id) {
+                    setClientId(me.company_id);
+                    try {
+                        const favs = await vendorService.getFavorites(me.company_id);
+                        if (!cancelled) setFavoriteIds(new Set(favs.map((v) => v.id)));
+                    } catch {
+                        // Favourites optional.
+                    }
+                }
+            } catch (err) {
+                if (!cancelled) setError(err.message || "Failed to load filters");
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    const fetchVendors = async () => {
+    const fetchVendors = useCallback(async () => {
+        const [sort_by, order] = sortValue.split("|");
+        setLoading(true);
         try {
-            setLoading(true);
-            const data = await vendorService.getAll();
-            setVendors(data);
+            const res = await vendorService.search({
+                scope: "engaged",
+                q: debouncedSearch,
+                service_id: serviceFilter,
+                status: statusFilter,
+                compliance: complianceFilter,
+                sort_by,
+                order,
+                page: 1,
+                per_page: PAGE_SIZE,
+            });
+            setVendors(res.items || []);
+            setTotal(res.total || 0);
             setError("");
         } catch (err) {
             setError(err.message || "Failed to load vendors");
         } finally {
             setLoading(false);
         }
-    };
+    }, [debouncedSearch, serviceFilter, statusFilter, complianceFilter, sortValue]);
 
-    const filteredVendors = useMemo(() => {
-        const search = searchTerm.trim().toLowerCase();
-        return vendors.filter((v) => {
-            const matchesStatus =
-                statusFilter === "ALL" || v.status === statusFilter;
-            const matchesCompliance =
-                complianceFilter === "ALL" ||
-                v.compliance_status === complianceFilter;
-            const matchesSearch =
-                (v.company_name || "").toLowerCase().includes(search) ||
-                (v.company_code || "").toLowerCase().includes(search) ||
-                (v.primary_contact_name || "").toLowerCase().includes(search) ||
-                (v.description || "").toLowerCase().includes(search);
-            return matchesStatus && matchesCompliance && matchesSearch;
-        });
-    }, [vendors, searchTerm, statusFilter, complianceFilter]);
+    useEffect(() => {
+        fetchVendors();
+    }, [fetchVendors]);
+
+    const handleAddFavorite = async (vendorId) => {
+        if (!clientId) return;
+        try {
+            await vendorService.addFavorite(clientId, vendorId);
+            setFavoriteIds((prev) => new Set(prev).add(vendorId));
+        } catch (err) {
+            setError(err.message || "Failed to add to favorites");
+        }
+    };
 
     const handleFormChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -103,24 +167,36 @@ export default function Vendors() {
 
     return (
         <AppShell
-            title="Vendor Marketplace"
-            subtitle="Browse and manage vendors"
-            loading={loading}
+            title="Vendors"
+            subtitle="Vendors connected to your client through favorites, work orders, tickets, or invoices"
+            loading={loading && vendors.length === 0}
             loadingText="Loading vendors..."
             controls={<ExportButton onExport={exportService.vendors} />}
         >
             {error && <div className="vendors-error">{error}</div>}
 
-            <section className="vendors-controls">
+            <section className="vm-controls">
                 <input
                     type="search"
-                    className="vendors-search"
-                    placeholder="Search vendors..."
+                    className="vm-search"
+                    placeholder="Search by name, code, contact, description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 <select
-                    className="vendors-filter"
+                    className="vm-filter"
+                    value={serviceFilter}
+                    onChange={(e) => setServiceFilter(e.target.value)}
+                >
+                    <option value="">All Services</option>
+                    {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                            {s.service}
+                        </option>
+                    ))}
+                </select>
+                <select
+                    className="vm-filter"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                 >
@@ -131,7 +207,7 @@ export default function Vendors() {
                     ))}
                 </select>
                 <select
-                    className="vendors-filter"
+                    className="vm-filter"
                     value={complianceFilter}
                     onChange={(e) => setComplianceFilter(e.target.value)}
                 >
@@ -141,7 +217,22 @@ export default function Vendors() {
                         </option>
                     ))}
                 </select>
+                <select
+                    className="vm-filter"
+                    value={sortValue}
+                    onChange={(e) => setSortValue(e.target.value)}
+                >
+                    {sortOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
+                    ))}
+                </select>
             </section>
+
+            <p className="vm-count">
+                {total} vendor{total !== 1 ? "s" : ""} connected to your client
+            </p>
 
             <button
                 className="fab-create-vendor"
@@ -150,22 +241,8 @@ export default function Vendors() {
             >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="12" fill="#007bff" />
-                    <rect
-                        x="11"
-                        y="6"
-                        width="2"
-                        height="12"
-                        rx="1"
-                        fill="#fff"
-                    />
-                    <rect
-                        x="6"
-                        y="11"
-                        width="12"
-                        height="2"
-                        rx="1"
-                        fill="#fff"
-                    />
+                    <rect x="11" y="6" width="2" height="12" rx="1" fill="#fff" />
+                    <rect x="6" y="11" width="12" height="2" rx="1" fill="#fff" />
                 </svg>
                 <span className="fab-label">Add Vendor</span>
             </button>
@@ -252,56 +329,23 @@ export default function Vendors() {
                 </section>
             )}
 
-            <section className="vendors-table-wrap">
-                {!loading && filteredVendors.length === 0 ? (
-                    <div className="vendors-state">No vendors found</div>
+            <section className="vm-grid">
+                {!loading && vendors.length === 0 ? (
+                    <div className="vm-empty">
+                        Your client isn't linked to any vendors yet. Visit the
+                        Marketplace to add favorites or assign vendors to a
+                        work order.
+                    </div>
                 ) : (
-                    <table className="vendors-table">
-                        <thead>
-                            <tr>
-                                <th>Company</th>
-                                <th>Code</th>
-                                <th>Contact</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th>Compliance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredVendors.map((vendor) => (
-                                <tr
-                                    key={vendor.id}
-                                    className="vendors-row-clickable"
-                                    onClick={() =>
-                                        navigate(`/vendors/${vendor.id}`)
-                                    }
-                                >
-                                    <td>
-                                        {vendor.company_name || vendor.name}
-                                    </td>
-                                    <td>{vendor.company_code || "-"}</td>
-                                    <td>
-                                        {vendor.primary_contact_name || "-"}
-                                    </td>
-                                    <td>{vendor.company_email || "-"}</td>
-                                    <td>
-                                        <span
-                                            className={`status-badge status-${vendor.status}`}
-                                        >
-                                            {vendor.status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span
-                                            className={`status-badge compliance-${vendor.compliance_status}`}
-                                        >
-                                            {vendor.compliance_status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    vendors.map((vendor) => (
+                        <VendorCard
+                            key={vendor.id}
+                            vendor={vendor}
+                            isFavorite={favoriteIds.has(vendor.id)}
+                            canFavorite={!!clientId}
+                            onAddFavorite={handleAddFavorite}
+                        />
+                    ))
                 )}
             </section>
         </AppShell>

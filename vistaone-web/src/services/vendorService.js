@@ -24,6 +24,7 @@ export const vendorService = {
     service_id = "",
     status = "",
     compliance = "",
+    scope = "",
     sort_by = "company_name",
     order = "asc",
     page = 1,
@@ -34,6 +35,7 @@ export const vendorService = {
     if (service_id) params.set("service_id", service_id);
     if (status) params.set("status", status);
     if (compliance) params.set("compliance", compliance);
+    if (scope) params.set("scope", scope);
     params.set("sort_by", sort_by);
     params.set("order", order);
     params.set("page", String(page));
