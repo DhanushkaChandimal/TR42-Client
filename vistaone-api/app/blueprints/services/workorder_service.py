@@ -3,6 +3,7 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models import WorkOrder
 from app.blueprints.repository.workorder_repository import WorkOrderRepository
+from app.blueprints.repository.address_repository import AddressRepository
 import logging
 from app.blueprints.enum.enums import LocationTypeEnum, StatusEnum, FrequencyEnum
 
@@ -26,10 +27,13 @@ class WorkOrderService:
             [s.value for s in StatusEnum],
         )
 
+    _ADDRESS_KEYS = {"street", "city", "state", "zip", "country"}
+
     @staticmethod
     def create_workorder(validated_workorder_data, current_user_id):
         try:
-            work_order = WorkOrder(**validated_workorder_data)
+            workorder_kwargs = {k: v for k, v in validated_workorder_data.items() if k not in WorkOrderService._ADDRESS_KEYS}
+            work_order = WorkOrder(**workorder_kwargs)
 
             if not work_order.is_recurring:
                 work_order.recurrence_type = FrequencyEnum.ONE_TIME.value
@@ -50,8 +54,18 @@ class WorkOrderService:
                 work_order.latitude = None
                 work_order.longitude = None
                 work_order.well_id = None
-                if not validated_workorder_data.get("location"):
-                    raise Exception("location is required for ADDRESS location_type")
+                street = validated_workorder_data.get("street")
+                city = validated_workorder_data.get("city")
+                state = validated_workorder_data.get("state") or ""
+                zip_code = validated_workorder_data.get("zip")
+                country = validated_workorder_data.get("country") or "US"
+                if not street or not city or not zip_code:
+                    raise Exception("street, city, and zip are required for ADDRESS location_type")
+                address = AddressRepository.get_or_create_address(
+                    {"street": street, "city": city, "state": state, "zip": zip_code, "country": country},
+                    user_id=current_user_id,
+                )
+                work_order.location = address.id
 
             elif location_type == LocationTypeEnum.GPS:
                 work_order.well_id = None
@@ -132,8 +146,19 @@ class WorkOrderService:
                 workorder.latitude = None
                 workorder.longitude = None
                 workorder.well_id = None
-                if not workorder.location and not data.get("location"):
-                    raise Exception("location required for ADDRESS")
+                street = data.get("street")
+                city = data.get("city")
+                state = data.get("state") or ""
+                zip_code = data.get("zip")
+                country = data.get("country") or "US"
+                if street and city and zip_code:
+                    address = AddressRepository.get_or_create_address(
+                        {"street": street, "city": city, "state": state, "zip": zip_code, "country": country},
+                        user_id=current_user_id,
+                    )
+                    workorder.location = address.id
+                elif not workorder.location:
+                    raise Exception("street, city, and zip are required for ADDRESS location_type")
 
             elif location_type == LocationTypeEnum.GPS:
                 workorder.well_id = None
