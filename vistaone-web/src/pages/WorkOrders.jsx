@@ -255,8 +255,10 @@ export default function WorkOrders() {
                   <td>{order.service?.service || "—"}</td>
                   <td>{order.location_type || "—"}</td>
                   <td>
-                    {order.location_type === "ADDRESS" && order.location
-                      ? order.location
+                    {order.location_type === "ADDRESS"
+                      ? order.address
+                        ? [order.address.street, order.address.city, order.address.state, order.address.zip].filter(Boolean).join(", ")
+                        : order.location || "—"
                       : order.latitude != null && order.longitude != null
                       ? `${order.latitude}, ${order.longitude}`
                       : "—"}

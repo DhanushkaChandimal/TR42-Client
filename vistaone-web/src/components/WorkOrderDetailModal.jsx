@@ -50,7 +50,10 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
     location_type: wo.location_type || "GPS",
     latitude: wo.latitude != null ? String(wo.latitude) : "",
     longitude: wo.longitude != null ? String(wo.longitude) : "",
-    location: wo.location || "",
+    street: wo.address?.street || "",
+    city: wo.address?.city || "",
+    state: wo.address?.state || "",
+    zip: wo.address?.zip || "",
   });
   const [draft, setDraft] = useState(() => buildDraft(workOrder));
 
@@ -101,13 +104,17 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
         well_id: null,
       };
     } else if (draft.location_type === "ADDRESS") {
-      if (!draft.location.trim()) {
-        setSaveError("Address required.");
+      if (!draft.street.trim() || !draft.city.trim() || !draft.zip.trim()) {
+        setSaveError("Street, city, and ZIP are required.");
         setSaving(false);
         return;
       }
       locationFields = {
-        location: draft.location.trim(),
+        street: draft.street.trim(),
+        city: draft.city.trim(),
+        state: draft.state.trim(),
+        zip: draft.zip.trim(),
+        country: "US",
         latitude: null,
         longitude: null,
         well_id: null,
@@ -323,17 +330,46 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
                   </div>
                 )}
                 {draft.location_type === "ADDRESS" && (
-                  <label>
-                    Address
-                    <input
-                      type="text"
-                      value={draft.location}
-                      onChange={(e) =>
-                        setDraft((d) => ({ ...d, location: e.target.value }))
-                      }
-                      placeholder="Street, City, State ZIP"
-                    />
-                  </label>
+                  <div style={{ display: "grid", gap: "0.5rem" }}>
+                    <label>
+                      Street
+                      <input
+                        type="text"
+                        value={draft.street}
+                        onChange={(e) => setDraft((d) => ({ ...d, street: e.target.value }))}
+                        placeholder="123 Main St"
+                      />
+                    </label>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <label style={{ flex: 2 }}>
+                        City
+                        <input
+                          type="text"
+                          value={draft.city}
+                          onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
+                          placeholder="City"
+                        />
+                      </label>
+                      <label style={{ flex: 1 }}>
+                        State
+                        <input
+                          type="text"
+                          value={draft.state}
+                          onChange={(e) => setDraft((d) => ({ ...d, state: e.target.value }))}
+                          placeholder="TX"
+                        />
+                      </label>
+                      <label style={{ flex: 1 }}>
+                        ZIP
+                        <input
+                          type="text"
+                          value={draft.zip}
+                          onChange={(e) => setDraft((d) => ({ ...d, zip: e.target.value }))}
+                          placeholder="12345"
+                        />
+                      </label>
+                    </div>
+                  </div>
                 )}
                 {draft.location_type === "WELL" && (
                   <div style={{ fontSize: "0.85rem", color: "#666" }}>
@@ -394,8 +430,10 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
                 <dt>Location Type</dt><dd>{current.location_type || "—"}</dd>
                 <dt>Location</dt>
                 <dd>
-                  {current.location_type === "ADDRESS" && current.location
-                    ? current.location
+                  {current.location_type === "ADDRESS"
+                    ? current.address
+                      ? [current.address.street, current.address.city, current.address.state, current.address.zip].filter(Boolean).join(", ")
+                      : current.location || "—"
                     : current.latitude != null && current.longitude != null
                     ? `${current.latitude}, ${current.longitude}`
                     : "—"}

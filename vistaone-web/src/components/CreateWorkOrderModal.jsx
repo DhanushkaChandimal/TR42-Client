@@ -218,7 +218,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
         setLoading(false);
         return;
       }
-      locationFields = { location: `${street}, ${city}, ${state} ${zip}` };
+      locationFields = { street, city, state, zip, country: "US" };
     } else {
       if (!formData.well) {
         setError("Please pick a well.");
