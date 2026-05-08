@@ -462,3 +462,239 @@
   color: #5f6b80;
   font-style: italic;
 }
+
+/* ── Contacts header action row ─────────────────────────────── */
+.messages-contacts-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.messages-new-btn {
+  background: #2f6cf2;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.messages-new-btn:hover {
+  background: #1d5adc;
+}
+
+/* ── New Conversation Modal ──────────────────────────────────── */
+.msg-new-conv-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg-new-conv-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 440px;
+  max-width: 95vw;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.msg-new-conv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  border-bottom: 1px solid #e2e6ea;
+  font-weight: 700;
+  font-size: 15px;
+  color: #1a2640;
+  flex-shrink: 0;
+}
+
+.msg-new-conv-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: #5f6b80;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.msg-new-conv-close:hover {
+  background: #f1f5f9;
+  color: #1a2640;
+}
+
+.msg-new-conv-search {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e2e6ea;
+  flex-shrink: 0;
+}
+
+.msg-new-conv-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid #d4d8df;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  color: #1a2640;
+}
+
+.msg-new-conv-search input:focus {
+  border-color: #2f6cf2;
+  box-shadow: 0 0 0 2px rgba(47, 108, 242, 0.12);
+}
+
+.msg-new-conv-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.msg-new-conv-group-label {
+  padding: 8px 14px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f6b80;
+  background: #f7f8fa;
+  border-top: 1px solid #e2e6ea;
+  position: sticky;
+  top: 0;
+}
+
+.msg-new-conv-group-label:first-child {
+  border-top: none;
+}
+
+.msg-new-conv-user {
+  display: flex;
+  flex-direction: column;
+  padding: 9px 14px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  gap: 2px;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.msg-new-conv-user:hover {
+  background: #eef2f7;
+}
+
+.msg-new-conv-user:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.msg-new-conv-user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a2640;
+}
+
+.msg-new-conv-user-sub {
+  font-size: 11px;
+  color: #5f6b80;
+  text-transform: lowercase;
+}
+
+.msg-new-conv-empty {
+  padding: 7px 14px 9px;
+  font-size: 12px;
+  color: #8590a4;
+  font-style: italic;
+}
+
+.msg-new-conv-loading {
+  padding: 28px;
+  text-align: center;
+  font-size: 14px;
+  color: #5f6b80;
+}
+
+.msg-new-conv-error {
+  color: #b32424;
+}
+
+.msg-new-conv-footer-error {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #b32424;
+  border-top: 1px solid #e2e6ea;
+  flex-shrink: 0;
+}
+
+/* ── New Conversation Tabs ───────────────────────────────────── */
+.msg-new-conv-tabs {
+  display: flex;
+  border-bottom: 1px solid #e2e6ea;
+  background: #f7f8fa;
+  flex-shrink: 0;
+}
+
+.msg-new-conv-tab {
+  flex: 1;
+  padding: 9px 8px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6b80;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.msg-new-conv-tab:hover {
+  color: #1a2640;
+  background: #eef0f3;
+}
+
+.msg-new-conv-tab-active {
+  color: #2f6cf2;
+  border-bottom-color: #2f6cf2;
+  background: #fff;
+}
+
+.msg-new-conv-tab-count {
+  font-size: 10px;
+  font-weight: 700;
+  background: #e2e6ea;
+  border-radius: 10px;
+  padding: 1px 5px;
+  min-width: 16px;
+  text-align: center;
+  color: #5f6b80;
+}
+
+.msg-new-conv-tab-active .msg-new-conv-tab-count {
+  background: #dbeafe;
+  color: #2f6cf2;
+}

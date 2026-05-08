@@ -52,6 +52,7 @@ export default function Messages() {
 
   const [contacts, setContacts] = useState([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
+  const [showNewConv, setShowNewConv] = useState(false);
   const [activeContact, setActiveContact] = useState(null);
   const [activeChatId, setActiveChatId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -227,6 +228,15 @@ export default function Messages() {
     onMessage: handleIncomingMessage,
   });
 
+  const handleNewConvSelect = useCallback(
+    async (user) => {
+      setShowNewConv(false);
+      await loadContacts();
+      selectContact({ ...user, last_message: null });
+    },
+    [loadContacts, selectContact]
+  );
+
   useEffect(() => {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
@@ -259,6 +269,12 @@ export default function Messages() {
       title="Messages"
       subtitle="Pick a contact to view their thread, work orders, tickets, and invoices."
     >
+      {showNewConv && (
+        <NewConversationModal
+          onClose={() => setShowNewConv(false)}
+          onSelect={handleNewConvSelect}
+        />
+      )}
       <div className="messages-page">
         <div className="messages-page-grid">
           {paneLayout.leftCollapsed ? (
@@ -298,6 +314,7 @@ export default function Messages() {
                   onSelect={selectContact}
                   readMap={readMap}
                   onCollapse={() => setLeftCollapsed(true)}
+                  onNewConversation={() => setShowNewConv(true)}
                 />
               </div>
               <div
@@ -380,22 +397,33 @@ export default function Messages() {
   );
 }
 
-function ContactsList({ contacts, loading, activeId, onSelect, readMap, onCollapse }) {
+function ContactsList({ contacts, loading, activeId, onSelect, readMap, onCollapse, onNewConversation }) {
   return (
     <aside className="messages-contacts">
       <header className="messages-contacts-header">
         <span>Contacts</span>
-        {onCollapse && (
+        <div className="messages-contacts-header-actions">
           <button
             type="button"
-            className="messages-pane-collapse-btn"
-            onClick={onCollapse}
-            aria-label="Collapse contacts"
-            title="Collapse"
+            className="messages-new-btn"
+            onClick={onNewConversation}
+            aria-label="New conversation"
+            title="New conversation"
           >
-            ‹
+            +
           </button>
-        )}
+          {onCollapse && (
+            <button
+              type="button"
+              className="messages-pane-collapse-btn"
+              onClick={onCollapse}
+              aria-label="Collapse contacts"
+              title="Collapse"
+            >
+              ‹
+            </button>
+          )}
+        </div>
       </header>
       {loading ? (
         <div className="messages-state">Loading…</div>
@@ -554,6 +582,138 @@ function ThreadPane({
         </>
       )}
     </section>
+  );
+}
+
+const NEW_CONV_TABS = [
+  { key: "client", label: "Client", listKey: "company_colleagues" },
+  { key: "vendor", label: "Vendor", listKey: "vendor_favourites" },
+  { key: "contractor", label: "Contractor", listKey: "ticket_contractors" },
+];
+
+function NewConversationModal({ onClose, onSelect }) {
+  const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState(null);
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("client");
+  const [error, setError] = useState("");
+  const [starting, setStarting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await messagingService.findableContacts();
+        if (!cancelled) setGroups(data);
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to load contacts");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const q = search.trim().toLowerCase();
+  const filter = (list) =>
+    q
+      ? list.filter(
+          (u) =>
+            u.name.toLowerCase().includes(q) ||
+            (u.company || "").toLowerCase().includes(q) ||
+            (u.email || "").toLowerCase().includes(q)
+        )
+      : list;
+
+  const handleSelect = async (user) => {
+    if (starting) return;
+    setStarting(true);
+    setError("");
+    try {
+      const chat = await messagingService.openDirectChat(user.id);
+      onSelect({ ...user, chat_id: chat.id });
+    } catch (err) {
+      setError(err.message || "Failed to start conversation");
+      setStarting(false);
+    }
+  };
+
+  const activeTabDef = NEW_CONV_TABS.find((t) => t.key === activeTab);
+  const activeList = filter(groups?.[activeTabDef.listKey] || []);
+
+  return (
+    <div
+      className="msg-new-conv-overlay"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="msg-new-conv-modal" role="dialog" aria-modal="true" aria-label="New conversation">
+        <div className="msg-new-conv-header">
+          <span>New Conversation</span>
+          <button
+            type="button"
+            className="msg-new-conv-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <div className="msg-new-conv-search">
+          <input
+            type="text"
+            placeholder="Search people…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            // eslint-disable-next-line jsx-a11y/no-autofocus
+            autoFocus
+          />
+        </div>
+        <div className="msg-new-conv-tabs">
+          {NEW_CONV_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`msg-new-conv-tab${activeTab === t.key ? " msg-new-conv-tab-active" : ""}`}
+              onClick={() => setActiveTab(t.key)}
+            >
+              {t.label}
+              {groups && (
+                <span className="msg-new-conv-tab-count">
+                  {groups[t.listKey]?.length ?? 0}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="msg-new-conv-body">
+          {loading ? (
+            <div className="msg-new-conv-loading">Loading…</div>
+          ) : error && !groups ? (
+            <div className="msg-new-conv-loading msg-new-conv-error">{error}</div>
+          ) : activeList.length === 0 ? (
+            <div className="msg-new-conv-empty" style={{ padding: "14px" }}>No contacts found.</div>
+          ) : (
+            activeList.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                className="msg-new-conv-user"
+                onClick={() => handleSelect(u)}
+                disabled={starting}
+              >
+                <span className="msg-new-conv-user-name">{u.name}</span>
+                <span className="msg-new-conv-user-sub">
+                  {u.company ? `${u.company} · ${u.role}` : u.role}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+        {error && groups && (
+          <div className="msg-new-conv-footer-error">{error}</div>
+        )}
+      </div>
+    </div>
   );
 }
 
