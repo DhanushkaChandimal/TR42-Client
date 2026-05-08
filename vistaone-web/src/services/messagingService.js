@@ -132,6 +132,25 @@ export const messagingService = {
     return await res.json();
   },
 
+  findableContacts: async () => {
+    const res = await fetch(`${API_BASE}/messages/findable-contacts`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+    if (!res.ok) await fail(res, "Failed to load findable contacts");
+    return await res.json();
+  },
+
+  openDirectChat: async (recipientId) => {
+    const res = await fetch(`${API_BASE}/chats/direct`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ recipient_id: recipientId }),
+    });
+    if (!res.ok) await fail(res, "Failed to open chat");
+    return await res.json();
+  },
+
   attachmentUrl: (messageId, attachmentId) =>
     `${API_BASE}/messages/${messageId}/attachments/${attachmentId}`,
 };
