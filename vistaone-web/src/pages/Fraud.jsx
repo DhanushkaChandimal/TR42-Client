@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { qk } from "../lib/queryKeys";
 import AppShell from "../components/AppShell";
 import { fraudService } from "../services/fraudService";
 import "../styles/fraud.css";
@@ -51,34 +53,19 @@ function formatDate(s) {
 }
 
 export default function Fraud() {
-  const [data, setData] = useState(EMPTY);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [severityFilter, setSeverityFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(() => new Set());
   const [acknowledged, setAcknowledged] = useState(() => new Set());
 
-  useEffect(() => {
-    let cancelled = false;
-    fraudService
-      .getAlerts()
-      .then((d) => {
-        if (cancelled) return;
-        setData({ ...EMPTY, ...d });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err.message || "Failed to load fraud alerts");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const alertsQuery = useQuery({
+    queryKey: qk.fraud.list({}),
+    queryFn: () => fraudService.getAlerts(),
+  });
+  const data = { ...EMPTY, ...(alertsQuery.data || {}) };
+  const loading = alertsQuery.isLoading;
+  const error = alertsQuery.error?.message || "";
 
   // Apply filters per WO group: a group is shown if its status matches
   // the selected status group AND at least one alert matches severity +

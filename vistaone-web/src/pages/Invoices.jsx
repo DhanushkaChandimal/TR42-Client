@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { qk } from "../lib/queryKeys";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import InvoiceDetailModal from "../components/InvoiceDetailModal";
@@ -56,20 +57,13 @@ export default function Invoices() {
   const [sortBy, setSortBy] = useState("invoice_date_desc");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
-  const fetcher = useCallback(
-    (page, perPage) => {
-      const { column, direction } = parseSort(sortBy);
-      return invoiceService.search({
-        q: searchTerm.trim(),
-        status: statusFilter === "ALL" ? "" : statusFilter,
-        page,
-        per_page: perPage,
-        sort_by: SORT_COLUMN_MAP[column] || "created_at",
-        order: direction || "desc",
-      });
-    },
-    [searchTerm, statusFilter, sortBy],
-  );
+  const { column, direction } = parseSort(sortBy);
+  const listFilters = {
+    q: searchTerm.trim(),
+    status: statusFilter === "ALL" ? "" : statusFilter,
+    sort_by: SORT_COLUMN_MAP[column] || "created_at",
+    order: direction || "desc",
+  };
 
   const {
     items: invoices,
@@ -81,7 +75,11 @@ export default function Invoices() {
     setPage,
     setPerPage,
     refresh,
-  } = usePaginatedList(fetcher);
+  } = usePaginatedList({
+    queryKey: qk.invoices.list(listFilters),
+    queryFn: (p, pp) =>
+      invoiceService.search({ ...listFilters, page: p, per_page: pp }),
+  });
 
   const approveInvoice = async (id) => { const u = await invoiceService.approve(id); refresh(); return u; };
   const rejectInvoice = async (id, note, recipientIds) => {

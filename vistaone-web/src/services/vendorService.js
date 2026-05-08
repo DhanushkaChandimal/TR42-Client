@@ -19,6 +19,44 @@ export const vendorService = {
     return await response.json();
   },
 
+  search: async ({
+    q = "",
+    service_id = "",
+    status = "",
+    compliance = "",
+    scope = "",
+    sort_by = "company_name",
+    order = "asc",
+    page = 1,
+    per_page = 30,
+  } = {}) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (service_id) params.set("service_id", service_id);
+    if (status) params.set("status", status);
+    if (compliance) params.set("compliance", compliance);
+    if (scope) params.set("scope", scope);
+    params.set("sort_by", sort_by);
+    params.set("order", order);
+    params.set("page", String(page));
+    params.set("per_page", String(per_page));
+    const response = await authFetch(
+      `${VENDOR_ENDPOINT}/search?${params.toString()}`,
+      { method: "GET" }
+    );
+    if (!response.ok) await parseError(response, "Failed to search vendors");
+    return await response.json();
+  },
+
+  listServices: async () => {
+    const response = await authFetch(`${VENDOR_ENDPOINT}/services`, {
+      method: "GET",
+    });
+    if (!response.ok)
+      await parseError(response, "Failed to load service types");
+    return await response.json();
+  },
+
   getById: async (vendorId) => {
     const response = await authFetch(`${VENDOR_ENDPOINT}/${vendorId}`, { method: "GET" });
     if (!response.ok) await parseError(response, "Failed to fetch vendor");

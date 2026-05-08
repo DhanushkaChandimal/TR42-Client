@@ -14,6 +14,36 @@ class VendorService:
         return vendors_schema.dump(vendors), 200
 
     @staticmethod
+    def search_vendors(
+        q=None,
+        service_id=None,
+        status=None,
+        compliance=None,
+        engaged_with_client_id=None,
+        sort_by="company_name",
+        order="asc",
+        page=1,
+        per_page=30,
+    ):
+        result = VendorRepository.search(
+            q=q,
+            service_id=service_id,
+            status=status,
+            compliance=compliance,
+            engaged_with_client_id=engaged_with_client_id,
+            sort_by=sort_by,
+            order=order,
+            page=page,
+            per_page=per_page,
+        )
+        result["items"] = vendors_schema.dump(result["items"])
+        return result, 200
+
+    @staticmethod
+    def list_distinct_services():
+        return VendorRepository.distinct_services(), 200
+
+    @staticmethod
     def get_vendor_by_id(vendor_id):
         vendor = VendorRepository.get_by_id(vendor_id)
         if not vendor:

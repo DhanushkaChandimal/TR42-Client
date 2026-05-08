@@ -1,142 +1,176 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import {
+    useInfiniteQuery,
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
 import AppShell from "../components/AppShell";
+import VendorCard from "../components/VendorCard";
 import { vendorService } from "../services/vendorService";
+import { qk } from "../lib/queryKeys";
 import "../styles/vendor-marketplace.css";
 
+const PAGE_SIZE = 30;
+
 const statusOptions = [
-    { value: "ALL", label: "All Statuses" },
+    { value: "", label: "All Statuses" },
     { value: "ACTIVE", label: "Active" },
     { value: "INACTIVE", label: "Inactive" },
 ];
 
 const complianceOptions = [
-    { value: "ALL", label: "All Compliance" },
+    { value: "", label: "All Compliance" },
     { value: "COMPLETE", label: "Complete" },
     { value: "INCOMPLETE", label: "Incomplete" },
     { value: "EXPIRED", label: "Expired" },
 ];
 
 const sortOptions = [
-    { value: "name-asc", label: "Name A-Z" },
-    { value: "name-desc", label: "Name Z-A" },
-    { value: "status", label: "Status" },
-    { value: "compliance", label: "Compliance" },
+    { value: "company_name|asc", label: "Name A-Z" },
+    { value: "company_name|desc", label: "Name Z-A" },
+    { value: "status|asc", label: "Status" },
+    { value: "compliance_status|asc", label: "Compliance" },
+    { value: "created_at|desc", label: "Newest" },
 ];
 
+async function fetchMe() {
+    const res = await fetch("/api/users/me", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+}
+
 export default function VendorMarketplace() {
-    const navigate = useNavigate();
-    const [vendors, setVendors] = useState([]);
-    const [favoriteIds, setFavoriteIds] = useState(new Set());
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    const queryClient = useQueryClient();
+
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("ALL");
-    const [complianceFilter, setComplianceFilter] = useState("ALL");
-    const [sortBy, setSortBy] = useState("name-asc");
-    const [clientId, setClientId] = useState(null);
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [serviceFilter, setServiceFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [complianceFilter, setComplianceFilter] = useState("");
+    const [sortValue, setSortValue] = useState("company_name|asc");
+    const [error, setError] = useState("");
+
+    const sentinelRef = useRef(null);
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        const id = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+        return () => clearTimeout(id);
+    }, [searchTerm]);
 
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const allVendors = await vendorService.getAll();
-            setVendors(allVendors);
+    const meQuery = useQuery({ queryKey: qk.users.me, queryFn: fetchMe });
+    const clientId = meQuery.data?.company_id || null;
 
-            // Get current user's company_id to load their client favorites
-            try {
-                const res = await fetch("/api/users/me", {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-                    },
-                });
-                if (res.ok) {
-                    const user = await res.json();
-                    if (user.company_id) {
-                        setClientId(user.company_id);
-                        const favs = await vendorService.getFavorites(
-                            user.company_id,
-                        );
-                        setFavoriteIds(new Set(favs.map((v) => v.id)));
-                    }
+    const servicesQuery = useQuery({
+        queryKey: qk.vendors.services(),
+        queryFn: () => vendorService.listServices(),
+        staleTime: 10 * 60 * 1000,
+    });
+    const services = servicesQuery.data || [];
+
+    const favoritesQuery = useQuery({
+        queryKey: qk.vendors.favorites(clientId),
+        queryFn: () => vendorService.getFavorites(clientId),
+        enabled: !!clientId,
+    });
+    const favoriteIds = new Set((favoritesQuery.data || []).map((v) => v.id));
+
+    const [sort_by, order] = sortValue.split("|");
+    const filterParams = {
+        q: debouncedSearch,
+        service_id: serviceFilter,
+        status: statusFilter,
+        compliance: complianceFilter,
+        sort_by,
+        order,
+    };
+
+    const list = useInfiniteQuery({
+        queryKey: qk.vendors.list(filterParams),
+        initialPageParam: 1,
+        queryFn: ({ pageParam }) =>
+            vendorService.search({
+                ...filterParams,
+                page: pageParam,
+                per_page: PAGE_SIZE,
+            }),
+        getNextPageParam: (lastPage, _pages, lastPageParam) =>
+            lastPage?.has_more ? lastPageParam + 1 : undefined,
+    });
+
+    const vendors = (list.data?.pages || []).flatMap((p) => p.items || []);
+    const total = list.data?.pages?.[0]?.total || 0;
+
+    // Infinite scroll: fetch the next page when the sentinel enters the viewport.
+    useEffect(() => {
+        const node = sentinelRef.current;
+        if (!node) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (
+                    entries[0].isIntersecting &&
+                    list.hasNextPage &&
+                    !list.isFetchingNextPage
+                ) {
+                    list.fetchNextPage();
                 }
-            } catch {
-                // Favorites will be disabled if user profile fails
-            }
-            setError("");
-        } catch (err) {
-            setError(err.message || "Failed to load vendors");
-        } finally {
-            setLoading(false);
-        }
-    };
+            },
+            { rootMargin: "200px 0px" }
+        );
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [list]);
 
-    const handleAddFavorite = async (vendorId) => {
-        if (!clientId) return;
-        try {
-            await vendorService.addFavorite(clientId, vendorId);
-            setFavoriteIds((prev) => new Set(prev).add(vendorId));
-        } catch (err) {
-            setError(err.message || "Failed to add to favorites");
-        }
-    };
+    const addFavorite = useMutation({
+        mutationFn: (vendorId) =>
+            vendorService.addFavorite(clientId, vendorId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: qk.vendors.favorites(clientId),
+            });
+        },
+        onError: (err) => setError(err.message || "Failed to add favorite"),
+    });
 
-    const processedVendors = useMemo(() => {
-        const search = searchTerm.trim().toLowerCase();
-        const filtered = vendors.filter((v) => {
-            const matchesStatus =
-                statusFilter === "ALL" || v.status === statusFilter;
-            const matchesCompliance =
-                complianceFilter === "ALL" ||
-                v.compliance_status === complianceFilter;
-            const matchesSearch =
-                (v.company_name || "").toLowerCase().includes(search) ||
-                (v.company_code || "").toLowerCase().includes(search) ||
-                (v.primary_contact_name || "").toLowerCase().includes(search) ||
-                (v.description || "").toLowerCase().includes(search) ||
-                (v.service_type || "").toLowerCase().includes(search);
-            return matchesStatus && matchesCompliance && matchesSearch;
-        });
-
-        return filtered.sort((a, b) => {
-            if (sortBy === "name-asc")
-                return (a.company_name || "").localeCompare(
-                    b.company_name || "",
-                );
-            if (sortBy === "name-desc")
-                return (b.company_name || "").localeCompare(
-                    a.company_name || "",
-                );
-            if (sortBy === "status")
-                return (a.status || "").localeCompare(b.status || "");
-            if (sortBy === "compliance")
-                return (a.compliance_status || "").localeCompare(
-                    b.compliance_status || "",
-                );
-            return 0;
-        });
-    }, [vendors, searchTerm, statusFilter, complianceFilter, sortBy]);
+    const fetchError =
+        list.error?.message ||
+        servicesQuery.error?.message ||
+        meQuery.error?.message ||
+        "";
 
     return (
         <AppShell
             title="Vendor Marketplace"
             subtitle="Browse, search, and add vendors to your favorites"
-            loading={loading}
+            loading={list.isLoading}
             loadingText="Loading vendors..."
         >
-            {error && <div className="vm-error">{error}</div>}
+            {(error || fetchError) && (
+                <div className="vm-error">{error || fetchError}</div>
+            )}
 
             <section className="vm-controls">
                 <input
                     type="search"
                     className="vm-search"
-                    placeholder="Search by name, code, service type..."
+                    placeholder="Search by name, code, contact, description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
+                <select
+                    className="vm-filter"
+                    value={serviceFilter}
+                    onChange={(e) => setServiceFilter(e.target.value)}
+                >
+                    <option value="">All Services</option>
+                    {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                            {s.service}
+                        </option>
+                    ))}
+                </select>
                 <select
                     className="vm-filter"
                     value={statusFilter}
@@ -161,8 +195,8 @@ export default function VendorMarketplace() {
                 </select>
                 <select
                     className="vm-filter"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
+                    value={sortValue}
+                    onChange={(e) => setSortValue(e.target.value)}
                 >
                     {sortOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -173,84 +207,33 @@ export default function VendorMarketplace() {
             </section>
 
             <p className="vm-count">
-                {processedVendors.length} vendor
-                {processedVendors.length !== 1 ? "s" : ""} found
+                Showing {vendors.length} of {total} vendor
+                {total !== 1 ? "s" : ""}
             </p>
 
             <section className="vm-grid">
-                {!loading && processedVendors.length === 0 ? (
+                {!list.isLoading && vendors.length === 0 ? (
                     <div className="vm-empty">No vendors match your search</div>
                 ) : (
-                    processedVendors.map((vendor) => (
-                        <div key={vendor.id} className="vm-card">
-                            <div className="vm-card-header">
-                                <div>
-                                    <h3
-                                        className="vm-card-name"
-                                        onClick={() =>
-                                            navigate(`/vendors/${vendor.id}`)
-                                        }
-                                    >
-                                        {vendor.company_name || vendor.name}
-                                    </h3>
-                                    <p className="vm-card-code">
-                                        {vendor.company_code || ""}
-                                    </p>
-                                </div>
-                                <div className="vm-card-badges">
-                                    <span
-                                        className={`vm-badge vm-badge-${vendor.status}`}
-                                    >
-                                        {vendor.status}
-                                    </span>
-                                    <span
-                                        className={`vm-badge vm-badge-${vendor.compliance_status}`}
-                                    >
-                                        {vendor.compliance_status}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <p className="vm-card-desc">
-                                {vendor.description ||
-                                    "No description available"}
-                            </p>
-
-                            <div className="vm-card-contact">
-                                <p>{vendor.primary_contact_name || "-"}</p>
-                                <p>{vendor.company_email || "-"}</p>
-                                <p>{vendor.company_phone || "-"}</p>
-                            </div>
-
-                            <div className="vm-card-footer">
-                                <button
-                                    className="vm-card-view"
-                                    onClick={() =>
-                                        navigate(`/vendors/${vendor.id}`)
-                                    }
-                                >
-                                    View Details
-                                </button>
-                                {clientId && !favoriteIds.has(vendor.id) && (
-                                    <button
-                                        className="vm-card-fav"
-                                        onClick={() =>
-                                            handleAddFavorite(vendor.id)
-                                        }
-                                    >
-                                        + Add to Favorites
-                                    </button>
-                                )}
-                                {clientId && favoriteIds.has(vendor.id) && (
-                                    <span className="vm-card-fav-added">
-                                        In Favorites
-                                    </span>
-                                )}
-                            </div>
-                        </div>
+                    vendors.map((vendor) => (
+                        <VendorCard
+                            key={vendor.id}
+                            vendor={vendor}
+                            isFavorite={favoriteIds.has(vendor.id)}
+                            canFavorite={!!clientId}
+                            onAddFavorite={(id) => addFavorite.mutate(id)}
+                        />
                     ))
                 )}
             </section>
+
+            <div ref={sentinelRef} className="vm-sentinel" aria-hidden="true" />
+            {list.isFetchingNextPage && (
+                <div className="vm-loading-more">Loading more vendors…</div>
+            )}
+            {!list.hasNextPage && vendors.length > 0 && (
+                <div className="vm-end">You've reached the end.</div>
+            )}
         </AppShell>
     );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import Pagination from "../components/Pagination";
@@ -7,7 +7,9 @@ import TicketDetailModal from "../components/TicketDetailModal";
 import { exportService } from "../services/exportService";
 import { ticketService } from "../services/ticketService";
 import { workOrderService } from "../services/workOrderService";
+import { useQuery } from "@tanstack/react-query";
 import { usePaginatedList } from "../hooks/usePaginatedList";
+import { qk } from "../lib/queryKeys";
 import "../styles/tickets.css";
 import "../styles/dataTable.css";
 
@@ -100,27 +102,19 @@ function ticketCost(t) {
 }
 
 export default function Tickets() {
-  const [workOrders, setWorkOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("due_asc");
   const [selectedTicketId, setSelectedTicketId] = useState(null);
 
-  const fetcher = useCallback(
-    (page, perPage) => {
-      const { column, direction } = parseSort(sortBy);
-      return ticketService.search({
-        q: searchTerm.trim(),
-        status: statusFilter === "ALL" ? "" : statusFilter,
-        page,
-        per_page: perPage,
-        sort_by: SORT_COLUMN_MAP[column] || "created_at",
-        order: direction || "desc",
-      });
-    },
-    [searchTerm, statusFilter, sortBy],
-  );
+  const { column, direction } = parseSort(sortBy);
+  const listFilters = {
+    q: searchTerm.trim(),
+    status: statusFilter === "ALL" ? "" : statusFilter,
+    sort_by: SORT_COLUMN_MAP[column] || "created_at",
+    order: direction || "desc",
+  };
 
   const {
     items: tickets,
@@ -132,20 +126,19 @@ export default function Tickets() {
     setPage,
     setPerPage,
     refresh,
-  } = usePaginatedList(fetcher);
+  } = usePaginatedList({
+    queryKey: qk.tickets.list(listFilters),
+    queryFn: (p, pp) =>
+      ticketService.search({ ...listFilters, page: p, per_page: pp }),
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    workOrderService
-      .getAll()
-      .then((data) => {
-        if (!cancelled) setWorkOrders(Array.isArray(data) ? data : []);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const workOrdersQuery = useQuery({
+    queryKey: qk.workorders.list({ scope: "all" }),
+    queryFn: () => workOrderService.getAll().catch(() => []),
+  });
+  const workOrders = Array.isArray(workOrdersQuery.data)
+    ? workOrdersQuery.data
+    : [];
 
   const workOrderLookup = useMemo(() => {
     const map = new Map();

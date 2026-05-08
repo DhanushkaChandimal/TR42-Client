@@ -211,3 +211,38 @@
   color: #fff;
 }
 
+
+.vm-card-services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+
+.vm-service-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.vm-service-pill-more {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.vm-sentinel {
+  height: 1px;
+}
+
+.vm-loading-more,
+.vm-end {
+  text-align: center;
+  padding: 16px;
+  color: #64748b;
+  font-size: 13px;
+}

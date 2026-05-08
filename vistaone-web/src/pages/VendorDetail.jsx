@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import AppShell from "../components/AppShell";
 import { useAuthContext } from "../context/AuthContext";
 import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
@@ -7,6 +8,7 @@ import { vendorService } from "../services/vendorService";
 import { workOrderService } from "../services/workOrderService";
 import { invoiceService } from "../services/invoiceService";
 import { msaService } from "../services/msaService";
+import { qk } from "../lib/queryKeys";
 import "../styles/vendors.css";
 
 const HISTORY_LIMIT = 5;
@@ -37,51 +39,38 @@ export default function VendorDetail() {
   const canWriteWorkOrders = hasPermission("workorders", "write");
   const { vendorId } = useParams();
   const navigate = useNavigate();
-  const [vendor, setVendor] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [showCreateWO, setShowCreateWO] = useState(false);
-  const [workOrders, setWorkOrders] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [msas, setMsas] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
 
-  useEffect(() => {
-    const loadVendor = async () => {
-      try {
-        const data = await vendorService.getById(vendorId);
-        setVendor(data);
-      } catch (err) {
-        setError(err.message || "Failed to load vendor details");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadVendor();
-  }, [vendorId]);
+  const vendorQuery = useQuery({
+    queryKey: qk.vendors.detail(vendorId),
+    queryFn: () => vendorService.getById(vendorId),
+    enabled: !!vendorId,
+  });
+  const vendor = vendorQuery.data;
+  const loading = vendorQuery.isLoading;
+  const error = vendorQuery.error?.message || "";
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadHistory = async () => {
-      try {
-        const [wo, inv, msa] = await Promise.all([
-          workOrderService.getAll().catch(() => []),
-          invoiceService.getAll({ vendor_id: vendorId }).catch(() => []),
-          msaService.getAll({ vendor_id: vendorId }).catch(() => []),
-        ]);
-        if (cancelled) return;
-        setWorkOrders(Array.isArray(wo) ? wo : []);
-        setInvoices(Array.isArray(inv) ? inv : []);
-        setMsas(Array.isArray(msa) ? msa : []);
-      } finally {
-        if (!cancelled) setHistoryLoading(false);
-      }
-    };
-    loadHistory();
-    return () => {
-      cancelled = true;
-    };
-  }, [vendorId]);
+  const workOrdersQuery = useQuery({
+    queryKey: qk.workorders.list({ vendor_id: vendorId }),
+    queryFn: () => workOrderService.getAll().catch(() => []),
+    enabled: !!vendorId,
+  });
+  const invoicesQuery = useQuery({
+    queryKey: qk.invoices.list({ vendor_id: vendorId }),
+    queryFn: () =>
+      invoiceService.getAll({ vendor_id: vendorId }).catch(() => []),
+    enabled: !!vendorId,
+  });
+  const msasQuery = useQuery({
+    queryKey: ["msas", { vendor_id: vendorId }],
+    queryFn: () => msaService.getAll({ vendor_id: vendorId }).catch(() => []),
+    enabled: !!vendorId,
+  });
+  const workOrders = Array.isArray(workOrdersQuery.data) ? workOrdersQuery.data : [];
+  const invoices = Array.isArray(invoicesQuery.data) ? invoicesQuery.data : [];
+  const msas = Array.isArray(msasQuery.data) ? msasQuery.data : [];
+  const historyLoading =
+    workOrdersQuery.isLoading || invoicesQuery.isLoading || msasQuery.isLoading;
 
   const recentWorkOrders = useMemo(() => {
     const filtered = workOrders.filter((w) => w.vendor_id === vendorId);

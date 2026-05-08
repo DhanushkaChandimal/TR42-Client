@@ -21,6 +21,48 @@ def list_vendors(user_id):
     return jsonify(result), code
 
 
+@vendor_bp.route("/search", methods=["GET"])
+@permission_required("vendors", "read")
+def search_vendors(user_id):
+    """Paginated marketplace search. Returns
+    {items, total, page, per_page, has_more}."""
+    args = request.args
+    try:
+        page = int(args.get("page", 1))
+        per_page = int(args.get("per_page", 30))
+    except ValueError:
+        return jsonify({"error": "page and per_page must be integers"}), 400
+
+    # scope=engaged restricts the marketplace to vendors the caller's client
+    # has any relationship with (favourited, or named on a WO/ticket/invoice).
+    engaged_client = None
+    if (args.get("scope") or "").lower() == "engaged":
+        engaged_client = get_current_user_client_id()
+        if not engaged_client:
+            return jsonify({"error": "Caller has no client"}), 400
+
+    result, code = VendorService.search_vendors(
+        q=args.get("q") or None,
+        service_id=args.get("service_id") or None,
+        status=args.get("status") or None,
+        compliance=args.get("compliance") or None,
+        engaged_with_client_id=engaged_client,
+        sort_by=args.get("sort_by") or "company_name",
+        order=args.get("order") or "asc",
+        page=page,
+        per_page=per_page,
+    )
+    return jsonify(result), code
+
+
+@vendor_bp.route("/services", methods=["GET"])
+@permission_required("vendors", "read")
+def list_vendor_services(user_id):
+    """Distinct services available across vendors, for filter dropdowns."""
+    result, code = VendorService.list_distinct_services()
+    return jsonify(result), code
+
+
 @vendor_bp.route("/<vendor_id>", methods=["GET"])
 @permission_required("vendors", "read")
 def get_vendor(user_id, vendor_id):

@@ -1,37 +1,60 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import AppShell from "../components/AppShell";
 import { useAuthContext } from "../context/AuthContext";
 import ExportButton from "../components/ExportButton";
+import VendorCard from "../components/VendorCard";
 import { exportService } from "../services/exportService";
 import { vendorService } from "../services/vendorService";
+import { qk } from "../lib/queryKeys";
 import "../styles/vendors.css";
+import "../styles/vendor-marketplace.css";
+
+const PAGE_SIZE = 30;
 
 const statusOptions = [
-    { value: "ALL", label: "All Statuses" },
+    { value: "", label: "All Statuses" },
     { value: "ACTIVE", label: "Active" },
     { value: "INACTIVE", label: "Inactive" },
 ];
 
 const complianceOptions = [
-    { value: "ALL", label: "All Compliance" },
+    { value: "", label: "All Compliance" },
     { value: "COMPLETE", label: "Complete" },
     { value: "INCOMPLETE", label: "Incomplete" },
     { value: "EXPIRED", label: "Expired" },
 ];
 
+const sortOptions = [
+    { value: "company_name|asc", label: "Name A-Z" },
+    { value: "company_name|desc", label: "Name Z-A" },
+    { value: "status|asc", label: "Status" },
+    { value: "compliance_status|asc", label: "Compliance" },
+    { value: "created_at|desc", label: "Newest" },
+];
+
+async function fetchMe() {
+    const res = await fetch("/api/users/me", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+}
+
 export default function Vendors() {
     const { hasPermission } = useAuthContext();
     const canWrite = hasPermission("vendors", "write");
-    const navigate = useNavigate();
-    const [vendors, setVendors] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    const queryClient = useQueryClient();
+
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("ALL");
-    const [complianceFilter, setComplianceFilter] = useState("ALL");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [serviceFilter, setServiceFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [complianceFilter, setComplianceFilter] = useState("");
+    const [sortValue, setSortValue] = useState("company_name|asc");
+
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState("");
     const [formData, setFormData] = useState({
         company_name: "",
         company_code: "",
@@ -42,51 +65,66 @@ export default function Vendors() {
     });
 
     useEffect(() => {
-        fetchVendors();
-    }, []);
+        const id = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+        return () => clearTimeout(id);
+    }, [searchTerm]);
 
-    const fetchVendors = async () => {
-        try {
-            setLoading(true);
-            const data = await vendorService.getAll();
-            setVendors(data);
-            setError("");
-        } catch (err) {
-            setError(err.message || "Failed to load vendors");
-        } finally {
-            setLoading(false);
-        }
+    const meQuery = useQuery({ queryKey: qk.users.me, queryFn: fetchMe });
+    const clientId = meQuery.data?.company_id || null;
+
+    const servicesQuery = useQuery({
+        queryKey: qk.vendors.services(),
+        queryFn: () => vendorService.listServices(),
+        staleTime: 10 * 60 * 1000,
+    });
+    const services = servicesQuery.data || [];
+
+    const favoritesQuery = useQuery({
+        queryKey: qk.vendors.favorites(clientId),
+        queryFn: () => vendorService.getFavorites(clientId),
+        enabled: !!clientId,
+    });
+    const favoriteIds = new Set((favoritesQuery.data || []).map((v) => v.id));
+
+    const [sort_by, order] = sortValue.split("|");
+    const listParams = {
+        scope: "engaged",
+        q: debouncedSearch,
+        service_id: serviceFilter,
+        status: statusFilter,
+        compliance: complianceFilter,
+        sort_by,
+        order,
+        page: 1,
+        per_page: PAGE_SIZE,
     };
+    const vendorsQuery = useQuery({
+        queryKey: qk.vendors.list(listParams),
+        queryFn: () => vendorService.search(listParams),
+        placeholderData: (prev) => prev,
+    });
+    const vendors = vendorsQuery.data?.items || [];
+    const total = vendorsQuery.data?.total || 0;
+    const loading = vendorsQuery.isLoading;
 
-    const filteredVendors = useMemo(() => {
-        const search = searchTerm.trim().toLowerCase();
-        return vendors.filter((v) => {
-            const matchesStatus =
-                statusFilter === "ALL" || v.status === statusFilter;
-            const matchesCompliance =
-                complianceFilter === "ALL" ||
-                v.compliance_status === complianceFilter;
-            const matchesSearch =
-                (v.company_name || "").toLowerCase().includes(search) ||
-                (v.company_code || "").toLowerCase().includes(search) ||
-                (v.primary_contact_name || "").toLowerCase().includes(search) ||
-                (v.description || "").toLowerCase().includes(search);
-            return matchesStatus && matchesCompliance && matchesSearch;
-        });
-    }, [vendors, searchTerm, statusFilter, complianceFilter]);
+    const addFavorite = useMutation({
+        mutationFn: (vendorId) =>
+            vendorService.addFavorite(clientId, vendorId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: qk.vendors.favorites(clientId),
+            });
+            queryClient.invalidateQueries({ queryKey: qk.vendors.all });
+        },
+        onError: (err) =>
+            setError(err.message || "Failed to add to favorites"),
+    });
 
-    const handleFormChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleCreateVendor = async (e) => {
-        e.preventDefault();
-        if (!formData.company_name.trim() || !formData.company_email.trim()) {
-            return;
-        }
-        try {
-            setCreating(true);
-            await vendorService.create(formData);
+    const createVendor = useMutation({
+        mutationFn: (payload) => vendorService.create(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: qk.vendors.all });
+            setShowCreateForm(false);
             setFormData({
                 company_name: "",
                 company_code: "",
@@ -95,35 +133,60 @@ export default function Vendors() {
                 company_phone: "",
                 description: "",
             });
-            setShowCreateForm(false);
-            fetchVendors();
-        } catch (err) {
-            setError(err.message || "Failed to create vendor");
-        } finally {
-            setCreating(false);
-        }
+        },
+        onError: (err) => setError(err.message || "Failed to create vendor"),
+    });
+
+    const handleFormChange = (e) =>
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+
+    const handleCreateVendor = (e) => {
+        e.preventDefault();
+        if (!formData.company_name.trim() || !formData.company_email.trim()) return;
+        setError("");
+        createVendor.mutate(formData);
     };
+
+    const fetchError =
+        vendorsQuery.error?.message ||
+        servicesQuery.error?.message ||
+        meQuery.error?.message ||
+        "";
 
     return (
         <AppShell
-            title="Vendor Marketplace"
-            subtitle="Browse and manage vendors"
-            loading={loading}
+            title="Vendors"
+            subtitle="Vendors connected to your client through favorites, work orders, tickets, or invoices"
+            loading={loading && vendors.length === 0}
             loadingText="Loading vendors..."
             controls={<ExportButton onExport={exportService.vendors} />}
         >
-            {error && <div className="vendors-error">{error}</div>}
+            {(error || fetchError) && (
+                <div className="vendors-error">{error || fetchError}</div>
+            )}
 
-            <section className="vendors-controls">
+            <section className="vm-controls">
                 <input
                     type="search"
-                    className="vendors-search"
-                    placeholder="Search vendors..."
+                    className="vm-search"
+                    placeholder="Search by name, code, contact, description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 <select
-                    className="vendors-filter"
+                    className="vm-filter"
+                    value={serviceFilter}
+                    onChange={(e) => setServiceFilter(e.target.value)}
+                >
+                    <option value="">All Services</option>
+                    {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                            {s.service}
+                        </option>
+                    ))}
+                </select>
+                <select
+                    className="vm-filter"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                 >
@@ -134,7 +197,7 @@ export default function Vendors() {
                     ))}
                 </select>
                 <select
-                    className="vendors-filter"
+                    className="vm-filter"
                     value={complianceFilter}
                     onChange={(e) => setComplianceFilter(e.target.value)}
                 >
@@ -144,7 +207,22 @@ export default function Vendors() {
                         </option>
                     ))}
                 </select>
+                <select
+                    className="vm-filter"
+                    value={sortValue}
+                    onChange={(e) => setSortValue(e.target.value)}
+                >
+                    {sortOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
+                    ))}
+                </select>
             </section>
+
+            <p className="vm-count">
+                {total} vendor{total !== 1 ? "s" : ""} connected to your client
+            </p>
 
             {canWrite && (
                 <button
@@ -154,22 +232,8 @@ export default function Vendors() {
                 >
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <circle cx="12" cy="12" r="12" fill="#007bff" />
-                        <rect
-                            x="11"
-                            y="6"
-                            width="2"
-                            height="12"
-                            rx="1"
-                            fill="#fff"
-                        />
-                        <rect
-                            x="6"
-                            y="11"
-                            width="12"
-                            height="2"
-                            rx="1"
-                            fill="#fff"
-                        />
+                        <rect x="11" y="6" width="2" height="12" rx="1" fill="#fff" />
+                        <rect x="6" y="11" width="12" height="2" rx="1" fill="#fff" />
                     </svg>
                     <span className="fab-label">Add Vendor</span>
                 </button>
@@ -248,65 +312,32 @@ export default function Vendors() {
                             <button
                                 type="submit"
                                 className="vendors-btn-submit"
-                                disabled={creating}
+                                disabled={createVendor.isPending}
                             >
-                                {creating ? "Creating..." : "Create Vendor"}
+                                {createVendor.isPending ? "Creating..." : "Create Vendor"}
                             </button>
                         </div>
                     </form>
                 </section>
             )}
 
-            <section className="vendors-table-wrap">
-                {!loading && filteredVendors.length === 0 ? (
-                    <div className="vendors-state">No vendors found</div>
+            <section className="vm-grid">
+                {!loading && vendors.length === 0 ? (
+                    <div className="vm-empty">
+                        Your client isn't linked to any vendors yet. Visit the
+                        Marketplace to add favorites or assign vendors to a
+                        work order.
+                    </div>
                 ) : (
-                    <table className="vendors-table">
-                        <thead>
-                            <tr>
-                                <th>Company</th>
-                                <th>Code</th>
-                                <th>Contact</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th>Compliance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredVendors.map((vendor) => (
-                                <tr
-                                    key={vendor.id}
-                                    className="vendors-row-clickable"
-                                    onClick={() =>
-                                        navigate(`/vendors/${vendor.id}`)
-                                    }
-                                >
-                                    <td>
-                                        {vendor.company_name || vendor.name}
-                                    </td>
-                                    <td>{vendor.company_code || "-"}</td>
-                                    <td>
-                                        {vendor.primary_contact_name || "-"}
-                                    </td>
-                                    <td>{vendor.company_email || "-"}</td>
-                                    <td>
-                                        <span
-                                            className={`status-badge status-${vendor.status}`}
-                                        >
-                                            {vendor.status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span
-                                            className={`status-badge compliance-${vendor.compliance_status}`}
-                                        >
-                                            {vendor.compliance_status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    vendors.map((vendor) => (
+                        <VendorCard
+                            key={vendor.id}
+                            vendor={vendor}
+                            isFavorite={favoriteIds.has(vendor.id)}
+                            canFavorite={!!clientId}
+                            onAddFavorite={(id) => addFavorite.mutate(id)}
+                        />
+                    ))
                 )}
             </section>
         </AppShell>
