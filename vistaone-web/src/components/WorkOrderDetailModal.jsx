@@ -5,6 +5,7 @@ import { invoiceService } from "../services/invoiceService";
 import { workOrderService } from "../services/workOrderService";
 import { vendorService } from "../services/vendorService";
 import WorkOrderRecipients from "./WorkOrderRecipients";
+import AddressFields, { validateZip } from "./AddressFields";
 import "../styles/workOrderRecipients.css";
 
 const formatDate = (s) =>
@@ -39,6 +40,7 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [zipError, setZipError] = useState("");
   const [vendors, setVendors] = useState([]);
   const [deleting, setDeleting] = useState(false);
   const buildDraft = (wo) => ({
@@ -54,6 +56,7 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
     city: wo.address?.city || "",
     state: wo.address?.state || "",
     zip: wo.address?.zip || "",
+    country: wo.address?.country || "US",
   });
   const [draft, setDraft] = useState(() => buildDraft(workOrder));
 
@@ -82,6 +85,7 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
   const cancelEdit = () => {
     setEditMode(false);
     setSaveError("");
+    setZipError("");
   };
 
   const saveEdit = async () => {
@@ -109,12 +113,20 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
         setSaving(false);
         return;
       }
+      const country = draft.country || "US";
+      const zipErr = validateZip(draft.zip.trim(), country);
+      if (zipErr) {
+        setZipError(zipErr);
+        setSaveError("Please fix the ZIP code.");
+        setSaving(false);
+        return;
+      }
       locationFields = {
         street: draft.street.trim(),
         city: draft.city.trim(),
         state: draft.state.trim(),
         zip: draft.zip.trim(),
-        country: "US",
+        country,
         latitude: null,
         longitude: null,
         well_id: null,
@@ -330,46 +342,23 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
                   </div>
                 )}
                 {draft.location_type === "ADDRESS" && (
-                  <div style={{ display: "grid", gap: "0.5rem" }}>
-                    <label>
-                      Street
-                      <input
-                        type="text"
-                        value={draft.street}
-                        onChange={(e) => setDraft((d) => ({ ...d, street: e.target.value }))}
-                        placeholder="123 Main St"
-                      />
-                    </label>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <label style={{ flex: 2 }}>
-                        City
-                        <input
-                          type="text"
-                          value={draft.city}
-                          onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
-                          placeholder="City"
-                        />
-                      </label>
-                      <label style={{ flex: 1 }}>
-                        State
-                        <input
-                          type="text"
-                          value={draft.state}
-                          onChange={(e) => setDraft((d) => ({ ...d, state: e.target.value }))}
-                          placeholder="TX"
-                        />
-                      </label>
-                      <label style={{ flex: 1 }}>
-                        ZIP
-                        <input
-                          type="text"
-                          value={draft.zip}
-                          onChange={(e) => setDraft((d) => ({ ...d, zip: e.target.value }))}
-                          placeholder="12345"
-                        />
-                      </label>
-                    </div>
-                  </div>
+                  <AddressFields
+                    values={{
+                      street: draft.street,
+                      city: draft.city,
+                      state: draft.state,
+                      zip: draft.zip,
+                      country: draft.country,
+                    }}
+                    onChange={(e) => {
+                      if (e.target.name === "country") setZipError("");
+                      setDraft((d) => ({ ...d, [e.target.name]: e.target.value }));
+                    }}
+                    zipError={zipError}
+                    onZipBlur={() =>
+                      setZipError(validateZip(draft.zip, draft.country || "US"))
+                    }
+                  />
                 )}
                 {draft.location_type === "WELL" && (
                   <div style={{ fontSize: "0.85rem", color: "#666" }}>

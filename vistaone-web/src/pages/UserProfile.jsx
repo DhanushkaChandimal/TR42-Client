@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AppShell from "../components/AppShell";
 import ChangePasswordModal from "../components/ChangePasswordModal";
 import { useUserProfile } from "../hooks/useUserProfile";
+import AddressFields, { validateZip } from "../components/AddressFields";
 import "../styles/userProfile.css";
 
 const ADDRESS_FIELDS = ["street", "city", "state", "zip", "country"];
@@ -13,6 +14,7 @@ export default function UserProfile() {
     const [showPwModal, setShowPwModal] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
     const [addressError, setAddressError] = useState("");
+    const [zipError, setZipError] = useState("");
 
     useEffect(() => {
         // Sync the controlled form with newly-fetched profile data. This is the
@@ -24,9 +26,9 @@ export default function UserProfile() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        // Clear feedback as soon as the user keeps typing
         setSuccessMessage("");
         setAddressError("");
+        setZipError("");
         if (ADDRESS_FIELDS.includes(name)) {
             setFormData((prev) => ({
                 ...prev,
@@ -72,6 +74,12 @@ export default function UserProfile() {
         });
 
         if (addrComplete) {
+            const zipErr = validateZip(addr.zip?.trim(), addr.country?.trim() || "US");
+            if (zipErr) {
+                setZipError(zipErr);
+                setAddressError(zipErr);
+                return;
+            }
             payload.address = {
                 street: addr.street,
                 city: addr.city,
@@ -94,6 +102,7 @@ export default function UserProfile() {
         setFormData(data || {});
         setSuccessMessage("");
         setAddressError("");
+        setZipError("");
         setEditMode(false);
     };
 
@@ -206,53 +215,26 @@ export default function UserProfile() {
 
                 <section className="profile-card profile-card-full">
                     <h3>Address</h3>
-                    <label>
-                        Street
-                        <input
-                            name="street"
-                            value={formData.address?.street || ""}
-                            onChange={handleChange}
-                            disabled={!editMode}
-                        />
-                    </label>
-                    <div className="profile-form-row">
-                        <label>
-                            City
-                            <input
-                                name="city"
-                                value={formData.address?.city || ""}
-                                onChange={handleChange}
-                                disabled={!editMode}
-                            />
-                        </label>
-                        <label>
-                            State
-                            <input
-                                name="state"
-                                value={formData.address?.state || ""}
-                                onChange={handleChange}
-                                disabled={!editMode}
-                            />
-                        </label>
-                        <label>
-                            ZIP
-                            <input
-                                name="zip"
-                                value={formData.address?.zip || ""}
-                                onChange={handleChange}
-                                disabled={!editMode}
-                            />
-                        </label>
-                        <label>
-                            Country
-                            <input
-                                name="country"
-                                value={formData.address?.country || ""}
-                                onChange={handleChange}
-                                disabled={!editMode}
-                            />
-                        </label>
-                    </div>
+                    <AddressFields
+                        values={{
+                            street: formData.address?.street || "",
+                            city: formData.address?.city || "",
+                            state: formData.address?.state || "",
+                            zip: formData.address?.zip || "",
+                            country: formData.address?.country || "US",
+                        }}
+                        onChange={handleChange}
+                        disabled={!editMode}
+                        zipError={editMode ? zipError : ""}
+                        onZipBlur={() =>
+                            setZipError(
+                                validateZip(
+                                    formData.address?.zip,
+                                    formData.address?.country || "US",
+                                ),
+                            )
+                        }
+                    />
                 </section>
             </div>
 

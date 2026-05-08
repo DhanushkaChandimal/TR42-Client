@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRegisterClient } from "../hooks/useRegisterClient";
 import { Link } from "react-router-dom";
+import AddressFields, { validateZip } from "../components/AddressFields";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../styles/login.css";
 import {
@@ -28,7 +29,7 @@ const initialCompanyData = {
     city: "",
     state: "",
     zip: "",
-    country: "",
+    country: "US",
 };
 
 const initialAdminData = {
@@ -132,16 +133,14 @@ function RegisterClient() {
             newErrors.city = "Invalid city name";
 
         if (!state.trim()) newErrors.state = "State is required";
-        else if (!/^[a-zA-Z\s'-]{2,}$/.test(state.trim()))
-            newErrors.state = "Invalid state name";
 
         if (!zip.trim()) newErrors.zip = "ZIP code is required";
-        else if (!/^\d{5}(-\d{4})?$/.test(zip.trim()))
-            newErrors.zip = "Invalid ZIP code";
+        else {
+            const zipErr = validateZip(zip.trim(), country.trim() || "US");
+            if (zipErr) newErrors.zip = zipErr;
+        }
 
         if (!country.trim()) newErrors.country = "Country is required";
-        else if (country.trim().length < 2)
-            newErrors.country = "Invalid country";
 
         setCompanyErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -533,121 +532,20 @@ function RegisterClient() {
 
                                             <div className="mb-3">
                                                 <label className="form-label login-label">
-                                                    Address Line 1
+                                                    Address
                                                 </label>
-                                                <div className="input-group login-input-group">
-                                                    <span className="input-group-text">
-                                                        <MapPin size={18} />
-                                                    </span>
-                                                    <input
-                                                        type="text"
-                                                        name="street"
-                                                        value={
-                                                            companyData.street
-                                                        }
-                                                        onChange={
-                                                            handleCompanyChange
-                                                        }
-                                                        className={`form-control${companyErrors.street ? " is-invalid" : ""}`}
-                                                        placeholder="123 Main St"
-                                                    />
-                                                </div>
-                                                {companyErrors.street && (
-                                                    <div className="invalid-feedback d-block">
-                                                        {companyErrors.street}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="row g-2">
-                                                <div className="col-md-4 mb-3">
-                                                    <label className="form-label login-label">
-                                                        City
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        name="city"
-                                                        value={companyData.city}
-                                                        onChange={
-                                                            handleCompanyChange
-                                                        }
-                                                        className={`form-control${companyErrors.city ? " is-invalid" : ""}`}
-                                                        placeholder="City"
-                                                    />
-                                                    {companyErrors.city && (
-                                                        <div className="invalid-feedback d-block">
-                                                            {companyErrors.city}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="col-md-3 mb-3">
-                                                    <label className="form-label login-label">
-                                                        State
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        name="state"
-                                                        value={
-                                                            companyData.state
-                                                        }
-                                                        onChange={
-                                                            handleCompanyChange
-                                                        }
-                                                        className={`form-control${companyErrors.state ? " is-invalid" : ""}`}
-                                                        placeholder="State"
-                                                    />
-                                                    {companyErrors.state && (
-                                                        <div className="invalid-feedback d-block">
-                                                            {
-                                                                companyErrors.state
-                                                            }
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="col-md-3 mb-3">
-                                                    <label className="form-label login-label">
-                                                        ZIP
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        name="zip"
-                                                        value={companyData.zip}
-                                                        onChange={
-                                                            handleCompanyChange
-                                                        }
-                                                        className={`form-control${companyErrors.zip ? " is-invalid" : ""}`}
-                                                        placeholder="ZIP"
-                                                    />
-                                                    {companyErrors.zip && (
-                                                        <div className="invalid-feedback d-block">
-                                                            {companyErrors.zip}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="col-md-2 mb-3">
-                                                    <label className="form-label login-label">
-                                                        Country
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        name="country"
-                                                        value={
-                                                            companyData.country
-                                                        }
-                                                        onChange={
-                                                            handleCompanyChange
-                                                        }
-                                                        className={`form-control${companyErrors.country ? " is-invalid" : ""}`}
-                                                        placeholder="US"
-                                                    />
-                                                    {companyErrors.country && (
-                                                        <div className="invalid-feedback d-block">
-                                                            {
-                                                                companyErrors.country
-                                                            }
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                <AddressFields
+                                                    values={{
+                                                        street: companyData.street,
+                                                        city: companyData.city,
+                                                        state: companyData.state,
+                                                        zip: companyData.zip,
+                                                        country: companyData.country,
+                                                    }}
+                                                    onChange={handleCompanyChange}
+                                                    errors={companyErrors}
+                                                    inputClassName="form-control"
+                                                />
                                             </div>
 
                                             <div className="d-flex gap-2 mt-3">

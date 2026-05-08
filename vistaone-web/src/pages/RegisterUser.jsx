@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRegisterUser } from "../hooks/useRegisterUser";
 import { authService } from "../services/authServices";
 import { Link } from "react-router-dom";
+import AddressFields, { validateZip } from "../components/AddressFields";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "../styles/register-user.css";
 import "../styles/login.css";
@@ -36,7 +37,7 @@ const initialState = {
     city: "",
     state: "",
     zip: "",
-    country: "",
+    country: "US",
     client_id: "",
 };
 
@@ -364,20 +365,17 @@ function RegisterUser() {
 
         if (!state) {
             newErrors.state = "State is required";
-        } else if (!/^[a-zA-Z\s'-]{2,}$/.test(state)) {
-            newErrors.state = "Invalid state name";
         }
 
         if (!zip) {
             newErrors.zip = "ZIP code is required";
-        } else if (!/^\d{5}(-\d{4})?$/.test(zip)) {
-            newErrors.zip = "Invalid ZIP code";
+        } else {
+            const zipErr = validateZip(zip, country || "US");
+            if (zipErr) newErrors.zip = zipErr;
         }
 
         if (!country) {
             newErrors.country = "Country is required";
-        } else if (country.length < 2) {
-            newErrors.country = "Invalid country";
         }
 
         setErrors(newErrors);
@@ -803,84 +801,20 @@ function RegisterUser() {
                                             {/* Address */}
                                             <div className="mb-3">
                                                 <label className="form-label login-label">
-                                                    Address Line 1
+                                                    Address
                                                 </label>
-                                                <div className="input-group login-input-group">
-                                                    <span className="input-group-text">
-                                                        <MapPin size={18} />
-                                                    </span>
-                                                    <input
-                                                        type="text"
-                                                        name="street"
-                                                        value={formData.street}
-                                                        onChange={handleChange}
-                                                        className={`form-control${errors.street ? " is-invalid" : ""}`}
-                                                        placeholder="123 Main St"
-                                                    />
-                                                </div>
-                                                {errors.street && (
-                                                    <div className="invalid-feedback d-block">
-                                                        {errors.street}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="row g-2">
-                                                <div className="col-md-4 mb-3">
-                                                    <label className="form-label login-label">City</label>
-                                                    <input
-                                                        type="text"
-                                                        name="city"
-                                                        value={formData.city}
-                                                        onChange={handleChange}
-                                                        className={`form-control${errors.city ? " is-invalid" : ""}`}
-                                                        placeholder="City"
-                                                    />
-                                                    {errors.city && (
-                                                        <div className="invalid-feedback d-block">{errors.city}</div>
-                                                    )}
-                                                </div>
-                                                <div className="col-md-3 mb-3">
-                                                    <label className="form-label login-label">State</label>
-                                                    <input
-                                                        type="text"
-                                                        name="state"
-                                                        value={formData.state}
-                                                        onChange={handleChange}
-                                                        className={`form-control${errors.state ? " is-invalid" : ""}`}
-                                                        placeholder="State"
-                                                    />
-                                                    {errors.state && (
-                                                        <div className="invalid-feedback d-block">{errors.state}</div>
-                                                    )}
-                                                </div>
-                                                <div className="col-md-3 mb-3">
-                                                    <label className="form-label login-label">ZIP</label>
-                                                    <input
-                                                        type="text"
-                                                        name="zip"
-                                                        value={formData.zip}
-                                                        onChange={handleChange}
-                                                        className={`form-control${errors.zip ? " is-invalid" : ""}`}
-                                                        placeholder="ZIP"
-                                                    />
-                                                    {errors.zip && (
-                                                        <div className="invalid-feedback d-block">{errors.zip}</div>
-                                                    )}
-                                                </div>
-                                                <div className="col-md-2 mb-3">
-                                                    <label className="form-label login-label">Country</label>
-                                                    <input
-                                                        type="text"
-                                                        name="country"
-                                                        value={formData.country}
-                                                        onChange={handleChange}
-                                                        className={`form-control${errors.country ? " is-invalid" : ""}`}
-                                                        placeholder="Country"
-                                                    />
-                                                    {errors.country && (
-                                                        <div className="invalid-feedback d-block">{errors.country}</div>
-                                                    )}
-                                                </div>
+                                                <AddressFields
+                                                    values={{
+                                                        street: formData.street,
+                                                        city: formData.city,
+                                                        state: formData.state,
+                                                        zip: formData.zip,
+                                                        country: formData.country,
+                                                    }}
+                                                    onChange={handleChange}
+                                                    errors={errors}
+                                                    inputClassName="form-control"
+                                                />
                                             </div>
 
                                             <div className="d-flex gap-2 mt-3">
