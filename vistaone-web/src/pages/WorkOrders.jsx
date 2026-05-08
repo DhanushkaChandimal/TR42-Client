@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import AppShell from "../components/AppShell";
+import { useAuthContext } from "../context/AuthContext";
 import ExportButton from "../components/ExportButton";
 import Pagination from "../components/Pagination";
 import StatusSummaryCards from "../components/StatusSummaryCards";
@@ -67,6 +68,8 @@ function nextSortFor(column, sortBy) {
 }
 
 export default function WorkOrders() {
+  const { hasPermission } = useAuthContext();
+  const canWrite = hasPermission("workorders", "write");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("date_desc");
@@ -157,13 +160,15 @@ export default function WorkOrders() {
       controls={
         <>
           <ExportButton withDateRange onExport={exportService.workorders} />
-          <button
-            className="workorders-create-btn"
-            onClick={handleOpenModal}
-            title="Create Work Order"
-          >
-            + Create Work Order
-          </button>
+          {canWrite && (
+            <button
+              className="workorders-create-btn"
+              onClick={handleOpenModal}
+              title="Create Work Order"
+            >
+              + Create Work Order
+            </button>
+          )}
         </>
       }
     >

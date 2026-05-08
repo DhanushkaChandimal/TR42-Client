@@ -4,6 +4,7 @@ import CreateOrEditWellModal from "../components/CreateOrEditWellModal";
 import Pagination from "../components/Pagination";
 import { usePaginatedList } from "../hooks/usePaginatedList";
 import { searchWells, createWell, updateWell } from "../services/wellService";
+import { useAuthContext } from "../context/AuthContext";
 import "../styles/workorder.css";
 import "../styles/dataTable.css";
 
@@ -35,6 +36,8 @@ function nextSortFor(column, sortBy) {
 }
 
 export default function Wells() {
+  const { hasPermission } = useAuthContext();
+  const canWrite = hasPermission("wells", "write");
   const [showModal, setShowModal] = useState(false);
   const [editWell, setEditWell] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -116,15 +119,17 @@ export default function Wells() {
       loading={loading && wells.length === 0}
       loadingText="Loading wells..."
       controls={
-        <button
-          className="workorders-create-btn"
-          onClick={() => {
-            setEditWell(null);
-            setShowModal(true);
-          }}
-        >
-          + Add Well
-        </button>
+        canWrite && (
+          <button
+            className="workorders-create-btn"
+            onClick={() => {
+              setEditWell(null);
+              setShowModal(true);
+            }}
+          >
+            + Add Well
+          </button>
+        )
       }
     >
       <section className="workorders-controls">
@@ -162,21 +167,18 @@ export default function Wells() {
               {wells.map((well) => (
                 <tr
                   key={well.id}
-                  className="data-table-row-clickable"
-                  onClick={() => {
-                    setEditWell(well);
-                    setShowModal(true);
-                  }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`Edit well ${well.api_number}`}
-                  onKeyDown={(e) => {
+                  className={canWrite ? "data-table-row-clickable" : ""}
+                  onClick={canWrite ? () => { setEditWell(well); setShowModal(true); } : undefined}
+                  tabIndex={canWrite ? 0 : undefined}
+                  role={canWrite ? "button" : undefined}
+                  aria-label={canWrite ? `Edit well ${well.api_number}` : undefined}
+                  onKeyDown={canWrite ? (e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       setEditWell(well);
                       setShowModal(true);
                     }
-                  }}
+                  } : undefined}
                 >
                   <td>{well.api_number}</td>
                   <td>{well.well_name}</td>
