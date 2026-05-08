@@ -6,12 +6,27 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _bucket_counts(rows, all_keys):
+    out = {k: 0 for k in all_keys}
+    for status, count in rows:
+        key = status.value if hasattr(status, "value") else str(status)
+        out[key] = int(count)
+    return out
+
+
 class TicketService:
 
     @staticmethod
     def get_all_tickets(work_order_id=None, vendor_id=None, status=None, client_id=None):
         return TicketRepository.get_all(
             work_order_id=work_order_id, vendor_id=vendor_id, status=status, client_id=client_id
+        )
+
+    @staticmethod
+    def status_counts(client_id=None, search_text=None):
+        return _bucket_counts(
+            TicketRepository.status_counts(client_id=client_id, search_text=search_text),
+            [s.value for s in TicketStatusEnum],
         )
 
     @staticmethod

@@ -8,6 +8,16 @@ async function parseError(res, fallback) {
 }
 
 export const invoiceService = {
+  summary: async ({ q = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    const qs = params.toString();
+    const url = qs ? `${INVOICE_ENDPOINT}/summary?${qs}` : `${INVOICE_ENDPOINT}/summary`;
+    const response = await authFetch(url, { method: 'GET' });
+    if (!response.ok) await parseError(response, 'Failed to fetch invoice summary');
+    return await response.json();
+  },
+
   search: async ({ q = '', status = '', work_order_id = '', page = 1, per_page = 10, sort_by = 'created_at', order = 'desc' } = {}) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);

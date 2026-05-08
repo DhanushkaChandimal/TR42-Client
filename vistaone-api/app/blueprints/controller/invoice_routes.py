@@ -76,6 +76,16 @@ def search_invoices(current_user_id):
         return jsonify({"error": str(e)}), 400
 
 
+@invoice_bp.route("/summary", methods=["GET"])
+@permission_required("invoices", "read")
+def invoice_summary(current_user_id):
+    """Whole-dataset status counts for the invoice list summary cards."""
+    client_id = get_current_user_client_id()
+    search_text = request.args.get("q", "")
+    counts = InvoiceService.status_counts(client_id=client_id, search_text=search_text)
+    return jsonify({"counts": counts}), 200
+
+
 @invoice_bp.route("/<string:invoice_id>", methods=["GET"])
 @permission_required("invoices", "read")
 def get_invoice(current_user_id, invoice_id):

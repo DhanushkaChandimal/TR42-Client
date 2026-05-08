@@ -404,7 +404,7 @@
 /* Inline Create Work Order button — matched to .export-btn for visual consistency */
 .workorders-create-btn {
 	align-self: flex-end;
-	background: #1f3a8a;
+	background: #0a1f3b;
 	color: #fff;
 	border: none;
 	padding: 8px 16px;
@@ -416,7 +416,7 @@
 }
 .workorders-create-btn:hover:not(:disabled),
 .workorders-create-btn:focus {
-	background: #1e3a78;
+	background: #112d4e;
 	outline: none;
 }
 

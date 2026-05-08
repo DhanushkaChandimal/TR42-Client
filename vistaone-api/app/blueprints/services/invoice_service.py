@@ -8,6 +8,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def _bucket_counts(rows, all_keys):
+    """Turn (status, count) rows into a dict that includes every enum value
+    pre-populated to 0 so the frontend can render a fixed set of cards."""
+    out = {k: 0 for k in all_keys}
+    for status, count in rows:
+        key = status.value if hasattr(status, "value") else str(status)
+        out[key] = int(count)
+    return out
+
+
 ## Service adds business logic like status transitions and line item totals
 
 
@@ -26,6 +37,13 @@ class InvoiceService:
         if not invoice:
             raise ValueError("Invoice not found")
         return invoice
+
+    @staticmethod
+    def status_counts(client_id=None, search_text=None):
+        return _bucket_counts(
+            InvoiceRepository.status_counts(client_id=client_id, search_text=search_text),
+            [s.value for s in InvoiceStatusEnum],
+        )
 
     @staticmethod
     def search_invoices(search_text, status, page, per_page, sort_by, order, client_id=None, work_order_id=None):

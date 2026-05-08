@@ -1,12 +1,25 @@
 import os
 from dotenv import load_dotenv
+from sqlalchemy.pool import NullPool
 
 load_dotenv()
+
+# Supabase's session-mode pooler caps clients at pool_size=15. The default
+# Flask-SQLAlchemy QueuePool (size=5 + overflow=10 = 15) lines up with that
+# limit exactly, so any leaked or idle connection tips the app into
+# `EMAXCONNSESSION: max clients reached` and every subsequent request 500s.
+# NullPool opens/closes per request and lets pgbouncer do the pooling — the
+# documented Supabase recommendation.
+SHARED_ENGINE_OPTIONS = {
+    "poolclass": NullPool,
+    "pool_pre_ping": True,
+}
 
 
 class DevelopmentConfig:
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")
+    SQLALCHEMY_ENGINE_OPTIONS = SHARED_ENGINE_OPTIONS
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
     CACHE_TYPE = "SimpleCache"
     CACHE_DEFAULT_TIMEOUT = 300
@@ -43,6 +56,7 @@ class TestingConfig:
 class ProductionConfig:
     DEBUG = False
     SQLALCHEMY_DATABASE_URI = os.environ.get("SQLALCHEMY_DATABASE_URI")
+    SQLALCHEMY_ENGINE_OPTIONS = SHARED_ENGINE_OPTIONS
     SECRET_KEY = os.environ.get("SECRET_KEY")
     CACHE_TYPE = "SimpleCache"
     FRONTEND_URL = "https://client-web-dashboard.vercel.app"

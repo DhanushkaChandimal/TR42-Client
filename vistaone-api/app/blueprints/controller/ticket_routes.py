@@ -56,6 +56,16 @@ def search_tickets(current_user_id):
         return jsonify({"error": str(e)}), 400
 
 
+@ticket_bp.route("/summary", methods=["GET"])
+@permission_required("workorders", "read")
+def ticket_summary(current_user_id):
+    """Whole-dataset status counts for the ticket list summary cards."""
+    client_id = get_current_user_client_id()
+    search_text = request.args.get("q", "")
+    counts = TicketService.status_counts(client_id=client_id, search_text=search_text)
+    return jsonify({"counts": counts}), 200
+
+
 @ticket_bp.route("/<string:ticket_id>", methods=["GET"])
 @permission_required("workorders", "read")
 def get_ticket(current_user_id, ticket_id):

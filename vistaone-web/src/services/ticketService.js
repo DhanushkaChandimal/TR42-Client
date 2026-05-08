@@ -8,6 +8,16 @@ async function parseError(res, fallback) {
 }
 
 export const ticketService = {
+  summary: async ({ q = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    const qs = params.toString();
+    const url = qs ? `${TICKET_ENDPOINT}/summary?${qs}` : `${TICKET_ENDPOINT}/summary`;
+    const response = await authFetch(url, { method: 'GET' });
+    if (!response.ok) await parseError(response, 'Failed to fetch ticket summary');
+    return await response.json();
+  },
+
   search: async ({ q = '', status = '', work_order_id = '', page = 1, per_page = 10, sort_by = 'created_at', order = 'desc' } = {}) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);

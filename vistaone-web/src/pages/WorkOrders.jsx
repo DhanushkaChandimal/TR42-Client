@@ -2,12 +2,26 @@ import { useCallback, useState } from "react";
 import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import Pagination from "../components/Pagination";
+import StatusSummaryCards from "../components/StatusSummaryCards";
 import { usePaginatedList } from "../hooks/usePaginatedList";
 import { workOrderService } from "../services/workOrderService";
 import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
 import WorkOrderDetailModal from "../components/WorkOrderDetailModal";
 import { exportService } from "../services/exportService";
 import "../styles/workorder.css";
+import "../styles/dataTable.css";
+
+const SUMMARY_STATUSES = [
+  { value: "UNASSIGNED", label: "Unassigned" },
+  { value: "PENDING", label: "Pending" },
+  { value: "ASSIGNED", label: "Assigned" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "HALTED", label: "Halted" },
+  { value: "CANCELLED", label: "Cancelled" },
+  { value: "REJECTED", label: "Rejected" },
+  { value: "CLOSED", label: "Closed" },
+];
 
 // Map UI column keys to actual WorkOrder attribute names the backend can sort by.
 const SORT_COLUMN_MAP = {
@@ -91,7 +105,7 @@ export default function WorkOrders() {
   const sortIndicator = (column) => {
     if (activeSort.column !== column) return null;
     return (
-      <span className="workorders-sort-arrow" aria-hidden="true">
+      <span className="data-table-sort-arrow" aria-hidden="true">
         {activeSort.direction === "asc" ? "▲" : "▼"}
       </span>
     );
@@ -106,7 +120,7 @@ export default function WorkOrders() {
     },
     tabIndex: 0,
     role: "button",
-    className: `workorders-th-sortable ${
+    className: `data-table-th-sortable ${
       activeSort.column === column ? "is-active" : ""
     }`,
     "aria-sort":
@@ -153,6 +167,17 @@ export default function WorkOrders() {
         </>
       }
     >
+      <StatusSummaryCards
+        fetchSummary={workOrderService.summary}
+        q={searchTerm.trim()}
+        statuses={SUMMARY_STATUSES}
+        activeStatus={statusFilter === "ALL" ? "" : statusFilter}
+        onSelect={(value) => setStatusFilter(value || "ALL")}
+        refreshKey={filteredOrders
+          .map((o) => `${o.id}:${o.current_status}`)
+          .join(",")}
+      />
+
       <section className="workorders-controls">
         <input
           type="search"
@@ -174,13 +199,13 @@ export default function WorkOrders() {
         </select>
       </section>
 
-      <section className="workorders-table-wrap">
+      <section className="data-table-wrap">
         {loading && filteredOrders.length === 0 ? (
-          <div className="workorders-state">Loading work orders...</div>
+          <div className="data-table-state">Loading work orders...</div>
         ) : filteredOrders.length === 0 ? (
-          <div className="workorders-state">No work orders found</div>
+          <div className="data-table-state">No work orders found</div>
         ) : (
-          <table className="workorders-table workorders-table-flat">
+          <table className="data-table">
             <thead>
               <tr>
                 <th {...headerProps("order_id", "order id")}>
@@ -208,7 +233,7 @@ export default function WorkOrders() {
               {filteredOrders.map((order) => (
                 <tr
                   key={order.work_order_code}
-                  className="workorders-row-clickable"
+                  className="data-table-row-clickable"
                   onClick={() => setDetailOrder(order)}
                   tabIndex={0}
                   role="button"

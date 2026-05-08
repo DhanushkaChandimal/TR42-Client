@@ -4,7 +4,24 @@ from app.extensions import db
 from app.models.ticket import Ticket
 from app.models.invoice import Invoice
 from app.models.workorder import WorkOrder
+from app.models.vendor import Vendor
 import logging
+
+# Whitelist of sort_by values the search endpoint accepts. The keys are the
+# tokens the frontend sends; values are either a Ticket column or a marker
+# string that triggers a join below. Anything outside this map falls back to
+# created_at.
+TICKET_SORT_FIELDS = {
+    "created_at": Ticket.created_at,
+    "due_date": Ticket.due_date,
+    "description": Ticket.description,
+    "assigned_contractor": Ticket.assigned_contractor,
+    "priority": Ticket.priority,
+    "status": Ticket.status,
+    "vendor": "_vendor",
+    "work_order": "_work_order",
+    "cost": "_cost",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -95,10 +112,16 @@ class TicketRepository:
                 joinedload(Ticket.vendor),
                 joinedload(Ticket.work_order),
             )
+
+            spec = TICKET_SORT_FIELDS.get(sort_by, Ticket.created_at)
+
+            # Join WorkOrder once, whether for tenant scope or for sorting,
+            # so we don't double-join (which SQLAlchemy treats as ambiguous).
+            if client_id or spec == "_work_order":
+                query = query.outerjoin(WorkOrder, Ticket.work_order_id == WorkOrder.id)
             if client_id:
-                query = query.join(WorkOrder, Ticket.work_order_id == WorkOrder.id).filter(
-                    WorkOrder.client_id == client_id
-                )
+                query = query.filter(WorkOrder.client_id == client_id)
+
             if work_order_id:
                 query = query.filter(Ticket.work_order_id == work_order_id)
             if status:
@@ -114,8 +137,43 @@ class TicketRepository:
                             Ticket.assigned_contractor.ilike(pattern),
                         )
                     )
-            sort_column = getattr(Ticket, sort_by, Ticket.created_at)
-            query = query.order_by(desc(sort_column) if order.lower() == "desc" else asc(sort_column))
+
+            direction = desc if order.lower() == "desc" else asc
+            if spec == "_vendor":
+                query = query.outerjoin(Vendor, Ticket.vendor_id == Vendor.id)
+                sort_column = Vendor.company_name
+            elif spec == "_work_order":
+                sort_column = WorkOrder.work_order_code
+            elif spec == "_cost":
+                query = query.outerjoin(Invoice, Ticket.invoice_id == Invoice.id)
+                sort_column = Invoice.total_amount
+            else:
+                sort_column = spec
+            # NULLS LAST so empty values (no vendor, no invoice, no WO code)
+            # don't dominate the top of an ascending sort.
+            query = query.order_by(direction(sort_column).nullslast())
             return query.paginate(page=page, per_page=per_page, error_out=False)
         except Exception as e:
             raise Exception(f"Error during ticket search: {str(e)}")
+
+    @staticmethod
+    def status_counts(client_id=None, search_text=None):
+        """Group-by-status count over the entire client dataset (not paged)."""
+        from sqlalchemy import func
+        query = db.session.query(Ticket.status, func.count(Ticket.id))
+        if client_id:
+            query = query.join(WorkOrder, Ticket.work_order_id == WorkOrder.id).filter(
+                WorkOrder.client_id == client_id
+            )
+        if search_text:
+            for word in search_text.lower().split():
+                pattern = f"%{word}%"
+                query = query.filter(
+                    or_(
+                        Ticket.description.ilike(pattern),
+                        cast(Ticket.status, String).ilike(pattern),
+                        cast(Ticket.priority, String).ilike(pattern),
+                        Ticket.assigned_contractor.ilike(pattern),
+                    )
+                )
+        return query.group_by(Ticket.status).all()

@@ -3,19 +3,31 @@ import AppShell from "../components/AppShell";
 import ExportButton from "../components/ExportButton";
 import InvoiceDetailModal from "../components/InvoiceDetailModal";
 import Pagination from "../components/Pagination";
+import StatusSummaryCards from "../components/StatusSummaryCards";
 import { exportService } from "../services/exportService";
 import { invoiceService } from "../services/invoiceService";
 import { usePaginatedList } from "../hooks/usePaginatedList";
 import "../styles/invoices.css";
+import "../styles/dataTable.css";
 
 const statusOptions = [
   { value: "ALL", label: "All" },
-  { value: "PENDING", label: "Pending" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "SUBMITTED", label: "Submitted" },
   { value: "APPROVED", label: "Approved" },
   { value: "REJECTED", label: "Rejected" },
+  { value: "PAID", label: "Paid" },
 ];
 
-const STATUS_RANK = { PENDING: 0, APPROVED: 1, REJECTED: 2 };
+const SUMMARY_STATUSES = statusOptions.slice(1);
+
+const SORT_COLUMN_MAP = {
+  vendor: "vendor",
+  amount: "total_amount",
+  invoice_date: "invoice_date",
+  due_date: "due_date",
+  status: "invoice_status",
+};
 
 const HEADER_SORT_DEFAULTS = {
   vendor: "asc",
@@ -24,16 +36,6 @@ const HEADER_SORT_DEFAULTS = {
   due_date: "asc",
   status: "asc",
 };
-
-function dateValue(value) {
-  if (!value) return 0;
-  const t = new Date(value).getTime();
-  return Number.isNaN(t) ? 0 : t;
-}
-
-function vendorLabel(inv) {
-  return (inv.vendor?.company_name || inv.vendor?.name || "").toLowerCase();
-}
 
 function parseSort(sortBy) {
   const m = sortBy?.match(/^(.*)_(asc|desc)$/);
@@ -48,57 +50,6 @@ function nextSortFor(column, sortBy) {
   return current.direction === "asc" ? `${column}_desc` : `${column}_asc`;
 }
 
-function sortInvoices(list, sortBy) {
-  const sorted = [...list];
-  switch (sortBy) {
-    case "vendor_asc":
-      sorted.sort((a, b) => vendorLabel(a).localeCompare(vendorLabel(b)));
-      break;
-    case "vendor_desc":
-      sorted.sort((a, b) => vendorLabel(b).localeCompare(vendorLabel(a)));
-      break;
-    case "amount_asc":
-      sorted.sort(
-        (a, b) => Number(a.total_amount || 0) - Number(b.total_amount || 0),
-      );
-      break;
-    case "amount_desc":
-      sorted.sort(
-        (a, b) => Number(b.total_amount || 0) - Number(a.total_amount || 0),
-      );
-      break;
-    case "invoice_date_asc":
-      sorted.sort((a, b) => dateValue(a.invoice_date) - dateValue(b.invoice_date));
-      break;
-    case "invoice_date_desc":
-      sorted.sort((a, b) => dateValue(b.invoice_date) - dateValue(a.invoice_date));
-      break;
-    case "due_date_asc":
-      sorted.sort((a, b) => dateValue(a.due_date) - dateValue(b.due_date));
-      break;
-    case "due_date_desc":
-      sorted.sort((a, b) => dateValue(b.due_date) - dateValue(a.due_date));
-      break;
-    case "status_asc":
-      sorted.sort(
-        (a, b) =>
-          (STATUS_RANK[a.invoice_status] ?? 99) -
-          (STATUS_RANK[b.invoice_status] ?? 99),
-      );
-      break;
-    case "status_desc":
-      sorted.sort(
-        (a, b) =>
-          (STATUS_RANK[b.invoice_status] ?? 99) -
-          (STATUS_RANK[a.invoice_status] ?? 99),
-      );
-      break;
-    default:
-      break;
-  }
-  return sorted;
-}
-
 export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -106,13 +57,18 @@ export default function Invoices() {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   const fetcher = useCallback(
-    (page, perPage) => invoiceService.search({
-      q: searchTerm.trim(),
-      status: statusFilter === "ALL" ? "" : statusFilter,
-      page,
-      per_page: perPage,
-    }),
-    [searchTerm, statusFilter],
+    (page, perPage) => {
+      const { column, direction } = parseSort(sortBy);
+      return invoiceService.search({
+        q: searchTerm.trim(),
+        status: statusFilter === "ALL" ? "" : statusFilter,
+        page,
+        per_page: perPage,
+        sort_by: SORT_COLUMN_MAP[column] || "created_at",
+        order: direction || "desc",
+      });
+    },
+    [searchTerm, statusFilter, sortBy],
   );
 
   const {
@@ -131,26 +87,12 @@ export default function Invoices() {
   const rejectInvoice = async (id) => { const u = await invoiceService.reject(id); refresh(); return u; };
   const setInvoicePending = async (id) => { const u = await invoiceService.setPending(id); refresh(); return u; };
 
-  const filteredInvoices = useMemo(() => {
-    const search = searchTerm.trim().toLowerCase();
-    const matched = invoices.filter((inv) => {
-      const matchesStatus =
-        statusFilter === "ALL" || inv.invoice_status === statusFilter;
-      const matchesSearch =
-        (inv.id || "").toLowerCase().includes(search) ||
-        (inv.vendor?.company_name || inv.vendor?.name || "").toLowerCase().includes(search) ||
-        (inv.client_id || "").toLowerCase().includes(search);
-      return matchesStatus && matchesSearch;
-    });
-    return sortInvoices(matched, sortBy);
-  }, [invoices, searchTerm, statusFilter, sortBy]);
-
   const activeSort = parseSort(sortBy);
   const handleHeaderSort = (column) => setSortBy(nextSortFor(column, sortBy));
   const sortIndicator = (column) => {
     if (activeSort.column !== column) return null;
     return (
-      <span className="inv-sort-arrow" aria-hidden="true">
+      <span className="data-table-sort-arrow" aria-hidden="true">
         {activeSort.direction === "asc" ? "▲" : "▼"}
       </span>
     );
@@ -165,7 +107,7 @@ export default function Invoices() {
     },
     tabIndex: 0,
     role: "button",
-    className: `inv-th-sortable ${
+    className: `data-table-th-sortable ${
       activeSort.column === column ? "is-active" : ""
     }`,
     "aria-sort":
@@ -212,15 +154,12 @@ export default function Invoices() {
     return updated;
   };
 
-  const statusCounts = useMemo(() => {
-    const counts = { PENDING: 0, APPROVED: 0, REJECTED: 0 };
-    invoices.forEach((inv) => {
-      if (counts[inv.invoice_status] !== undefined) {
-        counts[inv.invoice_status]++;
-      }
-    });
-    return counts;
-  }, [invoices]);
+  // Bumping this counter forces the StatusSummaryCards to refetch when an
+  // invoice changes status (approve/reject/undo).
+  const summaryRefreshKey = useMemo(
+    () => invoices.map((i) => `${i.id}:${i.invoice_status}`).join(","),
+    [invoices],
+  );
 
   return (
     <AppShell
@@ -230,23 +169,14 @@ export default function Invoices() {
       loadingText="Loading invoices..."
       controls={<ExportButton withDateRange onExport={exportService.invoices} />}
     >
-      {/* Status summary cards */}
-      <section className="inv-summary">
-        {statusOptions.slice(1).map((opt) => (
-          <div
-            key={opt.value}
-            className={`inv-summary-card inv-summary-${opt.value.toLowerCase()} ${
-              statusFilter === opt.value ? "inv-summary-active" : ""
-            }`}
-            onClick={() =>
-              setStatusFilter(statusFilter === opt.value ? "ALL" : opt.value)
-            }
-          >
-            <p className="inv-summary-count">{statusCounts[opt.value] || 0}</p>
-            <p className="inv-summary-label">{opt.label}</p>
-          </div>
-        ))}
-      </section>
+      <StatusSummaryCards
+        fetchSummary={invoiceService.summary}
+        q={searchTerm.trim()}
+        statuses={SUMMARY_STATUSES}
+        activeStatus={statusFilter === "ALL" ? "" : statusFilter}
+        onSelect={(value) => setStatusFilter(value || "ALL")}
+        refreshKey={summaryRefreshKey}
+      />
 
       <section className="inv-controls">
         <input
@@ -269,87 +199,89 @@ export default function Invoices() {
         </select>
       </section>
 
-      <section className="inv-table-wrap">
-          {!loading && filteredInvoices.length === 0 ? (
-            <div className="inv-empty">No invoices found</div>
-          ) : (
-            <table className="inv-table inv-table-flat">
-              <thead>
-                <tr>
-                  <th {...headerProps("vendor", "vendor")}>
-                    Vendor {sortIndicator("vendor")}
-                  </th>
-                  <th {...headerProps("amount", "amount")}>
-                    Amount {sortIndicator("amount")}
-                  </th>
-                  <th {...headerProps("invoice_date", "invoice date")}>
-                    Invoice Date {sortIndicator("invoice_date")}
-                  </th>
-                  <th {...headerProps("due_date", "due date")}>
-                    Due Date {sortIndicator("due_date")}
-                  </th>
-                  <th {...headerProps("status", "status")}>
-                    Status {sortIndicator("status")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredInvoices.map((inv) => (
-                  <tr
-                    key={inv.id}
-                    className={`inv-row inv-row-clickable ${
-                      selectedInvoice?.id === inv.id ? "inv-row-selected" : ""
-                    }`}
-                    onClick={() => {
+      <section className="data-table-wrap">
+        {!loading && invoices.length === 0 ? (
+          <div className="data-table-state">No invoices found</div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th {...headerProps("vendor", "vendor")}>
+                  Vendor {sortIndicator("vendor")}
+                </th>
+                <th {...headerProps("amount", "amount")}>
+                  Amount {sortIndicator("amount")}
+                </th>
+                <th {...headerProps("invoice_date", "invoice date")}>
+                  Invoice Date {sortIndicator("invoice_date")}
+                </th>
+                <th {...headerProps("due_date", "due date")}>
+                  Due Date {sortIndicator("due_date")}
+                </th>
+                <th {...headerProps("status", "status")}>
+                  Status {sortIndicator("status")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv) => (
+                <tr
+                  key={inv.id}
+                  className={`data-table-row-clickable ${
+                    selectedInvoice?.id === inv.id ? "data-table-row-selected" : ""
+                  }`}
+                  onClick={() => {
+                    setSelectedInvoice(inv);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
                       setSelectedInvoice(inv);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedInvoice(inv);
-                      }
-                    }}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={`Review invoice ${inv.id?.slice(0, 8)}`}
-                  >
-                    <td>{inv.vendor?.company_name || inv.vendor?.name || "-"}</td>
-                    <td className="inv-amount">{formatCurrency(inv.total_amount)}</td>
-                    <td>{formatDate(inv.invoice_date)}</td>
-                    <td>{formatDate(inv.due_date)}</td>
-                    <td>
-                      <span className={`inv-badge inv-badge-${inv.invoice_status?.toLowerCase()}`}>
-                        {inv.invoice_status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <Pagination
-            page={page}
-            pages={pages}
-            total={total}
-            perPage={perPage}
-            onPageChange={setPage}
-            onPerPageChange={(n) => {
-              setPerPage(n);
-              setPage(1);
-            }}
-            disabled={loading}
-          />
-        </section>
-
-        {selectedInvoice && (
-          <InvoiceDetailModal
-            invoice={selectedInvoice}
-            onClose={() => setSelectedInvoice(null)}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onUndo={handleUndo}
-          />
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Review invoice ${inv.id?.slice(0, 8)}`}
+                >
+                  <td>{inv.vendor?.company_name || inv.vendor?.name || "-"}</td>
+                  <td className="data-table-cell-numeric inv-amount">
+                    {formatCurrency(inv.total_amount)}
+                  </td>
+                  <td>{formatDate(inv.invoice_date)}</td>
+                  <td>{formatDate(inv.due_date)}</td>
+                  <td>
+                    <span className={`inv-badge inv-badge-${inv.invoice_status?.toLowerCase()}`}>
+                      {inv.invoice_status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
+        <Pagination
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={(n) => {
+            setPerPage(n);
+            setPage(1);
+          }}
+          disabled={loading}
+        />
+      </section>
+
+      {selectedInvoice && (
+        <InvoiceDetailModal
+          invoice={selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onUndo={handleUndo}
+        />
+      )}
     </AppShell>
   );
 }
