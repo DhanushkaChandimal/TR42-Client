@@ -16,7 +16,7 @@ The contractor name-match is brittle. The proper fix is an
 `assigned_contractor_id` FK on ticket; that's a separate change.
 """
 import logging
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, text
 from app.extensions import db
 from app.models.chat import Chat
 from app.models.message import Message
@@ -801,19 +801,23 @@ class ChatService:
 
     @staticmethod
     def get_findable_contacts(user_id, client_id):
-        """Return contacts grouped into three categories for 'New Conversation' discovery:
-        - company_colleagues: other active users in the same client
-        - vendor_favourites: users enrolled in the client's favourite vendors
-        - ticket_contractors: contractor users name-matched from ticket records
+        """Return contacts grouped into three categories for 'New Conversation'
+        discovery, scoped to people the current client has actually worked with:
+
+        - company_colleagues: other users on the same client team
+        - vendor_favourites: users at vendors the client has work orders,
+          tickets, or invoices with
+        - ticket_contractors: contractor users assigned to tickets on the
+          client's work orders, resolved through ticket.assigned_contractor ->
+          contractor.user_id (the column is a contractor uuid, not a name)
 
         Users are deduplicated across groups (first group wins).
         """
         from app.models.client_user import ClientUser
-        from app.models.client_vendor import ClientVendor
 
         seen_ids = {user_id}
 
-        # --- Company colleagues ---
+        # --- Company colleagues (same client team) ---
         company_colleagues = []
         if client_id:
             colleague_rows = (
@@ -844,21 +848,53 @@ class ChatService:
                     }
                 )
 
-        # --- Vendor favourite contacts ---
+        # --- Vendors this client has actually worked with ---
+        # Source of truth: WO.assigned_vendor + invoice.vendor_id + ticket.vendor_id
+        # (tickets joined back to WO for client scoping).
         vendor_favourites = []
+        engaged_vendor_ids = set()
+        engaged_wo_ids = set()
         if client_id:
+            wo_rows = db.session.execute(
+                select(WorkOrder.id, WorkOrder.assigned_vendor).where(
+                    WorkOrder.client_id == client_id
+                )
+            ).all()
+            for wo_id, vendor_id in wo_rows:
+                engaged_wo_ids.add(wo_id)
+                if vendor_id:
+                    engaged_vendor_ids.add(vendor_id)
+
+            engaged_vendor_ids.update(
+                db.session.execute(
+                    select(Invoice.vendor_id).where(
+                        and_(
+                            Invoice.client_id == client_id,
+                            Invoice.vendor_id.isnot(None),
+                        )
+                    )
+                ).scalars().all()
+            )
+
+            if engaged_wo_ids:
+                engaged_vendor_ids.update(
+                    db.session.execute(
+                        select(Ticket.vendor_id).where(
+                            and_(
+                                Ticket.work_order_id.in_(engaged_wo_ids),
+                                Ticket.vendor_id.isnot(None),
+                            )
+                        )
+                    ).scalars().all()
+                )
+
+        if engaged_vendor_ids:
             fav_rows = (
                 db.session.execute(
                     select(User, VendorUser.vendor_user_role, Vendor.company_name)
                     .join(VendorUser, VendorUser.user_id == User.id)
                     .join(Vendor, Vendor.id == VendorUser.vendor_id)
-                    .join(ClientVendor, ClientVendor.vendor_id == VendorUser.vendor_id)
-                    .where(
-                        and_(
-                            ClientVendor.client_id == client_id,
-                            VendorUser.vendor_id.isnot(None),
-                        )
-                    )
+                    .where(VendorUser.vendor_id.in_(engaged_vendor_ids))
                 )
                 .all()
             )
@@ -877,46 +913,44 @@ class ChatService:
                     }
                 )
 
-        # --- Ticket contractors (name-matched) ---
+        # --- Contractors assigned to tickets on this client's WOs ---
+        # ticket.assigned_contractor stores contractor.id (a uuid), not a name.
+        # Resolve through contractor.user_id to reach auth_user. The contractor
+        # table is not modeled in SQLAlchemy yet, so we use a raw lookup.
         ticket_contractors = []
-        ticket_names = (
-            db.session.execute(
-                select(Ticket.assigned_contractor)
-                .where(Ticket.assigned_contractor.isnot(None))
-                .distinct()
-            )
-            .scalars()
-            .all()
-        )
-        normalized_names = {n.strip().lower() for n in ticket_names if n and n.strip()}
-        if normalized_names:
-            contractor_rows = (
-                db.session.execute(
-                    select(User).where(
-                        and_(
-                            func.lower(
-                                func.concat(User.first_name, " ", User.last_name)
-                            ).in_(normalized_names),
-                            User.id.notin_(list(seen_ids)),
-                        )
+        if engaged_wo_ids:
+            contractor_ids = db.session.execute(
+                select(Ticket.assigned_contractor).where(
+                    and_(
+                        Ticket.work_order_id.in_(engaged_wo_ids),
+                        Ticket.assigned_contractor.isnot(None),
                     )
-                )
-                .scalars()
-                .all()
-            )
-            for u in contractor_rows:
-                if u.id in seen_ids:
-                    continue
-                seen_ids.add(u.id)
-                ticket_contractors.append(
-                    {
-                        "id": u.id,
-                        "name": _full_name(u),
-                        "role": "contractor",
-                        "email": u.email,
-                        "phone": getattr(u, "contact_number", None),
-                    }
-                )
+                ).distinct()
+            ).scalars().all()
+            if contractor_ids:
+                user_ids = db.session.execute(
+                    text(
+                        "SELECT DISTINCT user_id FROM contractor "
+                        "WHERE id = ANY(:ids) AND user_id IS NOT NULL"
+                    ),
+                    {"ids": contractor_ids},
+                ).scalars().all()
+                user_ids = [uid for uid in user_ids if uid not in seen_ids]
+                if user_ids:
+                    contractor_rows = db.session.execute(
+                        select(User).where(User.id.in_(user_ids))
+                    ).scalars().all()
+                    for u in contractor_rows:
+                        seen_ids.add(u.id)
+                        ticket_contractors.append(
+                            {
+                                "id": u.id,
+                                "name": _full_name(u),
+                                "role": "contractor",
+                                "email": u.email,
+                                "phone": getattr(u, "contact_number", None),
+                            }
+                        )
 
         return {
             "company_colleagues": company_colleagues,
