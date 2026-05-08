@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ticketService } from "../services/ticketService";
 import { useAuthContext } from "../context/AuthContext";
+import { notifyPendingApprovalChanged } from "../hooks/usePendingApprovalCount";
 
 const formatDateTime = (s) => {
   if (!s) return "—";
@@ -74,6 +75,7 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
       setTicket(updated);
       setActionMessage(successMessage);
       if (onStatusChange) onStatusChange(updated);
+      notifyPendingApprovalChanged();
     } catch (err) {
       setActionMessage(err.message || "Action failed");
     } finally {
@@ -112,6 +114,7 @@ export default function TicketDetailModal({ ticketId, onClose, onStatusChange })
       setShowRejectForm(false);
       setRejectNote("");
       if (onStatusChange) onStatusChange(updated);
+      notifyPendingApprovalChanged();
     } catch (err) {
       setActionMessage(err.message || "Action failed");
     } finally {
