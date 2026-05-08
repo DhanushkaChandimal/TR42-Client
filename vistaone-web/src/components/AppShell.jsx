@@ -16,12 +16,12 @@ function AppShell({
     loading = false,
     loadingText = "Loading...",
 }) {
-    const { isMaster, isAdmin, user, hasPermission } = useAuthContext();
+    const { isMaster, user, hasPermission } = useAuthContext();
     const pendingApprovalCount = usePendingApprovalCount();
     const unreadMessageCount = useUnreadMessageCount();
 
     const adminSection = [];
-    if (isAdmin) {
+    if (hasPermission("users", "read")) {
         adminSection.push({
             to: "/admin/users",
             label: "User Management",
@@ -37,7 +37,10 @@ function AppShell({
     }
 
     const filterNav = (items) =>
-        items.filter((item) => !item.permission || hasPermission(item.permission, "read"));
+        items.filter(
+            (item) =>
+                !item.permission || hasPermission(item.permission, "read"),
+        );
 
     const decorate = (item) => {
         if (item.to === "/tickets" && pendingApprovalCount > 0) {
