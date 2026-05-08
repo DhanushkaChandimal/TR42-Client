@@ -299,6 +299,53 @@ export default function Messages() {
     onMessage: handleIncomingMessage,
   });
 
+  // Polling fallback for the open thread. Realtime is the fast path, but
+  // websocket drops, RLS quirks, or a JWT subject mismatch can leave the
+  // recipient seeing only the unread badge update (which runs on a 20s
+  // contacts poll) while the conversation itself stays frozen. Polling
+  // listMessages(after=lastSeen) every 4 seconds while a chat is open
+  // catches anything realtime didn't deliver.
+  useEffect(() => {
+    if (!activeChatId) return undefined;
+    let cancelled = false;
+
+    const tick = async () => {
+      if (cancelled) return;
+      if (document.visibilityState !== "visible") return;
+      const after = lastSeenRef.current;
+      if (!after) return;
+      try {
+        const newMsgs = await messagingService.listMessages(activeChatId, {
+          after,
+        });
+        if (
+          cancelled ||
+          activeChatId !== activeChatIdRef.current ||
+          !newMsgs?.length
+        ) {
+          return;
+        }
+        setMessages((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const additions = newMsgs.filter((m) => !seen.has(m.id));
+          if (!additions.length) return prev;
+          return [...prev, ...additions];
+        });
+        const latest = newMsgs[newMsgs.length - 1];
+        lastSeenRef.current = latest.created_at;
+        markRead(activeChatId, latest.created_at);
+      } catch {
+        // A transient failure shouldn't kill the polling loop.
+      }
+    };
+
+    const id = setInterval(tick, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [activeChatId]);
+
   const handleNewConvSelect = useCallback(
     async (user) => {
       setShowNewConv(false);
