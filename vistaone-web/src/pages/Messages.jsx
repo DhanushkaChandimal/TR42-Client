@@ -12,6 +12,10 @@ const LEFT_MIN = 200, LEFT_MAX = 480, LEFT_DEFAULT = 280;
 const RIGHT_MIN = 220, RIGHT_MAX = 540, RIGHT_DEFAULT = 320;
 const LS_LAYOUT_KEY = "messagesPageLayout:v1";
 
+// Messenger-style pagination: load the most recent N on open and fetch the
+// next chunk when the user scrolls to the top of the thread.
+const MESSAGE_PAGE_SIZE = 30;
+
 function loadLayout() {
   try {
     const raw = localStorage.getItem(LS_LAYOUT_KEY);
@@ -56,6 +60,8 @@ export default function Messages() {
   const [activeContact, setActiveContact] = useState(null);
   const [activeChatId, setActiveChatId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [hasMoreOlder, setHasMoreOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [contactContext, setContactContext] = useState(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [loadingContext, setLoadingContext] = useState(false);
@@ -173,6 +179,7 @@ export default function Messages() {
       setActiveChatId(contact.chat_id);
       activeChatIdRef.current = contact.chat_id;
       setMessages([]);
+      setHasMoreOlder(false);
       setContactContext(null);
       lastSeenRef.current = null;
       setLoadingThread(true);
@@ -180,10 +187,13 @@ export default function Messages() {
       setError("");
       try {
         const [msgs, ctx] = await Promise.all([
-          messagingService.listMessages(contact.chat_id),
+          messagingService.listMessages(contact.chat_id, {
+            limit: MESSAGE_PAGE_SIZE,
+          }),
           messagingService.getUserContext(contact.id).catch(() => null),
         ]);
         setMessages(msgs);
+        setHasMoreOlder(msgs.length === MESSAGE_PAGE_SIZE);
         setContactContext(ctx);
         if (msgs.length) {
           lastSeenRef.current = msgs[msgs.length - 1].created_at;
@@ -200,6 +210,39 @@ export default function Messages() {
     },
     []
   );
+
+  const loadOlderMessages = useCallback(async () => {
+    const chatId = activeChatIdRef.current;
+    if (!chatId || loadingOlder || !hasMoreOlder || messages.length === 0) {
+      return;
+    }
+    const oldest = messages[0];
+    const node = threadRef.current;
+    const prevHeight = node?.scrollHeight ?? 0;
+    setLoadingOlder(true);
+    try {
+      const older = await messagingService.listMessages(chatId, {
+        before: oldest.created_at,
+        limit: MESSAGE_PAGE_SIZE,
+      });
+      if (chatId !== activeChatIdRef.current) return;
+      if (older.length) {
+        setMessages((prev) => [...older, ...prev]);
+        // Restore scroll position so the user stays anchored at the same
+        // message they were reading instead of jumping to the new top.
+        requestAnimationFrame(() => {
+          if (node) {
+            node.scrollTop = node.scrollHeight - prevHeight;
+          }
+        });
+      }
+      setHasMoreOlder(older.length === MESSAGE_PAGE_SIZE);
+    } catch (err) {
+      setError(err.message || "Failed to load older messages");
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [hasMoreOlder, loadingOlder, messages]);
 
   // Deep link via ?user=<id>. If the target is already a known contact we just
   // open that thread; otherwise create/find the direct chat and select it so
@@ -265,11 +308,15 @@ export default function Messages() {
     [loadContacts, selectContact]
   );
 
+  // Auto-scroll to bottom only when the latest message changes, not when
+  // older messages are prepended via pagination (which keeps the tail the
+  // same and would otherwise yank the user out of their scroll position).
+  const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   useEffect(() => {
-    if (threadRef.current) {
+    if (threadRef.current && lastMessageId) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
-  }, [messages.length]);
+  }, [lastMessageId, activeChatId]);
 
   const send = async (e) => {
     e.preventDefault();
@@ -369,6 +416,9 @@ export default function Messages() {
               sending={sending}
               error={error}
               onSend={send}
+              hasMoreOlder={hasMoreOlder}
+              loadingOlder={loadingOlder}
+              onLoadOlder={loadOlderMessages}
             />
           </div>
 
@@ -513,8 +563,23 @@ function ThreadPane({
   sending,
   error,
   onSend,
+  hasMoreOlder,
+  loadingOlder,
+  onLoadOlder,
 }) {
   const formRef = useRef(null);
+  const handleScroll = useCallback(
+    (e) => {
+      // Messenger-style: when the user reaches the top, fetch the next chunk
+      // of older messages. A small threshold avoids constant refires while
+      // still feeling instant on overscroll.
+      if (e.currentTarget.scrollTop <= 40 && hasMoreOlder && !loadingOlder) {
+        onLoadOlder?.();
+      }
+    },
+    [hasMoreOlder, loadingOlder, onLoadOlder]
+  );
+
   if (!activeContact) {
     return (
       <section className="messages-thread-pane">
@@ -532,7 +597,16 @@ function ThreadPane({
         <div className="messages-state">Loading…</div>
       ) : (
         <>
-          <div className="messages-thread" ref={threadRef}>
+          <div
+            className="messages-thread"
+            ref={threadRef}
+            onScroll={handleScroll}
+          >
+            {loadingOlder && (
+              <div className="messages-state messages-load-older">
+                Loading older messages…
+              </div>
+            )}
             {messages.length === 0 ? (
               <div className="messages-state">No messages yet. Say hi.</div>
             ) : (

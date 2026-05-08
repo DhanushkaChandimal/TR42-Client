@@ -1022,13 +1022,19 @@ class ChatService:
         return msg, None, 201
 
     @staticmethod
-    def list_messages(chat_id, user_id, after=None):
+    def list_messages(chat_id, user_id, after=None, before=None, limit=None):
         chat = ChatRepository.get_by_id(chat_id)
         if not chat:
             return None, "Chat not found", 404
         if not ChatService.can_user_access_chat(chat, user_id):
             return None, "Forbidden", 403
-        return MessageRepository.list_by_chat(chat_id, after=after), None, 200
+        return (
+            MessageRepository.list_by_chat(
+                chat_id, after=after, before=before, limit=limit
+            ),
+            None,
+            200,
+        )
 
 
 def _enum_value(value):

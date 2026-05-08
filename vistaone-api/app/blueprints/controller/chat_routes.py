@@ -112,14 +112,28 @@ def open_chat(user_id, wo_id):
 @chat_bp.route("/chats/<chat_id>/messages", methods=["GET"])
 @permission_required("workorders", "read")
 def list_messages(user_id, chat_id):
-    after_raw = request.args.get("after")
-    after = None
-    if after_raw:
+    def _parse_ts(raw):
+        if not raw:
+            return None
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+
+    try:
+        after = _parse_ts(request.args.get("after"))
+        before = _parse_ts(request.args.get("before"))
+    except ValueError:
+        return jsonify({"message": "Invalid timestamp"}), 400
+
+    limit = None
+    limit_raw = request.args.get("limit")
+    if limit_raw:
         try:
-            after = datetime.fromisoformat(after_raw.replace("Z", "+00:00"))
+            limit = max(1, min(int(limit_raw), 200))
         except ValueError:
-            return jsonify({"message": "Invalid 'after' timestamp"}), 400
-    msgs, err, code = ChatService.list_messages(chat_id, user_id, after=after)
+            return jsonify({"message": "Invalid 'limit' value"}), 400
+
+    msgs, err, code = ChatService.list_messages(
+        chat_id, user_id, after=after, before=before, limit=limit
+    )
     if err:
         return jsonify({"message": err}), code
     return jsonify({"messages": messages_schema.dump(msgs)}), 200

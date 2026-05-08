@@ -53,10 +53,27 @@ class ChatRepository:
 class MessageRepository:
 
     @staticmethod
-    def list_by_chat(chat_id, after=None):
+    def list_by_chat(chat_id, after=None, before=None, limit=None):
+        """Fetch messages for a chat, ordered oldest-first.
+
+        - `after`  : only messages created strictly after this timestamp.
+                     Used by realtime polling.
+        - `before` : only messages created strictly before this timestamp.
+                     Used by 'load older messages' pagination.
+        - `limit`  : when set, returns the most recent N matches and reverses
+                     them to ASC, so the caller still sees oldest-first.
+        """
         stmt = select(Message).where(Message.chat_id == chat_id)
         if after:
             stmt = stmt.where(Message.created_at > after)
+        if before:
+            stmt = stmt.where(Message.created_at < before)
+
+        if limit:
+            stmt = stmt.order_by(Message.created_at.desc()).limit(limit)
+            rows = db.session.execute(stmt).scalars().all()
+            return list(reversed(rows))
+
         stmt = stmt.order_by(Message.created_at.asc())
         return db.session.execute(stmt).scalars().all()
 
