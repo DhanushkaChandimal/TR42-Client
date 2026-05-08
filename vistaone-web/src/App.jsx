@@ -107,9 +107,9 @@ function App() {
             <Route
                 path="/admin/users"
                 element={
-                    <RoleProtectedRoute roles={["MASTER", "ADMIN"]}>
+                    <PermissionRoute resource="users">
                         <UserManagement />
-                    </RoleProtectedRoute>
+                    </PermissionRoute>
                 }
             />
             <Route
