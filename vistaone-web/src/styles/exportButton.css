@@ -32,7 +32,7 @@
 
 .export-btn {
   align-self: flex-end;
-  background: #1f3a8a;
+  background: #0a1f3b;
   color: #fff;
   border: none;
   padding: 8px 16px;
@@ -40,11 +40,11 @@
   font-weight: 600;
   border-radius: 4px;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background 0.12s;
 }
 
 .export-btn:hover:not(:disabled) {
-  background: #1e3a78;
+  background: #112d4e;
 }
 
 .export-btn:disabled {
