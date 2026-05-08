@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import { useAuthContext } from "../context/AuthContext";
 import ExportButton from "../components/ExportButton";
 import { exportService } from "../services/exportService";
 import { vendorService } from "../services/vendorService";
@@ -20,6 +21,8 @@ const complianceOptions = [
 ];
 
 export default function Vendors() {
+    const { hasPermission } = useAuthContext();
+    const canWrite = hasPermission("vendors", "write");
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -143,32 +146,34 @@ export default function Vendors() {
                 </select>
             </section>
 
-            <button
-                className="fab-create-vendor"
-                onClick={() => setShowCreateForm(!showCreateForm)}
-                title="Add Vendor"
-            >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="12" fill="#007bff" />
-                    <rect
-                        x="11"
-                        y="6"
-                        width="2"
-                        height="12"
-                        rx="1"
-                        fill="#fff"
-                    />
-                    <rect
-                        x="6"
-                        y="11"
-                        width="12"
-                        height="2"
-                        rx="1"
-                        fill="#fff"
-                    />
-                </svg>
-                <span className="fab-label">Add Vendor</span>
-            </button>
+            {canWrite && (
+                <button
+                    className="fab-create-vendor"
+                    onClick={() => setShowCreateForm(!showCreateForm)}
+                    title="Add Vendor"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="12" fill="#007bff" />
+                        <rect
+                            x="11"
+                            y="6"
+                            width="2"
+                            height="12"
+                            rx="1"
+                            fill="#fff"
+                        />
+                        <rect
+                            x="6"
+                            y="11"
+                            width="12"
+                            height="2"
+                            rx="1"
+                            fill="#fff"
+                        />
+                    </svg>
+                    <span className="fab-label">Add Vendor</span>
+                </button>
+            )}
 
             {showCreateForm && (
                 <section className="vendors-create-form">

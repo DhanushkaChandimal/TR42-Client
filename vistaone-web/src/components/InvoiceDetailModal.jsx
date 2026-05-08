@@ -31,7 +31,8 @@ export default function InvoiceDetailModal({
   onReject,
   onUndo,
 }) {
-  const { isAdmin } = useAuthContext();
+  const { hasPermission } = useAuthContext();
+  const canWrite = hasPermission("invoices", "write");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [showRejectForm, setShowRejectForm] = useState(false);
@@ -275,7 +276,7 @@ export default function InvoiceDetailModal({
             <div className="ticket-detail-action-message">{actionMessage}</div>
           )}
 
-          {invoice.invoice_status === "SUBMITTED" && !showRejectForm && (
+          {canWrite && invoice.invoice_status === "SUBMITTED" && !showRejectForm && (
             <div className="ticket-detail-actions">
               <button
                 className="ticket-btn-approve"
@@ -297,7 +298,7 @@ export default function InvoiceDetailModal({
             </div>
           )}
 
-          {invoice.invoice_status === "SUBMITTED" && showRejectForm && (
+          {canWrite && invoice.invoice_status === "SUBMITTED" && showRejectForm && (
             <RejectionForm
               loadRecipients={() =>
                 invoiceService.getNotificationRecipients(invoice.id)
@@ -314,7 +315,7 @@ export default function InvoiceDetailModal({
               <p className="ticket-detail-note ticket-detail-note-success">
                 This invoice has been approved.
               </p>
-              {isAdmin && (
+              {canWrite && (
                 <div className="ticket-detail-actions">
                   <button
                     className="ticket-btn-undo"
@@ -335,7 +336,7 @@ export default function InvoiceDetailModal({
               <p className="ticket-detail-note ticket-detail-note-error">
                 This invoice was rejected. The vendor will need to resubmit.
               </p>
-              {isAdmin && (
+              {canWrite && (
                 <div className="ticket-detail-actions">
                   <button
                     className="ticket-btn-undo"

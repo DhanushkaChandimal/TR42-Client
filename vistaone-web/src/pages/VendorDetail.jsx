@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import { useAuthContext } from "../context/AuthContext";
 import CreateWorkOrderModal from "../components/CreateWorkOrderModal";
 import { vendorService } from "../services/vendorService";
 import { workOrderService } from "../services/workOrderService";
@@ -32,6 +33,8 @@ function formatCurrency(v) {
 }
 
 export default function VendorDetail() {
+  const { hasPermission } = useAuthContext();
+  const canWriteWorkOrders = hasPermission("workorders", "write");
   const { vendorId } = useParams();
   const navigate = useNavigate();
   const [vendor, setVendor] = useState(null);
@@ -130,7 +133,8 @@ export default function VendorDetail() {
             >
               Back
             </button>
-            {vendor.status === "ACTIVE" &&
+            {canWriteWorkOrders &&
+              vendor.status === "ACTIVE" &&
               vendor.compliance_status === "COMPLETE" && (
                 <button
                   className="vendor-detail-create-wo"

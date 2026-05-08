@@ -4,6 +4,7 @@ import MapPicker from "./MapPicker";
 import { useWorkOrder } from "../hooks/useWorkOrder";
 import { vendorService } from "../services/vendorService";
 import { useWell } from "../hooks/useWell";
+import AddressFields, { validateZip } from "./AddressFields";
 
 const recurringOptions = [
   { value: "daily", label: "Daily" },
@@ -29,6 +30,11 @@ const emptyForm = {
   endDate: "",
   address_id: "",
   well: "",
+  street: "",
+  city: "",
+  state: "",
+  zip: "",
+  country: "US",
 };
 
 function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId }) {
@@ -40,6 +46,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
   const [markerPos, setMarkerPos] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [zipError, setZipError] = useState("");
   const { createWorkOrder } = useWorkOrder();
   const [vendors, setVendors] = useState([]);
   const [vendorsLoading, setVendorsLoading] = useState(true);
@@ -213,12 +220,20 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
       const city = (formData.city || "").trim();
       const state = (formData.state || "").trim();
       const zip = (formData.zip || "").trim();
+      const country = formData.country || "US";
       if (!street || !city || !state || !zip) {
         setError("Please complete the address fields.");
         setLoading(false);
         return;
       }
-      locationFields = { location: `${street}, ${city}, ${state} ${zip}` };
+      const zipErr = validateZip(zip, country);
+      if (zipErr) {
+        setZipError(zipErr);
+        setError("Please fix the ZIP code.");
+        setLoading(false);
+        return;
+      }
+      locationFields = { street, city, state, zip, country };
     } else {
       if (!formData.well) {
         setError("Please pick a well.");
@@ -262,6 +277,7 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
   const handleCloseModal = () => {
     setShowModal(false);
     setFormData(emptyForm);
+    setZipError("");
   };
 
   return createPortal(
@@ -530,48 +546,24 @@ function CreateWorkOrderModal({ setShowModal, fetchWorkOrders, prefilledVendorId
             </div>
           )}
           {formData.locationMethod === "address" && (
-            <div
-              className="workorder-address-fields"
-              style={{ marginBottom: 16 }}
-            >
-              <input
-                type="text"
-                name="street"
-                placeholder="Street Address"
-                value={formData.street || ""}
-                onChange={handleFormChange}
-                required
-                style={{ marginBottom: 8 }}
+            <div className="workorder-address-fields" style={{ marginBottom: 16 }}>
+              <AddressFields
+                values={{
+                  street: formData.street,
+                  city: formData.city,
+                  state: formData.state,
+                  zip: formData.zip,
+                  country: formData.country,
+                }}
+                onChange={(e) => {
+                  if (e.target.name === "country") setZipError("");
+                  handleFormChange(e);
+                }}
+                zipError={zipError}
+                onZipBlur={() =>
+                  setZipError(validateZip(formData.zip, formData.country || "US"))
+                }
               />
-              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                <input
-                  type="text"
-                  name="city"
-                  placeholder="City"
-                  value={formData.city || ""}
-                  onChange={handleFormChange}
-                  required
-                  style={{ flex: 2 }}
-                />
-                <input
-                  type="text"
-                  name="state"
-                  placeholder="State"
-                  value={formData.state || ""}
-                  onChange={handleFormChange}
-                  required
-                  style={{ flex: 1 }}
-                />
-                <input
-                  type="text"
-                  name="zip"
-                  placeholder="ZIP"
-                  value={formData.zip || ""}
-                  onChange={handleFormChange}
-                  required
-                  style={{ flex: 1 }}
-                />
-              </div>
             </div>
           )}
           {/* Date, priority, recurring */}

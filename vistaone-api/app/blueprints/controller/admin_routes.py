@@ -1,5 +1,5 @@
 from flask import request, jsonify, Blueprint
-from app.utils.util import role_required
+from app.utils.util import role_required, permission_required
 from app.blueprints.repository.user_repository import UserRepository
 from app.blueprints.enum.enums import UserStatus
 from app.models.user import User
@@ -15,7 +15,7 @@ ADMIN = "ADMIN"
 # ── User Management ──────────────────────────────────────────────────────────
 
 @admin_bp.route("/users", methods=["GET"])
-@role_required(MASTER, ADMIN)
+@permission_required("users", "read")
 def list_users(user_id):
     current_user = User.query.get(user_id)
     users = UserRepository.get_users_by_client(current_user.client_id)
@@ -23,7 +23,7 @@ def list_users(user_id):
 
 
 @admin_bp.route("/users/pending", methods=["GET"])
-@role_required(MASTER, ADMIN)
+@permission_required("users", "read")
 def list_pending_users(user_id):
     current_user = User.query.get(user_id)
     users = UserRepository.get_pending_users_by_client(current_user.client_id)
@@ -31,7 +31,7 @@ def list_pending_users(user_id):
 
 
 @admin_bp.route("/users/<target_user_id>/approve", methods=["POST"])
-@role_required(MASTER, ADMIN)
+@permission_required("users", "write")
 def approve_user(user_id, target_user_id):
     current_user = User.query.get(user_id)
     target = UserRepository.get_user_by_id(target_user_id)
@@ -45,7 +45,7 @@ def approve_user(user_id, target_user_id):
 
 
 @admin_bp.route("/users/<target_user_id>/reject", methods=["POST"])
-@role_required(MASTER, ADMIN)
+@permission_required("users", "write")
 def reject_user(user_id, target_user_id):
     current_user = User.query.get(user_id)
     target = UserRepository.get_user_by_id(target_user_id)
@@ -59,7 +59,7 @@ def reject_user(user_id, target_user_id):
 
 
 @admin_bp.route("/users/<target_user_id>", methods=["PUT"])
-@role_required(MASTER, ADMIN)
+@permission_required("users", "write")
 def update_user(user_id, target_user_id):
     current_user = User.query.get(user_id)
     target = UserRepository.get_user_by_id(target_user_id)
@@ -72,7 +72,7 @@ def update_user(user_id, target_user_id):
 
 
 @admin_bp.route("/users/<target_user_id>/roles", methods=["PUT"])
-@role_required(MASTER, ADMIN)
+@permission_required("users", "write")
 def set_user_roles(user_id, target_user_id):
     from app.models.permission import Permission
     current_user = User.query.get(user_id)

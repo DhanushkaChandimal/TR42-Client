@@ -47,7 +47,7 @@ def _vendor_label(v):
 
 
 @analytics_bp.route("/summary", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("analytics", "read")
 def analytics_summary(current_user_id):
     client_id = get_current_user_client_id()
 

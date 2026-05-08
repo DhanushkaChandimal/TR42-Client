@@ -53,7 +53,7 @@ def _iso(dt):
 
 
 @fraud_bp.route("/alerts", methods=["GET"])
-@permission_required("workorders", "read")
+@permission_required("fraud", "read")
 def fraud_alerts(current_user_id):
     client_id = get_current_user_client_id()
 

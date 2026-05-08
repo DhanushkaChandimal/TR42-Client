@@ -5,6 +5,7 @@ import { invoiceService } from "../services/invoiceService";
 import { workOrderService } from "../services/workOrderService";
 import { vendorService } from "../services/vendorService";
 import WorkOrderRecipients from "./WorkOrderRecipients";
+import AddressFields, { validateZip } from "./AddressFields";
 import "../styles/workOrderRecipients.css";
 
 const formatDate = (s) =>
@@ -39,6 +40,7 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [zipError, setZipError] = useState("");
   const [vendors, setVendors] = useState([]);
   const [deleting, setDeleting] = useState(false);
   const buildDraft = (wo) => ({
@@ -50,7 +52,11 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
     location_type: wo.location_type || "GPS",
     latitude: wo.latitude != null ? String(wo.latitude) : "",
     longitude: wo.longitude != null ? String(wo.longitude) : "",
-    location: wo.location || "",
+    street: wo.address?.street || "",
+    city: wo.address?.city || "",
+    state: wo.address?.state || "",
+    zip: wo.address?.zip || "",
+    country: wo.address?.country || "US",
   });
   const [draft, setDraft] = useState(() => buildDraft(workOrder));
 
@@ -79,6 +85,7 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
   const cancelEdit = () => {
     setEditMode(false);
     setSaveError("");
+    setZipError("");
   };
 
   const saveEdit = async () => {
@@ -101,13 +108,25 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
         well_id: null,
       };
     } else if (draft.location_type === "ADDRESS") {
-      if (!draft.location.trim()) {
-        setSaveError("Address required.");
+      if (!draft.street.trim() || !draft.city.trim() || !draft.zip.trim()) {
+        setSaveError("Street, city, and ZIP are required.");
+        setSaving(false);
+        return;
+      }
+      const country = draft.country || "US";
+      const zipErr = validateZip(draft.zip.trim(), country);
+      if (zipErr) {
+        setZipError(zipErr);
+        setSaveError("Please fix the ZIP code.");
         setSaving(false);
         return;
       }
       locationFields = {
-        location: draft.location.trim(),
+        street: draft.street.trim(),
+        city: draft.city.trim(),
+        state: draft.state.trim(),
+        zip: draft.zip.trim(),
+        country,
         latitude: null,
         longitude: null,
         well_id: null,
@@ -323,17 +342,23 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
                   </div>
                 )}
                 {draft.location_type === "ADDRESS" && (
-                  <label>
-                    Address
-                    <input
-                      type="text"
-                      value={draft.location}
-                      onChange={(e) =>
-                        setDraft((d) => ({ ...d, location: e.target.value }))
-                      }
-                      placeholder="Street, City, State ZIP"
-                    />
-                  </label>
+                  <AddressFields
+                    values={{
+                      street: draft.street,
+                      city: draft.city,
+                      state: draft.state,
+                      zip: draft.zip,
+                      country: draft.country,
+                    }}
+                    onChange={(e) => {
+                      if (e.target.name === "country") setZipError("");
+                      setDraft((d) => ({ ...d, [e.target.name]: e.target.value }));
+                    }}
+                    zipError={zipError}
+                    onZipBlur={() =>
+                      setZipError(validateZip(draft.zip, draft.country || "US"))
+                    }
+                  />
                 )}
                 {draft.location_type === "WELL" && (
                   <div style={{ fontSize: "0.85rem", color: "#666" }}>
@@ -394,8 +419,10 @@ export default function WorkOrderDetailModal({ workOrder, onClose, onSaved }) {
                 <dt>Location Type</dt><dd>{current.location_type || "—"}</dd>
                 <dt>Location</dt>
                 <dd>
-                  {current.location_type === "ADDRESS" && current.location
-                    ? current.location
+                  {current.location_type === "ADDRESS"
+                    ? current.address
+                      ? [current.address.street, current.address.city, current.address.state, current.address.zip].filter(Boolean).join(", ")
+                      : current.location || "—"
                     : current.latitude != null && current.longitude != null
                     ? `${current.latitude}, ${current.longitude}`
                     : "—"}
