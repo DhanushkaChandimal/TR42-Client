@@ -201,15 +201,43 @@ export default function Messages() {
     []
   );
 
-  // Deep link via ?user=<id>
+  // Deep link via ?user=<id>. If the target is already a known contact we just
+  // open that thread; otherwise create/find the direct chat and select it so
+  // the user lands inside the conversation instead of an empty Messages page.
+  const deepLinkAttemptedRef = useRef(null);
   useEffect(() => {
     if (!deepUser || loadingContacts) return;
+    if (deepLinkAttemptedRef.current === deepUser) return;
+    deepLinkAttemptedRef.current = deepUser;
+
+    setSearchParams({}, { replace: true });
+
     const found = contacts.find((c) => c.id === deepUser);
     if (found) {
       selectContact(found);
+      return;
     }
-    setSearchParams({}, { replace: true });
-  }, [deepUser, contacts, loadingContacts, selectContact, setSearchParams]);
+
+    (async () => {
+      try {
+        const [chat, ctx] = await Promise.all([
+          messagingService.openDirectChat(deepUser),
+          messagingService.getUserContext(deepUser).catch(() => null),
+        ]);
+        const contact = ctx?.contact;
+        selectContact({
+          id: deepUser,
+          chat_id: chat.id,
+          name: contact?.name || "Conversation",
+          role: (contact?.user_type || "user").toLowerCase(),
+          last_message: null,
+        });
+        loadContacts();
+      } catch (err) {
+        setError(err.message || "Failed to open conversation");
+      }
+    })();
+  }, [deepUser, contacts, loadingContacts, selectContact, setSearchParams, loadContacts]);
 
   const handleIncomingMessage = useCallback((row) => {
     if (row.chat_id === activeChatIdRef.current) {
