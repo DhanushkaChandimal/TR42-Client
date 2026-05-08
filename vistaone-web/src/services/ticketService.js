@@ -56,15 +56,31 @@ export const ticketService = {
     return await response.json();
   },
 
-  reject: async (ticketId, note) => {
-    const body = note != null ? JSON.stringify({ note }) : undefined;
+  reject: async (ticketId, note, recipientIds) => {
+    const payload = {};
+    if (note != null) payload.note = note;
+    if (Array.isArray(recipientIds) && recipientIds.length) {
+      payload.recipient_ids = recipientIds;
+    }
+    const hasBody = Object.keys(payload).length > 0;
     const response = await authFetch(`${TICKET_ENDPOINT}/${ticketId}/reject`, {
       method: "PUT",
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body,
+      headers: hasBody ? { "Content-Type": "application/json" } : undefined,
+      body: hasBody ? JSON.stringify(payload) : undefined,
     });
     if (!response.ok) await parseError(response, "Failed to reject ticket");
     return await response.json();
+  },
+
+  getNotificationRecipients: async (ticketId) => {
+    const response = await authFetch(
+      `${TICKET_ENDPOINT}/${ticketId}/notification-recipients`,
+      { method: "GET" }
+    );
+    if (!response.ok)
+      await parseError(response, "Failed to load recipients");
+    const data = await response.json();
+    return data.recipients || [];
   },
 
   setPending: async (ticketId) => {

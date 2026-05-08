@@ -22,6 +22,33 @@ def _bucket_counts(rows, all_keys):
 ## Service adds business logic like status transitions and line item totals
 
 
+def _format_invoice_rejection_message(invoice, rejecter, note):
+    amount = ""
+    if invoice.total_amount is not None:
+        amount = f" for ${float(invoice.total_amount):,.2f}"
+    label = f"Invoice {invoice.id[:8]}{amount}"
+    rejecter_name = (
+        " ".join(filter(None, [rejecter.first_name, rejecter.last_name])).strip()
+        or rejecter.username
+        or rejecter.email
+        if rejecter
+        else "the client"
+    )
+    contact_bits = []
+    if rejecter and rejecter.email:
+        contact_bits.append(rejecter.email)
+    if rejecter and getattr(rejecter, "contact_number", None):
+        contact_bits.append(rejecter.contact_number)
+    contact = " / ".join(contact_bits) if contact_bits else "no contact info on file"
+
+    lines = [
+        f"{label} has been rejected.",
+        f"Reason: {note}" if note else "No reason was provided.",
+        f"Please contact {rejecter_name} ({contact}) for next steps.",
+    ]
+    return "\n".join(lines)
+
+
 class InvoiceService:
 
     @staticmethod
@@ -131,7 +158,13 @@ class InvoiceService:
         return saved
 
     @staticmethod
-    def reject_invoice(invoice_id, current_user_id, client_id=None):
+    def reject_invoice(
+        invoice_id,
+        current_user_id,
+        client_id=None,
+        note=None,
+        recipient_ids=None,
+    ):
         invoice = InvoiceRepository.get_by_id(invoice_id, client_id=client_id)
         if not invoice:
             raise ValueError("Invoice not found")
@@ -141,6 +174,17 @@ class InvoiceService:
         invoice.last_modified_by = current_user_id
         saved = InvoiceRepository.update(invoice)
         logger.info(f"Invoice rejected: {saved.id}")
+
+        if recipient_ids:
+            from app.blueprints.services.chat_service import ChatService
+            from app.models.user import User
+            from app.extensions import db
+
+            cleaned = (note or "").strip()
+            rejecter = db.session.get(User, current_user_id)
+            body = _format_invoice_rejection_message(saved, rejecter, cleaned)
+            ChatService.fan_out_message(current_user_id, recipient_ids, body)
+
         return saved
 
     @staticmethod

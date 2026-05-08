@@ -959,6 +959,137 @@ class ChatService:
         }
 
     @staticmethod
+    def get_ticket_notification_recipients(ticket_id, exclude_user_id=None):
+        """Vendor users on the ticket's vendor plus the assigned contractor
+        user. Returned shape mirrors WO recipients so the frontend picker can
+        reuse the same components.
+        """
+        ticket = db.session.get(Ticket, ticket_id)
+        if not ticket:
+            return None
+
+        recipients = {}
+
+        if ticket.vendor_id:
+            for u, role in db.session.execute(
+                select(User, VendorUser.vendor_user_role)
+                .join(VendorUser, VendorUser.user_id == User.id)
+                .where(VendorUser.vendor_id == ticket.vendor_id)
+            ).all():
+                if exclude_user_id and u.id == exclude_user_id:
+                    continue
+                recipients[u.id] = {
+                    "id": u.id,
+                    "name": _full_name(u),
+                    "role": f"vendor:{role or 'member'}",
+                    "email": u.email,
+                    "phone": getattr(u, "contact_number", None),
+                }
+
+        if ticket.assigned_contractor:
+            row = db.session.execute(
+                text(
+                    "SELECT user_id FROM contractor "
+                    "WHERE id = :cid AND user_id IS NOT NULL"
+                ),
+                {"cid": ticket.assigned_contractor},
+            ).scalar()
+            if row and row != exclude_user_id and row not in recipients:
+                u = db.session.get(User, row)
+                if u:
+                    recipients[u.id] = {
+                        "id": u.id,
+                        "name": _full_name(u),
+                        "role": "contractor",
+                        "email": u.email,
+                        "phone": getattr(u, "contact_number", None),
+                    }
+
+        return list(recipients.values())
+
+    @staticmethod
+    def get_invoice_notification_recipients(invoice_id, exclude_user_id=None):
+        """Vendor users on the invoice's vendor plus contractor users assigned
+        to tickets on the invoice's work order.
+        """
+        invoice = db.session.get(Invoice, invoice_id)
+        if not invoice:
+            return None
+
+        recipients = {}
+
+        if invoice.vendor_id:
+            for u, role in db.session.execute(
+                select(User, VendorUser.vendor_user_role)
+                .join(VendorUser, VendorUser.user_id == User.id)
+                .where(VendorUser.vendor_id == invoice.vendor_id)
+            ).all():
+                if exclude_user_id and u.id == exclude_user_id:
+                    continue
+                recipients[u.id] = {
+                    "id": u.id,
+                    "name": _full_name(u),
+                    "role": f"vendor:{role or 'member'}",
+                    "email": u.email,
+                    "phone": getattr(u, "contact_number", None),
+                }
+
+        if invoice.work_order_id:
+            contractor_ids = db.session.execute(
+                select(Ticket.assigned_contractor)
+                .where(
+                    and_(
+                        Ticket.work_order_id == invoice.work_order_id,
+                        Ticket.assigned_contractor.isnot(None),
+                    )
+                )
+                .distinct()
+            ).scalars().all()
+            if contractor_ids:
+                user_ids = db.session.execute(
+                    text(
+                        "SELECT DISTINCT user_id FROM contractor "
+                        "WHERE id = ANY(:ids) AND user_id IS NOT NULL"
+                    ),
+                    {"ids": contractor_ids},
+                ).scalars().all()
+                for uid in user_ids:
+                    if not uid or uid == exclude_user_id or uid in recipients:
+                        continue
+                    u = db.session.get(User, uid)
+                    if u:
+                        recipients[u.id] = {
+                            "id": u.id,
+                            "name": _full_name(u),
+                            "role": "contractor",
+                            "email": u.email,
+                            "phone": getattr(u, "contact_number", None),
+                        }
+
+        return list(recipients.values())
+
+    @staticmethod
+    def fan_out_message(sender_id, recipient_ids, body):
+        """Send the same message body to a list of recipients individually,
+        each in its own 1-on-1 chat. Returns a list of (recipient_id, error)
+        tuples for any that failed; caller decides how to surface failures.
+        """
+        if not body or not body.strip():
+            return [(rid, "empty body") for rid in recipient_ids]
+
+        failures = []
+        for rid in recipient_ids:
+            if rid == sender_id:
+                continue
+            try:
+                chat, _ = ChatRepository.find_or_create(sender_id, rid)
+                MessageRepository.create(chat.id, sender_id, rid, body.strip())
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("fan_out_message to %s failed: %s", rid, exc)
+                failures.append((rid, str(exc)))
+        return failures
+
+    @staticmethod
     def open_direct_chat(current_user_id, recipient_id):
         """Open or return the global 1-on-1 chat between two users directly,
         without requiring a work order context.

@@ -14,6 +14,33 @@ def _bucket_counts(rows, all_keys):
     return out
 
 
+def _format_ticket_rejection_message(ticket, rejecter, note):
+    label = f"Ticket {ticket.id[:8]}"
+    description = (ticket.description or "").strip()
+    if description:
+        label = f"{label} ({description[:60]})"
+    rejecter_name = (
+        " ".join(filter(None, [rejecter.first_name, rejecter.last_name])).strip()
+        or rejecter.username
+        or rejecter.email
+        if rejecter
+        else "the client"
+    )
+    contact_bits = []
+    if rejecter and rejecter.email:
+        contact_bits.append(rejecter.email)
+    if rejecter and getattr(rejecter, "contact_number", None):
+        contact_bits.append(rejecter.contact_number)
+    contact = " / ".join(contact_bits) if contact_bits else "no contact info on file"
+
+    lines = [
+        f"{label} has been rejected.",
+        f"Reason: {note}" if note else "No reason was provided.",
+        f"Please contact {rejecter_name} ({contact}) for next steps.",
+    ]
+    return "\n".join(lines)
+
+
 class TicketService:
 
     @staticmethod
@@ -99,7 +126,13 @@ class TicketService:
         return saved
 
     @staticmethod
-    def reject_ticket(ticket_id, current_user_id, client_id=None, note=None):
+    def reject_ticket(
+        ticket_id,
+        current_user_id,
+        client_id=None,
+        note=None,
+        recipient_ids=None,
+    ):
         # Pull the ticket up front so we can stamp the rejection note onto
         # ticket.notes alongside the status change. The vendor and contractor
         # apps share this database, so writing the reason here is enough for
@@ -109,11 +142,23 @@ class TicketService:
             raise ValueError("Ticket not found")
         ticket.status = TicketStatusEnum.REJECTED
         ticket.updated_by = current_user_id
+        cleaned_note = note.strip() if note else ""
         if note is not None:
-            cleaned = note.strip()
-            ticket.notes = cleaned if cleaned else None
+            ticket.notes = cleaned_note or None
         saved = TicketRepository.update(ticket)
         logger.info(f"Ticket rejected: {saved.id}")
+
+        if recipient_ids:
+            # Notification is best-effort: a chat-send failure must not roll
+            # back the rejection itself.
+            from app.blueprints.services.chat_service import ChatService
+            from app.models.user import User
+            from app.extensions import db
+
+            rejecter = db.session.get(User, current_user_id)
+            body = _format_ticket_rejection_message(saved, rejecter, cleaned_note)
+            ChatService.fan_out_message(current_user_id, recipient_ids, body)
+
         return saved
 
     @staticmethod

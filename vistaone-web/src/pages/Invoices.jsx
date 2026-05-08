@@ -84,7 +84,11 @@ export default function Invoices() {
   } = usePaginatedList(fetcher);
 
   const approveInvoice = async (id) => { const u = await invoiceService.approve(id); refresh(); return u; };
-  const rejectInvoice = async (id) => { const u = await invoiceService.reject(id); refresh(); return u; };
+  const rejectInvoice = async (id, note, recipientIds) => {
+    const u = await invoiceService.reject(id, note, recipientIds);
+    refresh();
+    return u;
+  };
   const setInvoicePending = async (id) => { const u = await invoiceService.setPending(id); refresh(); return u; };
 
   const activeSort = parseSort(sortBy);
@@ -142,8 +146,8 @@ export default function Invoices() {
     return updated;
   };
 
-  const handleReject = async (invoiceId) => {
-    const updated = await rejectInvoice(invoiceId);
+  const handleReject = async (invoiceId, note, recipientIds) => {
+    const updated = await rejectInvoice(invoiceId, note, recipientIds);
     setSelectedInvoice(updated);
     return updated;
   };

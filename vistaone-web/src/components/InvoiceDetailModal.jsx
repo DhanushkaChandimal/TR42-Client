@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuthContext } from "../context/AuthContext";
 import { invoiceService } from "../services/invoiceService";
+import RejectionForm from "./RejectionForm";
 
 const formatDate = (s) => {
   if (!s) return "-";
@@ -33,6 +34,7 @@ export default function InvoiceDetailModal({
   const { isAdmin } = useAuthContext();
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [showRejectForm, setShowRejectForm] = useState(false);
   const [review, setReview] = useState(null);
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState("");
@@ -74,8 +76,25 @@ export default function InvoiceDetailModal({
 
   const handleApprove = () =>
     runAction(onApprove, "Invoice approved successfully");
-  const handleReject = () => runAction(onReject, "Invoice rejected");
   const handleUndo = () => runAction(onUndo, "Invoice reset to pending");
+
+  const handleRejectConfirm = async (note, recipientIds) => {
+    setActionLoading(true);
+    setActionMessage("");
+    try {
+      await onReject(invoice.id, note, recipientIds);
+      setActionMessage(
+        recipientIds.length
+          ? `Invoice rejected. Notified ${recipientIds.length} recipient(s).`
+          : "Invoice rejected."
+      );
+      setShowRejectForm(false);
+    } catch (err) {
+      setActionMessage(err.message || "Action failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const stop = (e) => e.stopPropagation();
 
@@ -256,7 +275,7 @@ export default function InvoiceDetailModal({
             <div className="ticket-detail-action-message">{actionMessage}</div>
           )}
 
-          {invoice.invoice_status === "SUBMITTED" && (
+          {invoice.invoice_status === "SUBMITTED" && !showRejectForm && (
             <div className="ticket-detail-actions">
               <button
                 className="ticket-btn-approve"
@@ -267,12 +286,27 @@ export default function InvoiceDetailModal({
               </button>
               <button
                 className="ticket-btn-reject"
-                onClick={handleReject}
+                onClick={() => {
+                  setShowRejectForm(true);
+                  setActionMessage("");
+                }}
                 disabled={actionLoading}
               >
-                {actionLoading ? "Processing..." : "Reject Invoice"}
+                Reject Invoice
               </button>
             </div>
+          )}
+
+          {invoice.invoice_status === "SUBMITTED" && showRejectForm && (
+            <RejectionForm
+              loadRecipients={() =>
+                invoiceService.getNotificationRecipients(invoice.id)
+              }
+              onSubmit={handleRejectConfirm}
+              onCancel={() => setShowRejectForm(false)}
+              submitting={actionLoading}
+              submitLabel="Confirm Rejection"
+            />
           )}
 
           {invoice.invoice_status === "APPROVED" && (

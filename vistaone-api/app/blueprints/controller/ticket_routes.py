@@ -134,10 +134,15 @@ def approve_ticket(current_user_id, ticket_id):
 def reject_ticket(current_user_id, ticket_id):
     payload = request.get_json(silent=True) or {}
     note = payload.get("note")
+    recipient_ids = payload.get("recipient_ids") or []
     try:
         client_id = get_current_user_client_id()
         ticket = TicketService.reject_ticket(
-            ticket_id, current_user_id, client_id=client_id, note=note
+            ticket_id,
+            current_user_id,
+            client_id=client_id,
+            note=note,
+            recipient_ids=recipient_ids,
         )
         return ticket_schema.jsonify(ticket), 200
     except ValueError:
@@ -145,6 +150,19 @@ def reject_ticket(current_user_id, ticket_id):
     except Exception as e:
         logger.error(f"Error rejecting ticket: {e}")
         return jsonify({"error": str(e)}), 400
+
+
+@ticket_bp.route("/<string:ticket_id>/notification-recipients", methods=["GET"])
+@permission_required("workorders", "read")
+def list_ticket_notification_recipients(current_user_id, ticket_id):
+    from app.blueprints.services.chat_service import ChatService
+
+    recipients = ChatService.get_ticket_notification_recipients(
+        ticket_id, exclude_user_id=current_user_id
+    )
+    if recipients is None:
+        return jsonify({"error": "Ticket not found"}), 404
+    return jsonify({"recipients": recipients}), 200
 
 
 @ticket_bp.route("/<string:ticket_id>/set-pending", methods=["PUT"])
