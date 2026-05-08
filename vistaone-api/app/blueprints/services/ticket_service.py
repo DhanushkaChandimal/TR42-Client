@@ -15,30 +15,55 @@ def _bucket_counts(rows, all_keys):
 
 
 def _format_ticket_rejection_message(ticket, rejecter, note):
-    label = f"Ticket {ticket.id[:8]}"
+    rejecter_name = _rejecter_display_name(rejecter)
+    contact = _rejecter_contact_line(rejecter)
     description = (ticket.description or "").strip()
-    if description:
-        label = f"{label} ({description[:60]})"
-    rejecter_name = (
-        " ".join(filter(None, [rejecter.first_name, rejecter.last_name])).strip()
-        or rejecter.username
-        or rejecter.email
-        if rejecter
-        else "the client"
-    )
-    contact_bits = []
-    if rejecter and rejecter.email:
-        contact_bits.append(rejecter.email)
-    if rejecter and getattr(rejecter, "contact_number", None):
-        contact_bits.append(rejecter.contact_number)
-    contact = " / ".join(contact_bits) if contact_bits else "no contact info on file"
 
     lines = [
-        f"{label} has been rejected.",
-        f"Reason: {note}" if note else "No reason was provided.",
-        f"Please contact {rejecter_name} ({contact}) for next steps.",
+        "Hello,",
+        "",
+        "A ticket associated with you has been brought to our attention and "
+        "requires review. After review on our end, the ticket has been "
+        "rejected and will need follow-up before it can be approved.",
+        "",
+        f"Ticket reference: {ticket.id[:8]}",
     ]
+    if description:
+        lines.append(f"Description: {description}")
+    lines.extend([
+        "",
+        f"Reason for rejection: {note}" if note else
+        "Reason for rejection: not provided.",
+        "",
+        f"Please reach out to {rejecter_name} at your earliest convenience "
+        "to discuss next steps.",
+        f"Contact: {contact}",
+        "",
+        "Thank you,",
+        rejecter_name,
+    ])
     return "\n".join(lines)
+
+
+def _rejecter_display_name(rejecter):
+    if not rejecter:
+        return "the client"
+    full = " ".join(
+        filter(None, [rejecter.first_name, rejecter.last_name])
+    ).strip()
+    return full or rejecter.username or rejecter.email or "the client"
+
+
+def _rejecter_contact_line(rejecter):
+    if not rejecter:
+        return "no contact info on file"
+    parts = []
+    if rejecter.email:
+        parts.append(rejecter.email)
+    phone = getattr(rejecter, "contact_number", None)
+    if phone:
+        parts.append(phone)
+    return " | ".join(parts) if parts else "no contact info on file"
 
 
 class TicketService:

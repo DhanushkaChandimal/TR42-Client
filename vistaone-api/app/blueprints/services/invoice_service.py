@@ -23,29 +23,42 @@ def _bucket_counts(rows, all_keys):
 
 
 def _format_invoice_rejection_message(invoice, rejecter, note):
-    amount = ""
-    if invoice.total_amount is not None:
-        amount = f" for ${float(invoice.total_amount):,.2f}"
-    label = f"Invoice {invoice.id[:8]}{amount}"
-    rejecter_name = (
-        " ".join(filter(None, [rejecter.first_name, rejecter.last_name])).strip()
-        or rejecter.username
-        or rejecter.email
-        if rejecter
-        else "the client"
+    from app.blueprints.services.ticket_service import (
+        _rejecter_display_name,
+        _rejecter_contact_line,
     )
-    contact_bits = []
-    if rejecter and rejecter.email:
-        contact_bits.append(rejecter.email)
-    if rejecter and getattr(rejecter, "contact_number", None):
-        contact_bits.append(rejecter.contact_number)
-    contact = " / ".join(contact_bits) if contact_bits else "no contact info on file"
+
+    rejecter_name = _rejecter_display_name(rejecter)
+    contact = _rejecter_contact_line(rejecter)
+    amount = (
+        f"${float(invoice.total_amount):,.2f}"
+        if invoice.total_amount is not None
+        else None
+    )
 
     lines = [
-        f"{label} has been rejected.",
-        f"Reason: {note}" if note else "No reason was provided.",
-        f"Please contact {rejecter_name} ({contact}) for next steps.",
+        "Hello,",
+        "",
+        "An invoice associated with you has been brought to our attention "
+        "and requires review. After review on our end, the invoice has been "
+        "rejected and will need follow-up before it can be approved.",
+        "",
+        f"Invoice reference: {invoice.id[:8]}",
     ]
+    if amount:
+        lines.append(f"Amount: {amount}")
+    lines.extend([
+        "",
+        f"Reason for rejection: {note}" if note else
+        "Reason for rejection: not provided.",
+        "",
+        f"Please reach out to {rejecter_name} at your earliest convenience "
+        "to discuss next steps.",
+        f"Contact: {contact}",
+        "",
+        "Thank you,",
+        rejecter_name,
+    ])
     return "\n".join(lines)
 
 
