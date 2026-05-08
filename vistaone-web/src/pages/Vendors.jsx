@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import AppShell from "../components/AppShell";
 import { useAuthContext } from "../context/AuthContext";
 import ExportButton from "../components/ExportButton";
 import VendorCard from "../components/VendorCard";
 import { exportService } from "../services/exportService";
 import { vendorService } from "../services/vendorService";
+import { qk } from "../lib/queryKeys";
 import "../styles/vendors.css";
 import "../styles/vendor-marketplace.css";
 
@@ -31,17 +33,18 @@ const sortOptions = [
     { value: "created_at|desc", label: "Newest" },
 ];
 
+async function fetchMe() {
+    const res = await fetch("/api/users/me", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+}
+
 export default function Vendors() {
     const { hasPermission } = useAuthContext();
     const canWrite = hasPermission("vendors", "write");
-    const [vendors, setVendors] = useState([]);
-    const [total, setTotal] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-
-    const [services, setServices] = useState([]);
-    const [favoriteIds, setFavoriteIds] = useState(new Set());
-    const [clientId, setClientId] = useState(null);
+    const queryClient = useQueryClient();
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -51,7 +54,7 @@ export default function Vendors() {
     const [sortValue, setSortValue] = useState("company_name|asc");
 
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState("");
     const [formData, setFormData] = useState({
         company_name: "",
         company_code: "",
@@ -66,91 +69,62 @@ export default function Vendors() {
         return () => clearTimeout(id);
     }, [searchTerm]);
 
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const [serviceList, me] = await Promise.all([
-                    vendorService.listServices().catch(() => []),
-                    fetch("/api/users/me", {
-                        headers: {
-                            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-                        },
-                    })
-                        .then((r) => (r.ok ? r.json() : null))
-                        .catch(() => null),
-                ]);
-                if (cancelled) return;
-                setServices(serviceList || []);
-                if (me?.company_id) {
-                    setClientId(me.company_id);
-                    try {
-                        const favs = await vendorService.getFavorites(me.company_id);
-                        if (!cancelled) setFavoriteIds(new Set(favs.map((v) => v.id)));
-                    } catch {
-                        // Favourites optional.
-                    }
-                }
-            } catch (err) {
-                if (!cancelled) setError(err.message || "Failed to load filters");
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    const meQuery = useQuery({ queryKey: qk.users.me, queryFn: fetchMe });
+    const clientId = meQuery.data?.company_id || null;
 
-    const fetchVendors = useCallback(async () => {
-        const [sort_by, order] = sortValue.split("|");
-        setLoading(true);
-        try {
-            const res = await vendorService.search({
-                scope: "engaged",
-                q: debouncedSearch,
-                service_id: serviceFilter,
-                status: statusFilter,
-                compliance: complianceFilter,
-                sort_by,
-                order,
-                page: 1,
-                per_page: PAGE_SIZE,
+    const servicesQuery = useQuery({
+        queryKey: qk.vendors.services(),
+        queryFn: () => vendorService.listServices(),
+        staleTime: 10 * 60 * 1000,
+    });
+    const services = servicesQuery.data || [];
+
+    const favoritesQuery = useQuery({
+        queryKey: qk.vendors.favorites(clientId),
+        queryFn: () => vendorService.getFavorites(clientId),
+        enabled: !!clientId,
+    });
+    const favoriteIds = new Set((favoritesQuery.data || []).map((v) => v.id));
+
+    const [sort_by, order] = sortValue.split("|");
+    const listParams = {
+        scope: "engaged",
+        q: debouncedSearch,
+        service_id: serviceFilter,
+        status: statusFilter,
+        compliance: complianceFilter,
+        sort_by,
+        order,
+        page: 1,
+        per_page: PAGE_SIZE,
+    };
+    const vendorsQuery = useQuery({
+        queryKey: qk.vendors.list(listParams),
+        queryFn: () => vendorService.search(listParams),
+        placeholderData: (prev) => prev,
+    });
+    const vendors = vendorsQuery.data?.items || [];
+    const total = vendorsQuery.data?.total || 0;
+    const loading = vendorsQuery.isLoading;
+
+    const addFavorite = useMutation({
+        mutationFn: (vendorId) =>
+            vendorService.addFavorite(clientId, vendorId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: qk.vendors.favorites(clientId),
             });
-            setVendors(res.items || []);
-            setTotal(res.total || 0);
-            setError("");
-        } catch (err) {
-            setError(err.message || "Failed to load vendors");
-        } finally {
-            setLoading(false);
-        }
-    }, [debouncedSearch, serviceFilter, statusFilter, complianceFilter, sortValue]);
+            queryClient.invalidateQueries({ queryKey: qk.vendors.all });
+        },
+        onError: (err) =>
+            setError(err.message || "Failed to add to favorites"),
+    });
 
-    useEffect(() => {
-        fetchVendors();
-    }, [fetchVendors]);
-
-    const handleAddFavorite = async (vendorId) => {
-        if (!clientId) return;
-        try {
-            await vendorService.addFavorite(clientId, vendorId);
-            setFavoriteIds((prev) => new Set(prev).add(vendorId));
-        } catch (err) {
-            setError(err.message || "Failed to add to favorites");
-        }
-    };
-
-    const handleFormChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleCreateVendor = async (e) => {
-        e.preventDefault();
-        if (!formData.company_name.trim() || !formData.company_email.trim()) {
-            return;
-        }
-        try {
-            setCreating(true);
-            await vendorService.create(formData);
+    const createVendor = useMutation({
+        mutationFn: (payload) => vendorService.create(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: qk.vendors.all });
+            setShowCreateForm(false);
             setFormData({
                 company_name: "",
                 company_code: "",
@@ -159,14 +133,25 @@ export default function Vendors() {
                 company_phone: "",
                 description: "",
             });
-            setShowCreateForm(false);
-            fetchVendors();
-        } catch (err) {
-            setError(err.message || "Failed to create vendor");
-        } finally {
-            setCreating(false);
-        }
+        },
+        onError: (err) => setError(err.message || "Failed to create vendor"),
+    });
+
+    const handleFormChange = (e) =>
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+
+    const handleCreateVendor = (e) => {
+        e.preventDefault();
+        if (!formData.company_name.trim() || !formData.company_email.trim()) return;
+        setError("");
+        createVendor.mutate(formData);
     };
+
+    const fetchError =
+        vendorsQuery.error?.message ||
+        servicesQuery.error?.message ||
+        meQuery.error?.message ||
+        "";
 
     return (
         <AppShell
@@ -176,7 +161,9 @@ export default function Vendors() {
             loadingText="Loading vendors..."
             controls={<ExportButton onExport={exportService.vendors} />}
         >
-            {error && <div className="vendors-error">{error}</div>}
+            {(error || fetchError) && (
+                <div className="vendors-error">{error || fetchError}</div>
+            )}
 
             <section className="vm-controls">
                 <input
@@ -325,9 +312,9 @@ export default function Vendors() {
                             <button
                                 type="submit"
                                 className="vendors-btn-submit"
-                                disabled={creating}
+                                disabled={createVendor.isPending}
                             >
-                                {creating ? "Creating..." : "Create Vendor"}
+                                {createVendor.isPending ? "Creating..." : "Create Vendor"}
                             </button>
                         </div>
                     </form>
@@ -348,7 +335,7 @@ export default function Vendors() {
                             vendor={vendor}
                             isFavorite={favoriteIds.has(vendor.id)}
                             canFavorite={!!clientId}
-                            onAddFavorite={handleAddFavorite}
+                            onAddFavorite={(id) => addFavorite.mutate(id)}
                         />
                     ))
                 )}

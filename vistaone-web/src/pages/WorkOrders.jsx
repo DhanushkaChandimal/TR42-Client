@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
+import { qk } from "../lib/queryKeys";
 import AppShell from "../components/AppShell";
 import { useAuthContext } from "../context/AuthContext";
 import ExportButton from "../components/ExportButton";
@@ -76,20 +77,13 @@ export default function WorkOrders() {
   const [showModal, setShowModal] = useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
 
-  const fetcher = useCallback(
-    (page, perPage) => {
-      const { column, direction } = parseSort(sortBy);
-      return workOrderService.search({
-        q: searchTerm.trim(),
-        status: statusFilter === "ALL" ? "" : statusFilter,
-        sort_by: SORT_COLUMN_MAP[column] || "created_at",
-        order: direction || "desc",
-        page,
-        per_page: perPage,
-      });
-    },
-    [searchTerm, statusFilter, sortBy],
-  );
+  const { column, direction } = parseSort(sortBy);
+  const listFilters = {
+    q: searchTerm.trim(),
+    status: statusFilter === "ALL" ? "" : statusFilter,
+    sort_by: SORT_COLUMN_MAP[column] || "created_at",
+    order: direction || "desc",
+  };
 
   const {
     items: filteredOrders,
@@ -101,7 +95,11 @@ export default function WorkOrders() {
     setPage,
     setPerPage,
     refresh,
-  } = usePaginatedList(fetcher);
+  } = usePaginatedList({
+    queryKey: qk.workorders.list(listFilters),
+    queryFn: (p, pp) =>
+      workOrderService.search({ ...listFilters, page: p, per_page: pp }),
+  });
 
   const activeSort = parseSort(sortBy);
   const handleHeaderSort = (column) => setSortBy(nextSortFor(column, sortBy));

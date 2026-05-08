@@ -1,57 +1,61 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 /**
- * Drives a server-paginated list. Caller supplies a `fetcher(page, perPage)`
- * that resolves to `{ data, total, pages }`. The fetcher should be memoized
- * via useCallback with the filter deps it cares about so changing filters
- * triggers a refetch and resets to page 1.
+ * Drives a server-paginated list, backed by React Query so the same filter
+ * combination shows cached pages instantly on revisit.
+ *
+ *   usePaginatedList({
+ *     queryKey: ["tickets", "list", { q, status }],
+ *     queryFn: (page, perPage) =>
+ *       ticketService.search({ q, status, page, per_page: perPage }),
+ *   });
+ *
+ * The query key automatically appends `{ page, perPage }`, so callers only
+ * include the filter portion. When the filter portion changes the hook
+ * resets to page 1.
  */
-export function usePaginatedList(fetcher, { initialPerPage = 10 } = {}) {
-    const [items, setItems] = useState([]);
-    const [total, setTotal] = useState(0);
-    const [pages, setPages] = useState(0);
+export function usePaginatedList({
+    queryKey,
+    queryFn,
+    initialPerPage = 10,
+    enabled = true,
+}) {
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(initialPerPage);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
 
-    // Reset to page 1 whenever filters (and therefore the fetcher identity) change.
+    const serializedKey = useMemo(() => JSON.stringify(queryKey), [queryKey]);
+    const prevKeyRef = useRef(serializedKey);
     useEffect(() => {
-        setPage(1);
-    }, [fetcher]);
-
-    const load = useCallback(async () => {
-        setLoading(true);
-        setError("");
-        try {
-            const res = await fetcher(page, perPage);
-            setItems(Array.isArray(res?.data) ? res.data : []);
-            setTotal(res?.total ?? 0);
-            setPages(res?.pages ?? 0);
-        } catch (err) {
-            setError(err?.message || "Failed to load");
-            setItems([]);
-            setTotal(0);
-            setPages(0);
-        } finally {
-            setLoading(false);
+        if (prevKeyRef.current !== serializedKey) {
+            setPage(1);
+            prevKeyRef.current = serializedKey;
         }
-    }, [fetcher, page, perPage]);
+    }, [serializedKey]);
 
-    useEffect(() => {
-        load();
-    }, [load]);
+    const fullKey = useMemo(
+        () => [...(queryKey || []), { page, perPage }],
+        [queryKey, page, perPage]
+    );
 
+    const query = useQuery({
+        queryKey: fullKey,
+        queryFn: () => queryFn(page, perPage),
+        enabled: enabled && !!queryFn,
+        placeholderData: (prev) => prev,
+    });
+
+    const data = query.data;
     return {
-        items,
-        total,
-        pages,
+        items: Array.isArray(data?.data) ? data.data : [],
+        total: data?.total ?? 0,
+        pages: data?.pages ?? 0,
         page,
         perPage,
-        loading,
-        error,
+        loading: query.isLoading || query.isFetching,
+        error: query.error?.message || "",
         setPage,
         setPerPage,
-        refresh: load,
+        refresh: query.refetch,
     };
 }

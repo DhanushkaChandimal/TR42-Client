@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
+import { qk } from "../lib/queryKeys";
 import AppShell from "../components/AppShell";
 import CreateOrEditWellModal from "../components/CreateOrEditWellModal";
 import Pagination from "../components/Pagination";
@@ -43,19 +44,12 @@ export default function Wells() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("created_desc");
 
-  const fetcher = useCallback(
-    (page, perPage) => {
-      const { column, direction } = parseSort(sortBy);
-      return searchWells({
-        q: searchTerm.trim(),
-        page,
-        per_page: perPage,
-        sort_by: SORT_COLUMN_MAP[column] || "created_at",
-        order: direction || "desc",
-      });
-    },
-    [searchTerm, sortBy],
-  );
+  const { column, direction } = parseSort(sortBy);
+  const listFilters = {
+    q: searchTerm.trim(),
+    sort_by: SORT_COLUMN_MAP[column] || "created_at",
+    order: direction || "desc",
+  };
 
   const {
     items: wells,
@@ -67,7 +61,11 @@ export default function Wells() {
     setPage,
     setPerPage,
     refresh,
-  } = usePaginatedList(fetcher);
+  } = usePaginatedList({
+    queryKey: qk.wells.list(listFilters),
+    queryFn: (p, pp) =>
+      searchWells({ ...listFilters, page: p, per_page: pp }),
+  });
 
   const handleSubmitWell = async (wellData) => {
     if (editWell) {

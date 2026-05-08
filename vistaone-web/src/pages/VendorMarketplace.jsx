@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+    useInfiniteQuery,
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
 import AppShell from "../components/AppShell";
 import VendorCard from "../components/VendorCard";
 import { vendorService } from "../services/vendorService";
+import { qk } from "../lib/queryKeys";
 import "../styles/vendor-marketplace.css";
 
 const PAGE_SIZE = 30;
@@ -27,18 +34,16 @@ const sortOptions = [
     { value: "created_at|desc", label: "Newest" },
 ];
 
-export default function VendorMarketplace() {
-    const [vendors, setVendors] = useState([]);
-    const [total, setTotal] = useState(0);
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(false);
-    const [loadingPage, setLoadingPage] = useState(false);
-    const [appendingPage, setAppendingPage] = useState(false);
+async function fetchMe() {
+    const res = await fetch("/api/users/me", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+}
 
-    const [services, setServices] = useState([]);
-    const [favoriteIds, setFavoriteIds] = useState(new Set());
-    const [clientId, setClientId] = useState(null);
-    const [error, setError] = useState("");
+export default function VendorMarketplace() {
+    const queryClient = useQueryClient();
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -46,94 +51,57 @@ export default function VendorMarketplace() {
     const [statusFilter, setStatusFilter] = useState("");
     const [complianceFilter, setComplianceFilter] = useState("");
     const [sortValue, setSortValue] = useState("company_name|asc");
+    const [error, setError] = useState("");
 
     const sentinelRef = useRef(null);
-    const requestIdRef = useRef(0);
 
-    // Debounce the search box so we don't fire a request per keystroke.
     useEffect(() => {
         const id = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
         return () => clearTimeout(id);
     }, [searchTerm]);
 
-    // Load static dropdown data + favourites once.
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const [serviceList, me] = await Promise.all([
-                    vendorService.listServices().catch(() => []),
-                    fetch("/api/users/me", {
-                        headers: {
-                            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-                        },
-                    })
-                        .then((r) => (r.ok ? r.json() : null))
-                        .catch(() => null),
-                ]);
-                if (cancelled) return;
-                setServices(serviceList || []);
-                if (me?.company_id) {
-                    setClientId(me.company_id);
-                    try {
-                        const favs = await vendorService.getFavorites(me.company_id);
-                        if (!cancelled) setFavoriteIds(new Set(favs.map((v) => v.id)));
-                    } catch {
-                        // Favourites optional; surface nothing.
-                    }
-                }
-            } catch (err) {
-                if (!cancelled) setError(err.message || "Failed to load filters");
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    const meQuery = useQuery({ queryKey: qk.users.me, queryFn: fetchMe });
+    const clientId = meQuery.data?.company_id || null;
 
-    const fetchPage = useCallback(
-        async (pageNum, mode) => {
-            const [sort_by, order] = sortValue.split("|");
-            const myRequest = ++requestIdRef.current;
-            if (mode === "replace") setLoadingPage(true);
-            else setAppendingPage(true);
-            try {
-                const res = await vendorService.search({
-                    q: debouncedSearch,
-                    service_id: serviceFilter,
-                    status: statusFilter,
-                    compliance: complianceFilter,
-                    sort_by,
-                    order,
-                    page: pageNum,
-                    per_page: PAGE_SIZE,
-                });
-                // Drop stale responses if the user kept typing/filtering.
-                if (myRequest !== requestIdRef.current) return;
-                setTotal(res.total || 0);
-                setHasMore(!!res.has_more);
-                setPage(pageNum);
-                setVendors((prev) =>
-                    mode === "append" ? [...prev, ...(res.items || [])] : res.items || []
-                );
-                setError("");
-            } catch (err) {
-                if (myRequest !== requestIdRef.current) return;
-                setError(err.message || "Failed to load vendors");
-            } finally {
-                if (myRequest === requestIdRef.current) {
-                    setLoadingPage(false);
-                    setAppendingPage(false);
-                }
-            }
-        },
-        [debouncedSearch, serviceFilter, statusFilter, complianceFilter, sortValue]
-    );
+    const servicesQuery = useQuery({
+        queryKey: qk.vendors.services(),
+        queryFn: () => vendorService.listServices(),
+        staleTime: 10 * 60 * 1000,
+    });
+    const services = servicesQuery.data || [];
 
-    // Reset to page 1 whenever filters change.
-    useEffect(() => {
-        fetchPage(1, "replace");
-    }, [fetchPage]);
+    const favoritesQuery = useQuery({
+        queryKey: qk.vendors.favorites(clientId),
+        queryFn: () => vendorService.getFavorites(clientId),
+        enabled: !!clientId,
+    });
+    const favoriteIds = new Set((favoritesQuery.data || []).map((v) => v.id));
+
+    const [sort_by, order] = sortValue.split("|");
+    const filterParams = {
+        q: debouncedSearch,
+        service_id: serviceFilter,
+        status: statusFilter,
+        compliance: complianceFilter,
+        sort_by,
+        order,
+    };
+
+    const list = useInfiniteQuery({
+        queryKey: qk.vendors.list(filterParams),
+        initialPageParam: 1,
+        queryFn: ({ pageParam }) =>
+            vendorService.search({
+                ...filterParams,
+                page: pageParam,
+                per_page: PAGE_SIZE,
+            }),
+        getNextPageParam: (lastPage, _pages, lastPageParam) =>
+            lastPage?.has_more ? lastPageParam + 1 : undefined,
+    });
+
+    const vendors = (list.data?.pages || []).flatMap((p) => p.items || []);
+    const total = list.data?.pages?.[0]?.total || 0;
 
     // Infinite scroll: fetch the next page when the sentinel enters the viewport.
     useEffect(() => {
@@ -141,40 +109,47 @@ export default function VendorMarketplace() {
         if (!node) return;
         const observer = new IntersectionObserver(
             (entries) => {
-                const entry = entries[0];
                 if (
-                    entry.isIntersecting &&
-                    hasMore &&
-                    !loadingPage &&
-                    !appendingPage
+                    entries[0].isIntersecting &&
+                    list.hasNextPage &&
+                    !list.isFetchingNextPage
                 ) {
-                    fetchPage(page + 1, "append");
+                    list.fetchNextPage();
                 }
             },
             { rootMargin: "200px 0px" }
         );
         observer.observe(node);
         return () => observer.disconnect();
-    }, [hasMore, loadingPage, appendingPage, page, fetchPage]);
+    }, [list]);
 
-    const handleAddFavorite = async (vendorId) => {
-        if (!clientId) return;
-        try {
-            await vendorService.addFavorite(clientId, vendorId);
-            setFavoriteIds((prev) => new Set(prev).add(vendorId));
-        } catch (err) {
-            setError(err.message || "Failed to add to favorites");
-        }
-    };
+    const addFavorite = useMutation({
+        mutationFn: (vendorId) =>
+            vendorService.addFavorite(clientId, vendorId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: qk.vendors.favorites(clientId),
+            });
+        },
+        onError: (err) => setError(err.message || "Failed to add favorite"),
+    });
+
+    const fetchError =
+        list.error?.message ||
+        servicesQuery.error?.message ||
+        meQuery.error?.message ||
+        "";
 
     return (
         <AppShell
             title="Vendor Marketplace"
             subtitle="Browse, search, and add vendors to your favorites"
-            loading={loadingPage && vendors.length === 0}
+            loading={list.isLoading}
             loadingText="Loading vendors..."
         >
-            {error && <div className="vm-error">{error}</div>}
+            {(error || fetchError) && (
+                <div className="vm-error">{error || fetchError}</div>
+            )}
 
             <section className="vm-controls">
                 <input
@@ -237,7 +212,7 @@ export default function VendorMarketplace() {
             </p>
 
             <section className="vm-grid">
-                {!loadingPage && vendors.length === 0 ? (
+                {!list.isLoading && vendors.length === 0 ? (
                     <div className="vm-empty">No vendors match your search</div>
                 ) : (
                     vendors.map((vendor) => (
@@ -246,17 +221,17 @@ export default function VendorMarketplace() {
                             vendor={vendor}
                             isFavorite={favoriteIds.has(vendor.id)}
                             canFavorite={!!clientId}
-                            onAddFavorite={handleAddFavorite}
+                            onAddFavorite={(id) => addFavorite.mutate(id)}
                         />
                     ))
                 )}
             </section>
 
             <div ref={sentinelRef} className="vm-sentinel" aria-hidden="true" />
-            {appendingPage && (
+            {list.isFetchingNextPage && (
                 <div className="vm-loading-more">Loading more vendors…</div>
             )}
-            {!hasMore && vendors.length > 0 && (
+            {!list.hasNextPage && vendors.length > 0 && (
                 <div className="vm-end">You've reached the end.</div>
             )}
         </AppShell>

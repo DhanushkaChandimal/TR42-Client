@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { qk } from "../lib/queryKeys";
 import {
   Bar,
   BarChart,
@@ -65,29 +66,14 @@ const EMPTY_SUMMARY = {
 };
 
 export default function Analytics() {
-  const [summary, setSummary] = useState(EMPTY_SUMMARY);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    analyticsService
-      .getSummary()
-      .then((data) => {
-        if (cancelled) return;
-        setSummary({ ...EMPTY_SUMMARY, ...data });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err.message || "Failed to load analytics");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const summaryQuery = useQuery({
+    queryKey: qk.analytics.overview(),
+    queryFn: () => analyticsService.getSummary(),
+    staleTime: 2 * 60 * 1000,
+  });
+  const summary = { ...EMPTY_SUMMARY, ...(summaryQuery.data || {}) };
+  const loading = summaryQuery.isLoading;
+  const error = summaryQuery.error?.message || "";
 
   const stats = summary.vendor_ticket_stats;
   const sharedServices = summary.vendors_by_shared_service;
