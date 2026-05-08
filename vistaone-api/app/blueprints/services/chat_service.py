@@ -800,6 +800,145 @@ class ChatService:
         return out
 
     @staticmethod
+    def get_findable_contacts(user_id, client_id):
+        """Return contacts grouped into three categories for 'New Conversation' discovery:
+        - company_colleagues: other active users in the same client
+        - vendor_favourites: users enrolled in the client's favourite vendors
+        - ticket_contractors: contractor users name-matched from ticket records
+
+        Users are deduplicated across groups (first group wins).
+        """
+        from app.models.client_user import ClientUser
+        from app.models.client_vendor import ClientVendor
+
+        seen_ids = {user_id}
+
+        # --- Company colleagues ---
+        company_colleagues = []
+        if client_id:
+            colleague_rows = (
+                db.session.execute(
+                    select(User)
+                    .join(ClientUser, ClientUser.user_id == User.id)
+                    .where(
+                        and_(
+                            ClientUser.client_id == client_id,
+                            User.id != user_id,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for u in colleague_rows:
+                if u.id in seen_ids:
+                    continue
+                seen_ids.add(u.id)
+                company_colleagues.append(
+                    {
+                        "id": u.id,
+                        "name": _full_name(u),
+                        "role": _enum_value(getattr(u, "user_type", None)) or "user",
+                        "email": u.email,
+                        "phone": getattr(u, "contact_number", None),
+                    }
+                )
+
+        # --- Vendor favourite contacts ---
+        vendor_favourites = []
+        if client_id:
+            fav_rows = (
+                db.session.execute(
+                    select(User, VendorUser.vendor_user_role, Vendor.company_name)
+                    .join(VendorUser, VendorUser.user_id == User.id)
+                    .join(Vendor, Vendor.id == VendorUser.vendor_id)
+                    .join(ClientVendor, ClientVendor.vendor_id == VendorUser.vendor_id)
+                    .where(
+                        and_(
+                            ClientVendor.client_id == client_id,
+                            VendorUser.vendor_id.isnot(None),
+                        )
+                    )
+                )
+                .all()
+            )
+            for u, role, company_name in fav_rows:
+                if u.id in seen_ids:
+                    continue
+                seen_ids.add(u.id)
+                vendor_favourites.append(
+                    {
+                        "id": u.id,
+                        "name": _full_name(u),
+                        "role": f"vendor:{role or 'member'}",
+                        "email": u.email,
+                        "phone": getattr(u, "contact_number", None),
+                        "company": company_name,
+                    }
+                )
+
+        # --- Ticket contractors (name-matched) ---
+        ticket_contractors = []
+        ticket_names = (
+            db.session.execute(
+                select(Ticket.assigned_contractor)
+                .where(Ticket.assigned_contractor.isnot(None))
+                .distinct()
+            )
+            .scalars()
+            .all()
+        )
+        normalized_names = {n.strip().lower() for n in ticket_names if n and n.strip()}
+        if normalized_names:
+            contractor_rows = (
+                db.session.execute(
+                    select(User).where(
+                        and_(
+                            func.lower(
+                                func.concat(User.first_name, " ", User.last_name)
+                            ).in_(normalized_names),
+                            User.id.notin_(list(seen_ids)),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for u in contractor_rows:
+                if u.id in seen_ids:
+                    continue
+                seen_ids.add(u.id)
+                ticket_contractors.append(
+                    {
+                        "id": u.id,
+                        "name": _full_name(u),
+                        "role": "contractor",
+                        "email": u.email,
+                        "phone": getattr(u, "contact_number", None),
+                    }
+                )
+
+        return {
+            "company_colleagues": company_colleagues,
+            "vendor_favourites": vendor_favourites,
+            "ticket_contractors": ticket_contractors,
+        }
+
+    @staticmethod
+    def open_direct_chat(current_user_id, recipient_id):
+        """Open or return the global 1-on-1 chat between two users directly,
+        without requiring a work order context.
+        """
+        recipient = db.session.get(User, recipient_id)
+        if not recipient:
+            return None, "Recipient not found", 404
+        try:
+            chat, _ = ChatRepository.find_or_create(current_user_id, recipient_id)
+        except ValueError as e:
+            return None, str(e), 400
+        return chat, None, 200
+
+    @staticmethod
     def open_chat(wo_id, current_user_id, recipient_id):
         """Idempotent: returns the global 1-on-1 chat for the pair. The
         wo_id is used only to validate that the recipient is associated

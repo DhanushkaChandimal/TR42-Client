@@ -40,6 +40,28 @@ def list_contacts(user_id):
     return jsonify({"contacts": ChatService.list_contacts(user_id)}), 200
 
 
+@chat_bp.route("/messages/findable-contacts", methods=["GET"])
+@permission_required("workorders", "read")
+def get_findable_contacts(user_id):
+    from flask import g
+    client_id = g.current_client_id
+    data = ChatService.get_findable_contacts(user_id, client_id)
+    return jsonify(data), 200
+
+
+@chat_bp.route("/chats/direct", methods=["POST"])
+@permission_required("workorders", "read")
+def open_direct_chat(user_id):
+    payload = request.get_json(silent=True) or {}
+    recipient_id = payload.get("recipient_id")
+    if not recipient_id:
+        return jsonify({"message": "recipient_id is required"}), 400
+    chat, err, code = ChatService.open_direct_chat(user_id, recipient_id)
+    if err:
+        return jsonify({"message": err}), code
+    return jsonify(chat_schema.dump(chat)), code
+
+
 @chat_bp.route("/users/<contact_id>/messaging-context", methods=["GET"])
 @permission_required("workorders", "read")
 def user_messaging_context(user_id, contact_id):
