@@ -101,12 +101,14 @@ def create_app(config_name="DevelopmentConfig"):
     app.register_blueprint(fraud_bp, url_prefix="/api/fraud")
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
+    allowed_origins = ["http://localhost:5173"]
+    frontend_url = app.config.get("FRONTEND_URL")
+    if frontend_url and frontend_url not in allowed_origins:
+        allowed_origins.append(frontend_url)
+
     CORS(
         app,
-        origins=[
-            "http://localhost:5173",
-            "https://client-web-dashboard.vercel.app",
-        ],
+        origins=allowed_origins,
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     )
