@@ -101,7 +101,10 @@ def create_app(config_name="DevelopmentConfig"):
     app.register_blueprint(fraud_bp, url_prefix="/api/fraud")
     app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
-    allowed_origins = ["http://localhost:5173"]
+    allowed_origins = [
+        "http://localhost:5173",
+        "https://client-web-dashboard-682qh33pc-dhanushkas-projects-bab7974e.vercel.app",
+    ]
     frontend_url = app.config.get("FRONTEND_URL")
     if frontend_url and frontend_url not in allowed_origins:
         allowed_origins.append(frontend_url)
