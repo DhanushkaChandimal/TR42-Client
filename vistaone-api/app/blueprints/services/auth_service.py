@@ -150,9 +150,11 @@ class LoginService:
 
             s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
             token = s.dumps(user.email, salt="email-verify")
+            email_sent = True
             try:
                 send_verification_email(user, token)
             except Exception as mail_err:
+                email_sent = False
                 logger.warning(f"Verification email failed (non-fatal): {mail_err}")
 
             db.session.commit()
@@ -161,7 +163,7 @@ class LoginService:
             logger.error(f"register_user failed, session rolled back: {exc}", exc_info=True)
             raise
 
-        return user, 201
+        return {"data": user, "email_sent": email_sent}, 201
 
     @staticmethod
     def register_client(client_data):
@@ -239,12 +241,14 @@ class LoginService:
 
         s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
         token = s.dumps(admin_user.email, salt="email-verify")
+        email_sent = True
         try:
             send_verification_email(admin_user, token)
         except Exception:
+            email_sent = False
             logger.error(f"Verification email failed for {admin_user.email}")
 
-        return client, 201
+        return {"data": client, "email_sent": email_sent}, 201
 
     @staticmethod
     def verify_email(token):

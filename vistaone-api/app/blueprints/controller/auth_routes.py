@@ -84,8 +84,12 @@ def register_user():
     result, status = LoginService.register_user(user_data)
     if status != 201:
         return jsonify(result), status
-    user = result
-    return jsonify({"message": "User registered successfully", "user_id": user.id}), 201
+    user = result["data"]
+    if result["email_sent"]:
+        message = "User registered successfully. Please check your email to verify your account."
+    else:
+        message = "Your account has been created. We were unable to send a verification email. Please contact your administrator."
+    return jsonify({"message": message, "user_id": user.id}), 201
 
 
 @users_bp.route("/verify-email", methods=["GET"])

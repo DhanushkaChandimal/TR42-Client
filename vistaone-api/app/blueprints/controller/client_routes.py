@@ -35,8 +35,12 @@ def register_client():
     result, status = LoginService.register_client(client_data)
     if status != 201:
         return jsonify(result), status
-    client = result
-    return jsonify({"message": "Client registered successfully", "client_id": client.id}), 201
+    client = result["data"]
+    if result["email_sent"]:
+        message = "Client registered successfully. Please check your email to verify your account."
+    else:
+        message = "Client registered successfully. We were unable to send a verification email. Please contact your administrator."
+    return jsonify({"message": message, "client_id": client.id}), 201
 
 
 @clients_bp.route("/settings", methods=["GET"])
