@@ -148,10 +148,10 @@ class LoginService:
                 db.session.add(client_user_rec)
                 db.session.flush()
 
-            s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-            token = s.dumps(user.email, salt="email-verify")
             email_sent = True
             try:
+                s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+                token = s.dumps(user.email, salt="email-verify")
                 send_verification_email(user, token)
             except Exception as mail_err:
                 email_sent = False
@@ -239,10 +239,10 @@ class LoginService:
             logger.error(f"register_client failed, session rolled back: {exc}", exc_info=True)
             raise
 
-        s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-        token = s.dumps(admin_user.email, salt="email-verify")
         email_sent = True
         try:
+            s = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+            token = s.dumps(admin_user.email, salt="email-verify")
             send_verification_email(admin_user, token)
         except Exception:
             email_sent = False

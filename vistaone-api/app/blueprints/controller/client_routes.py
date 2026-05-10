@@ -32,7 +32,11 @@ def register_client():
         client_data = register_client_schema.load(client_data)
     except ValidationError as e:
         return jsonify(e.messages), 400
-    result, status = LoginService.register_client(client_data)
+    try:
+        result, status = LoginService.register_client(client_data)
+    except Exception:
+        logger.error("Unhandled error in register_client", exc_info=True)
+        return jsonify({"message": "An error occurred during registration. Please try again."}), 500
     if status != 201:
         return jsonify(result), status
     client = result["data"]
