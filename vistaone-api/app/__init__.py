@@ -104,6 +104,7 @@ def create_app(config_name="DevelopmentConfig"):
     allowed_origins = [
         "http://localhost:5173",
         "https://client-web-dashboard-682qh33pc-dhanushkas-projects-bab7974e.vercel.app",
+        "https://client-web-dashboard.vercel.app",
     ]
     frontend_url = app.config.get("FRONTEND_URL")
     if frontend_url and frontend_url not in allowed_origins:
