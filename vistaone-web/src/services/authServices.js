@@ -33,85 +33,70 @@ async function handleResponse(res) {
 
 export const authService = {
     login: async ({ identifier, password }) => {
-        try {
-            const res = await fetch(LOGIN_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ identifier, password }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.message || 'Invalid email or password.');
-            return data;
-        } catch (err) {
-            if (err instanceof TypeError) throw new Error('Unable to reach server. Please try again later.');
-            throw err;
-        }
+        const res = await fetch(LOGIN_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.message || 'Invalid email or password.');
+        return data;
     },
 
     register: async (formData) => {
-        try {
-            const address = {
-                street: formData.street || "",
-                city: formData.city || "",
-                state: formData.state || "",
-                zip: formData.zip || "",
-                country: formData.country || "",
-            };
-            const payload = {};
-            Object.entries(formData).forEach(([key, value]) => {
-                if (value !== null && value !== undefined && !['confirmPassword', 'street', 'city', 'state', 'zip', 'country'].includes(key)) {
-                    payload[key] = value;
-                }
-            });
-            payload.address = address;
-            const res = await fetch(REGISTER_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            return await handleResponse(res);
-        } catch (err) {
-            if (err instanceof TypeError) throw new Error('Unable to reach server. Please try again later.');
-            throw err;
-        }
+        const address = {
+            street: formData.street || "",
+            city: formData.city || "",
+            state: formData.state || "",
+            zip: formData.zip || "",
+            country: formData.country || "",
+        };
+        const payload = {};
+        Object.entries(formData).forEach(([key, value]) => {
+            if (value !== null && value !== undefined && !['confirmPassword', 'street', 'city', 'state', 'zip', 'country'].includes(key)) {
+                payload[key] = value;
+            }
+        });
+        payload.address = address;
+        const res = await fetch(REGISTER_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        return await handleResponse(res);
     },
 
     registerClient: async ({ company, adminUser }) => {
-        try {
-            const address = {
-                street: company.street || "",
-                city: company.city || "",
-                state: company.state || "",
-                zip: company.zip || "",
-                country: company.country || "",
-            };
-            const payload = {
-                client_name: company.client_name,
-                client_code: company.client_code,
-                primary_contact_name: company.primary_contact_name,
-                company_email: company.company_email,
-                company_phone: company.company_phone,
-                address,
-                admin_user: {
-                    username: adminUser.username,
-                    email: adminUser.email,
-                    password: adminUser.password,
-                    first_name: adminUser.first_name,
-                    last_name: adminUser.last_name,
-                    contact_number: adminUser.contact_number,
-                },
-            };
-            if (company.company_web_address) payload.company_web_address = company.company_web_address;
-            const res = await fetch(REGISTER_CLIENT_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            return await handleResponse(res);
-        } catch (err) {
-            if (err instanceof TypeError) throw new Error('Unable to reach server. Please try again later.');
-            throw err;
-        }
+        const address = {
+            street: company.street || "",
+            city: company.city || "",
+            state: company.state || "",
+            zip: company.zip || "",
+            country: company.country || "",
+        };
+        const payload = {
+            client_name: company.client_name,
+            client_code: company.client_code,
+            primary_contact_name: company.primary_contact_name,
+            company_email: company.company_email,
+            company_phone: company.company_phone,
+            address,
+            admin_user: {
+                username: adminUser.username,
+                email: adminUser.email,
+                password: adminUser.password,
+                first_name: adminUser.first_name,
+                last_name: adminUser.last_name,
+                contact_number: adminUser.contact_number,
+            },
+        };
+        if (company.company_web_address) payload.company_web_address = company.company_web_address;
+        const res = await fetch(REGISTER_CLIENT_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        return await handleResponse(res);
     },
 
     getMe: async () => {
@@ -126,8 +111,7 @@ export const authService = {
             if (!res.ok) return { success: false, message: payload?.message || 'Verification failed.' };
             return { success: true, message: payload.message };
         } catch (err) {
-            if (err instanceof Error) return { success: false, message: err.message };
-            return { success: false, message: 'Unable to reach server. Please try again later.' };
+            return { success: false, message: err?.message || 'Verification failed. Please try again.' };
         }
     },
 
