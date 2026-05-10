@@ -1,4 +1,5 @@
 import { API_BASE } from "../config/api";
+import { safeFetch } from "./apiClient";
 
 const CLIENTS_ENDPOINT = `${API_BASE}/clients`;
 const LOGIN_ENDPOINT = `${API_BASE}/users/login`;
@@ -33,7 +34,7 @@ async function handleResponse(res) {
 
 export const authService = {
     login: async ({ identifier, password }) => {
-        const res = await fetch(LOGIN_ENDPOINT, {
+        const res = await safeFetch(LOGIN_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ identifier, password }),
@@ -58,7 +59,7 @@ export const authService = {
             }
         });
         payload.address = address;
-        const res = await fetch(REGISTER_ENDPOINT, {
+        const res = await safeFetch(REGISTER_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -91,7 +92,7 @@ export const authService = {
             },
         };
         if (company.company_web_address) payload.company_web_address = company.company_web_address;
-        const res = await fetch(REGISTER_CLIENT_ENDPOINT, {
+        const res = await safeFetch(REGISTER_CLIENT_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -100,13 +101,13 @@ export const authService = {
     },
 
     getMe: async () => {
-        const res = await fetch(ME_ENDPOINT, { headers: authHeader() });
+        const res = await safeFetch(ME_ENDPOINT, { headers: authHeader() });
         return handleResponse(res);
     },
 
     verifyEmail: async (token) => {
         try {
-            const res = await fetch(`${VERIFY_EMAIL_ENDPOINT}?token=${token}`);
+            const res = await safeFetch(`${VERIFY_EMAIL_ENDPOINT}?token=${token}`);
             const payload = await res.json().catch(() => ({}));
             if (!res.ok) return { success: false, message: payload?.message || 'Verification failed.' };
             return { success: true, message: payload.message };
@@ -117,17 +118,17 @@ export const authService = {
 
     // ── Admin: User Management ───────────────────────────────────────────────
     getUsers: async () => {
-        const res = await fetch(ADMIN_USERS_ENDPOINT, { headers: authHeader() });
+        const res = await safeFetch(ADMIN_USERS_ENDPOINT, { headers: authHeader() });
         return handleResponse(res);
     },
 
     getPendingUsers: async () => {
-        const res = await fetch(`${ADMIN_USERS_ENDPOINT}/pending`, { headers: authHeader() });
+        const res = await safeFetch(`${ADMIN_USERS_ENDPOINT}/pending`, { headers: authHeader() });
         return handleResponse(res);
     },
 
     approveUser: async (userId) => {
-        const res = await fetch(`${ADMIN_USERS_ENDPOINT}/${userId}/approve`, {
+        const res = await safeFetch(`${ADMIN_USERS_ENDPOINT}/${userId}/approve`, {
             method: 'POST',
             headers: authHeader(),
         });
@@ -135,7 +136,7 @@ export const authService = {
     },
 
     rejectUser: async (userId) => {
-        const res = await fetch(`${ADMIN_USERS_ENDPOINT}/${userId}/reject`, {
+        const res = await safeFetch(`${ADMIN_USERS_ENDPOINT}/${userId}/reject`, {
             method: 'POST',
             headers: authHeader(),
         });
@@ -143,7 +144,7 @@ export const authService = {
     },
 
     updateUser: async (userId, data) => {
-        const res = await fetch(`${ADMIN_USERS_ENDPOINT}/${userId}`, {
+        const res = await safeFetch(`${ADMIN_USERS_ENDPOINT}/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify(data),
@@ -152,7 +153,7 @@ export const authService = {
     },
 
     setUserRoles: async (userId, roles) => {
-        const res = await fetch(`${ADMIN_USERS_ENDPOINT}/${userId}/roles`, {
+        const res = await safeFetch(`${ADMIN_USERS_ENDPOINT}/${userId}/roles`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify({ roles }),
@@ -161,7 +162,7 @@ export const authService = {
     },
 
     transferMaster: async (targetUserId) => {
-        const res = await fetch(MASTER_TRANSFER_ENDPOINT, {
+        const res = await safeFetch(MASTER_TRANSFER_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify({ target_user_id: targetUserId }),
@@ -171,12 +172,12 @@ export const authService = {
 
     // ── Admin: Roles ─────────────────────────────────────────────────────────
     getRoles: async () => {
-        const res = await fetch(ADMIN_ROLES_ENDPOINT, { headers: authHeader() });
+        const res = await safeFetch(ADMIN_ROLES_ENDPOINT, { headers: authHeader() });
         return handleResponse(res);
     },
 
     createRole: async ({ name, description }) => {
-        const res = await fetch(ADMIN_ROLES_ENDPOINT, {
+        const res = await safeFetch(ADMIN_ROLES_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify({ name, description }),
@@ -185,7 +186,7 @@ export const authService = {
     },
 
     updateRole: async (roleId, { name, description }) => {
-        const res = await fetch(`${ADMIN_ROLES_ENDPOINT}/${roleId}`, {
+        const res = await safeFetch(`${ADMIN_ROLES_ENDPOINT}/${roleId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify({ name, description }),
@@ -194,7 +195,7 @@ export const authService = {
     },
 
     deleteRole: async (roleId, migrateToRoleId = null) => {
-        const res = await fetch(`${ADMIN_ROLES_ENDPOINT}/${roleId}`, {
+        const res = await safeFetch(`${ADMIN_ROLES_ENDPOINT}/${roleId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify(migrateToRoleId ? { migrate_to_role_id: migrateToRoleId } : {}),
@@ -203,12 +204,12 @@ export const authService = {
     },
 
     getRolePermissions: async (roleId) => {
-        const res = await fetch(`${ADMIN_ROLES_ENDPOINT}/${roleId}/permissions`, { headers: authHeader() });
+        const res = await safeFetch(`${ADMIN_ROLES_ENDPOINT}/${roleId}/permissions`, { headers: authHeader() });
         return handleResponse(res);
     },
 
     setRolePermissions: async (roleId, permissions) => {
-        const res = await fetch(`${ADMIN_ROLES_ENDPOINT}/${roleId}/permissions`, {
+        const res = await safeFetch(`${ADMIN_ROLES_ENDPOINT}/${roleId}/permissions`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify({ permissions }),
@@ -218,18 +219,18 @@ export const authService = {
 
     // ── Public: Client list (for registration dropdown) ──────────────────────
     getClients: async () => {
-        const res = await fetch(CLIENTS_ENDPOINT);
+        const res = await safeFetch(CLIENTS_ENDPOINT);
         return handleResponse(res);
     },
 
     // ── Client Settings ───────────────────────────────────────────────────────
     getClientSettings: async () => {
-        const res = await fetch(CLIENT_SETTINGS_ENDPOINT, { headers: authHeader() });
+        const res = await safeFetch(CLIENT_SETTINGS_ENDPOINT, { headers: authHeader() });
         return handleResponse(res);
     },
 
     updateClientSettings: async (settings) => {
-        const res = await fetch(CLIENT_SETTINGS_ENDPOINT, {
+        const res = await safeFetch(CLIENT_SETTINGS_ENDPOINT, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify(settings),
@@ -238,12 +239,12 @@ export const authService = {
     },
 
     getProfile: async () => {
-        const res = await fetch(PROFILE_ENDPOINT, { headers: authHeader() });
+        const res = await safeFetch(PROFILE_ENDPOINT, { headers: authHeader() });
         return handleResponse(res);
     },
 
     updateProfile: async (data) => {
-        const res = await fetch(PROFILE_ENDPOINT, {
+        const res = await safeFetch(PROFILE_ENDPOINT, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify(data),
@@ -252,7 +253,7 @@ export const authService = {
     },
 
     changePassword: async (data) => {
-        const res = await fetch(`${PROFILE_ENDPOINT}change-password`, {
+        const res = await safeFetch(`${PROFILE_ENDPOINT}change-password`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeader() },
             body: JSON.stringify(data),
