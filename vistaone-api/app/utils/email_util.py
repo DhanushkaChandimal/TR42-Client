@@ -1,6 +1,7 @@
 from flask_mail import Message
 from app.extensions import mail
 from flask import current_app
+import socket
 
 
 def send_verification_email(user, token):
@@ -22,4 +23,9 @@ def send_verification_email(user, token):
     If you did not create an account, please ignore this email.
     """
     msg = Message(subject=subject, recipients=[email], body=body)
-    mail.send(msg)
+    old_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(10)
+    try:
+        mail.send(msg)
+    finally:
+        socket.setdefaulttimeout(old_timeout)
